@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 520" role="img" aria-label="4G Bulb Indoor CCTV Camera">
+  <rect width="640" height="520" rx="44" fill="#f7fbfd"/>
+  <ellipse cx="320" cy="438" rx="148" ry="28" fill="#d9e7ef"/>
+  <path d="M258 76h124l-13 78H271L258 76Z" fill="#eaf3f8" stroke="#d7e6ee" stroke-width="10"/>
+  <path d="M218 178c0-52 42-94 94-94h16c52 0 94 42 94 94v120c0 56-46 102-102 102s-102-46-102-102V178Z" fill="#fff" stroke="#d7e6ee" stroke-width="10"/>
+  <rect x="262" y="180" width="116" height="128" rx="58" fill="#101827"/>
+  <circle cx="320" cy="244" r="40" fill="#020617"/>
+  <circle cx="320" cy="244" r="18" fill="#00aeea"/>
+  <path d="M240 206c-38 24-62 65-62 111M400 206c38 24 62 65 62 111" stroke="#0ea5e9" stroke-opacity=".35" stroke-width="12" stroke-linecap="round"/>
+  <path d="M274 402h92l16 52H258l16-52Z" fill="#fff" stroke="#d7e6ee" stroke-width="10"/>
+</svg>

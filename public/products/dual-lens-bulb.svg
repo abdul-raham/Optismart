@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 520" role="img" aria-label="Dual Lens Bulb CCTV Camera">
+  <rect width="640" height="520" rx="44" fill="#f7fbfd"/>
+  <ellipse cx="320" cy="435" rx="150" ry="28" fill="#d9e7ef"/>
+  <path d="M252 82h136l-16 88H268L252 82Z" fill="#eaf3f8" stroke="#d7e6ee" stroke-width="10"/>
+  <path d="M222 181c0-37 30-67 67-67h62c37 0 67 30 67 67v132c0 54-44 98-98 98s-98-44-98-98V181Z" fill="#fff" stroke="#d7e6ee" stroke-width="10"/>
+  <rect x="258" y="184" width="124" height="166" rx="62" fill="#101827"/>
+  <circle cx="320" cy="232" r="35" fill="#020617"/>
+  <circle cx="320" cy="232" r="15" fill="#00aeea"/>
+  <circle cx="320" cy="302" r="35" fill="#020617"/>
+  <circle cx="320" cy="302" r="15" fill="#00aeea"/>
+  <path d="M271 411h98l14 44H257l14-44Z" fill="#fff" stroke="#d7e6ee" stroke-width="10"/>
+</svg>

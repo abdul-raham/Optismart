@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 520" role="img" aria-label="Mini CCTV Camera">
+  <rect width="640" height="520" rx="44" fill="#f7fbfd"/>
+  <ellipse cx="320" cy="420" rx="152" ry="28" fill="#d9e7ef"/>
+  <rect x="202" y="156" width="236" height="178" rx="64" fill="#fff" stroke="#d7e6ee" stroke-width="10"/>
+  <rect x="244" y="191" width="152" height="108" rx="54" fill="#101827"/>
+  <circle cx="320" cy="245" r="47" fill="#020617"/>
+  <circle cx="320" cy="245" r="21" fill="#00aeea"/>
+  <circle cx="345" cy="220" r="8" fill="#e8fbff"/>
+  <path d="M254 334h132l21 66H233l21-66Z" fill="#fff" stroke="#d7e6ee" stroke-width="10"/>
+  <rect x="215" y="396" width="210" height="42" rx="21" fill="#fff" stroke="#d7e6ee" stroke-width="10"/>
+</svg>

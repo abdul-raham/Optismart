@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 520" role="img" aria-label="Indoor 4G Dual Lens CCTV Camera">
+  <rect width="640" height="520" rx="44" fill="#f7fbfd"/>
+  <ellipse cx="320" cy="436" rx="158" ry="28" fill="#d9e7ef"/>
+  <path d="M230 145c0-45 36-81 81-81h18c45 0 81 36 81 81v170c0 50-40 90-90 90s-90-40-90-90V145Z" fill="#fff" stroke="#d7e6ee" stroke-width="10"/>
+  <rect x="264" y="126" width="112" height="214" rx="56" fill="#101827"/>
+  <circle cx="320" cy="190" r="35" fill="#020617"/>
+  <circle cx="320" cy="190" r="15" fill="#00aeea"/>
+  <circle cx="320" cy="278" r="35" fill="#020617"/>
+  <circle cx="320" cy="278" r="15" fill="#00aeea"/>
+  <path d="M216 202c-30 21-48 55-48 92M424 202c30 21 48 55 48 92" stroke="#0ea5e9" stroke-opacity=".35" stroke-width="12" stroke-linecap="round"/>
+  <path d="M273 405h94l16 50H257l16-50Z" fill="#fff" stroke="#d7e6ee" stroke-width="10"/>
+</svg>

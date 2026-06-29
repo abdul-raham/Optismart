@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 520" role="img" aria-label="4G Solar PTZ Camera">
+  <rect width="640" height="520" rx="44" fill="#f7fbfd"/>
+  <ellipse cx="330" cy="432" rx="190" ry="30" fill="#d9e7ef"/>
+  <rect x="138" y="70" width="246" height="132" rx="18" fill="#172033" transform="rotate(-10 261 136)"/>
+  <path d="M166 103h210M158 145h210M151 187h210" stroke="#38bdf8" stroke-opacity=".45" stroke-width="7"/>
+  <path d="M382 143h52c28 0 51 23 51 51v102c0 65-53 118-118 118h-62c-65 0-118-53-118-118v-42c0-61 50-111 111-111h84Z" fill="#fff" stroke="#d7e6ee" stroke-width="10"/>
+  <path d="M256 250c0-42 34-76 76-76h70c42 0 76 34 76 76s-34 76-76 76h-70c-42 0-76-34-76-76Z" fill="#101827"/>
+  <circle cx="368" cy="250" r="46" fill="#020617"/>
+  <circle cx="368" cy="250" r="20" fill="#00aeea"/>
+  <path d="M230 180l-38-46M470 174l42-42" stroke="#94a3b8" stroke-width="12" stroke-linecap="round"/>
+</svg>

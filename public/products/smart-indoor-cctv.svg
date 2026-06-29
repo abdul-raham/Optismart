@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 520" role="img" aria-label="Smart Indoor CCTV Camera">
+  <rect width="640" height="520" rx="44" fill="#f7fbfd"/>
+  <ellipse cx="320" cy="430" rx="164" ry="28" fill="#d9e7ef"/>
+  <path d="M236 168c0-58 47-105 105-105h22c58 0 105 47 105 105v112c0 58-47 105-105 105h-22c-58 0-105-47-105-105V168Z" fill="#fff" stroke="#d7e6ee" stroke-width="10"/>
+  <path d="M272 169c0-38 31-69 69-69h22c38 0 69 31 69 69v48c0 38-31 69-69 69h-22c-38 0-69-31-69-69v-48Z" fill="#101827"/>
+  <circle cx="352" cy="194" r="50" fill="#030712"/>
+  <circle cx="352" cy="194" r="23" fill="#0ea5e9"/>
+  <circle cx="369" cy="176" r="9" fill="#e8fbff"/>
+  <path d="M296 381h112l20 54H276l20-54Z" fill="#fff" stroke="#d7e6ee" stroke-width="10"/>
+  <rect x="238" y="429" width="228" height="42" rx="21" fill="#fff" stroke="#d7e6ee" stroke-width="10"/>
+</svg>
