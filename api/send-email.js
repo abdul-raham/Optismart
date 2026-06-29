@@ -35,55 +35,98 @@ function safeUrl(value) {
 }
 
 function button(href, label) {
-  return `<div style="text-align:center;margin:32px 0">
-    <a href="${safeUrl(href)}" style="display:inline-block;padding:14px 26px;background:#0A74FF;color:#fff;border-radius:10px;text-decoration:none;font-weight:700">${escapeHtml(label)}</a>
-  </div>`
+  return `<table role="presentation" border="0" cellpadding="0" cellspacing="0" style="margin: 32px auto;">
+    <tr>
+      <td align="center" bgcolor="#0A74FF" style="border-radius: 99px; box-shadow: 0 4px 14px 0 rgba(10,116,255,0.39);">
+        <a href="${safeUrl(href)}" style="font-size: 14px; font-weight: 700; text-decoration: none; color: #ffffff; padding: 14px 32px; display: inline-block; border-radius: 99px;">${escapeHtml(label)}</a>
+      </td>
+    </tr>
+  </table>`
 }
 
-function layout(content) {
+function layout(title, content) {
   return `<!doctype html>
-  <html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
-  <body style="margin:0;background:#f1f5f9;font-family:Arial,sans-serif;color:#0f172a">
-    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="padding:32px 16px">
-      <tr><td align="center">
-        <table width="600" cellpadding="0" cellspacing="0" role="presentation" style="max-width:600px;background:#fff;border-radius:16px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,0.05)">
-          <tr><td style="padding:28px 32px;background:#0A74FF;color:#fff;text-align:center"><strong style="font-size:24px">${escapeHtml(fromName)}</strong></td></tr>
-          <tr><td style="padding:36px 32px;line-height:1.6">${content}</td></tr>
-          <tr><td style="padding:24px 32px;background:#f8fafc;text-align:center;color:#64748b;font-size:12px">Need help? <a href="mailto:${escapeHtml(supportEmail)}" style="color:#0A74FF">${escapeHtml(supportEmail)}</a><br>&copy; ${new Date().getFullYear()} ${escapeHtml(fromName)}</td></tr>
-        </table>
-      </td></tr>
+  <html>
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <style>
+      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; background-color: #f8fafc; }
+      table { border-collapse: collapse; }
+      .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 24px; overflow: hidden; box-shadow: 0 10px 40px -10px rgba(0,0,0,0.08); margin-top: 40px; margin-bottom: 40px; }
+      .header { background: linear-gradient(135deg, #0A74FF 0%, #00d2ff 100%); padding: 48px 32px; text-align: center; }
+      .header-title { color: #ffffff; font-size: 28px; font-weight: 900; letter-spacing: -0.5px; margin: 0; text-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+      .header-subtitle { color: rgba(255,255,255,0.8); font-size: 14px; text-transform: uppercase; letter-spacing: 2px; margin-top: 8px; font-weight: 700; }
+      .content { padding: 48px 40px; color: #334155; line-height: 1.7; font-size: 16px; }
+      .content h2 { color: #0f172a; font-size: 22px; font-weight: 800; margin-top: 0; margin-bottom: 24px; }
+      .footer { background: #f1f5f9; padding: 32px; text-align: center; font-size: 13px; color: #64748b; border-top: 1px solid #e2e8f0; }
+      .footer a { color: #0A74FF; text-decoration: none; font-weight: 600; }
+    </style>
+  </head>
+  <body>
+    <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="background-color: #f8fafc;">
+      <tr>
+        <td align="center" style="padding: 20px;">
+          <div class="container">
+            <div class="header">
+              <div class="header-subtitle">${escapeHtml(title)}</div>
+              <h1 class="header-title">${escapeHtml(fromName)}</h1>
+            </div>
+            <div class="content">
+              ${content}
+            </div>
+            <div class="footer">
+              Questions? We're here to help. <br/>
+              Contact us at <a href="mailto:${escapeHtml(supportEmail)}">${escapeHtml(supportEmail)}</a><br><br>
+              &copy; ${new Date().getFullYear()} ${escapeHtml(fromName)}. All rights reserved.
+            </div>
+          </div>
+        </td>
+      </tr>
     </table>
-  </body></html>`
+  </body>
+  </html>`
 }
 
 const templates = {
   welcome: ({ recipientEmail, recipientName }) => ({
     to: recipientEmail,
     subject: `Welcome to ${fromName}`,
-    html: layout(`
-      <h2 style="margin-top:0">Welcome, ${escapeHtml(recipientName)}!</h2>
-      <p>Your portal account is ready. You can now log in to ${escapeHtml(fromName)}.</p>
-      ${button(`${appUrl}/login`, 'Open Portal')}
+    html: layout('Welcome Aboard', `
+      <h2>Hello ${escapeHtml(recipientName)},</h2>
+      <p>Your portal account has been successfully created and is ready to use. We are thrilled to have you join the <strong>${escapeHtml(fromName)}</strong> ecosystem.</p>
+      <p>Click the button below to access your dashboard, manage operations, and grow your security business.</p>
+      ${button(`${appUrl}/login`, 'Open Your Portal')}
     `),
   }),
 
   new_lead: ({ dsaEmail, dsaName, customerName }) => ({
     to: dsaEmail,
-    subject: `New Lead Added: ${customerName}`,
-    html: layout(`
-      <h2 style="margin-top:0">Lead Captured</h2>
-      <p>Hello ${escapeHtml(dsaName)}, you have successfully added <strong>${escapeHtml(customerName)}</strong> to your OptiSmart pipeline.</p>
-      ${button(`${appUrl}/dsa/leads`, 'View Leads')}
+    subject: `New Lead Captured: ${customerName}`,
+    html: layout('New Pipeline Activity', `
+      <h2>Great job, ${escapeHtml(dsaName)}! 🎉</h2>
+      <p>You have successfully added a new lead to your pipeline: <strong>${escapeHtml(customerName)}</strong>.</p>
+      <p>Consistent follow-ups are the key to high conversion rates. Log in now to schedule a reminder or update the lead status.</p>
+      ${button(`${appUrl}/app/leads`, 'Manage Pipeline')}
     `),
   }),
 
   new_order: ({ recipientEmail, orderNumber, customerName }) => ({
     to: recipientEmail,
-    subject: `New Order Created - ${orderNumber}`,
-    html: layout(`
-      <h2 style="margin-top:0">Order Confirmed</h2>
-      <p>A new order (<strong>${escapeHtml(orderNumber)}</strong>) has been successfully created for ${escapeHtml(customerName)}.</p>
-      ${button(`${appUrl}/dsa/orders`, 'View Orders')}
+    subject: `Order Confirmation - ${orderNumber}`,
+    html: layout('Order Confirmed', `
+      <h2>Order Successfully Placed</h2>
+      <p>A new order has been generated and is now in processing.</p>
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin: 24px 0;">
+        <p style="margin: 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 700; letter-spacing: 1px;">Order Reference</p>
+        <p style="margin: 4px 0 0 0; font-size: 20px; font-weight: 800; color: #0f172a;">${escapeHtml(orderNumber)}</p>
+        <div style="margin-top: 16px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
+          <p style="margin: 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 700; letter-spacing: 1px;">Customer</p>
+          <p style="margin: 4px 0 0 0; font-size: 16px; font-weight: 600; color: #334155;">${escapeHtml(customerName)}</p>
+        </div>
+      </div>
+      <p>You can track the fulfillment status and assign an installer directly from the portal.</p>
+      ${button(`${appUrl}/app/orders`, 'Track Order')}
     `),
   }),
 }
@@ -110,13 +153,13 @@ export default async function handler(req, res) {
   try {
     const { type, data } = req.body || {}
     const createEmail = templates[type]
-    if (!createEmail) return res.status(400).json({ error: `Unknown email type: ${type}` })
+    if (!createEmail) return res.status(400).json({ error: \`Unknown email type: \${type}\` })
 
     const email = createEmail(data || {})
     if (!email.to) return res.status(400).json({ error: 'Recipient email is required' })
 
     await transporter.sendMail({
-      from: `"${String(fromName).replace(/["\r\n]/g, '')}" <${gmailUser}>`,
+      from: \`"\${String(fromName).replace(/["\\r\\n]/g, '')}" <\${gmailUser}>\`,
       ...email,
     })
 
@@ -126,5 +169,3 @@ export default async function handler(req, res) {
     return res.status(500).json({ success: false, error: error.message })
   }
 }
-
-export { escapeHtml, layout, templates }

@@ -4,34 +4,64 @@ import optismartLogo from '@/assets/optismart-logo.png'
 
 export function FullPageLoader() {
   return (
-    <div className="fixed inset-0 bg-white z-[9999] flex flex-col items-center justify-center">
-      {/* Background decoration */}
-      <div className="absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-gradient-to-br from-brand-500/5 via-cyan-500/5 to-transparent backdrop-blur-[2px]" />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-brand-400/10 blur-[80px] rounded-full pointer-events-none" />
-      </div>
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center">
+      {/* Premium Glassmorphism Background */}
+      <motion.div 
+        initial={{ opacity: 0 }} 
+        animate={{ opacity: 1 }} 
+        exit={{ opacity: 0 }} 
+        className="absolute inset-0 bg-surface-900/10 backdrop-blur-md" 
+      />
 
+      {/* Subtle Glows */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[300px] h-[300px] bg-brand-400/20 blur-[100px] rounded-full pointer-events-none" />
+
+      {/* Loader Container */}
       <motion.div
-        animate={{ scale: [1, 1.05, 1], opacity: [0.8, 1, 0.8] }}
-        transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-        className="relative z-10 mb-8"
+        initial={{ opacity: 0, scale: 0.9 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.9 }}
+        className="relative z-10 flex flex-col items-center"
       >
-        <img src={optismartLogo} alt="OptiSmart" className="h-12 sm:h-16 w-auto drop-shadow-xl" />
-      </motion.div>
-      
-      <div className="relative z-10 flex flex-col items-center">
-        <h2 className="text-lg font-bold text-surface-900 tracking-tight mb-4">Loading Portal</h2>
-        <div className="flex gap-2">
-          {[0, 1, 2].map((i) => (
-            <motion.div
-              key={i}
-              animate={{ y: [0, -8, 0], opacity: [0.2, 1, 0.2], scale: [1, 1.2, 1] }}
-              transition={{ duration: 1.2, repeat: Infinity, delay: i * 0.2, ease: 'easeInOut' }}
-              className="w-2.5 h-2.5 rounded-full bg-brand-500 shadow-sm"
+        <div className="relative flex items-center justify-center w-24 h-24 mb-6">
+          {/* Pulsing Outer Rings */}
+          <motion.div
+            animate={{ scale: [1, 1.5], opacity: [0.5, 0] }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: 'easeOut' }}
+            className="absolute inset-0 rounded-full border-2 border-brand-500"
+          />
+          <motion.div
+            animate={{ scale: [1, 1.5], opacity: [0.5, 0] }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: 'easeOut', delay: 0.5 }}
+            className="absolute inset-0 rounded-full border-2 border-brand-400"
+          />
+          
+          {/* Inner Glass Card holding logo */}
+          <div className="relative z-10 bg-white/80 backdrop-blur-xl rounded-full w-20 h-20 p-4 shadow-xl border border-white/50 flex items-center justify-center">
+            <motion.img 
+              src={optismartLogo} 
+              alt="OptiSmart" 
+              className="w-full h-auto drop-shadow-md"
+              animate={{ opacity: [0.8, 1, 0.8] }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
             />
-          ))}
+          </div>
         </div>
-      </div>
+        
+        {/* Subtle Loading Text */}
+        <div className="flex flex-col items-center gap-1.5">
+          <motion.div
+            className="h-1 w-12 bg-brand-100 rounded-full overflow-hidden"
+          >
+            <motion.div
+              className="h-full bg-brand-500 rounded-full"
+              animate={{ x: ['-100%', '100%'] }}
+              transition={{ duration: 1, repeat: Infinity, ease: 'easeInOut' }}
+            />
+          </motion.div>
+          <span className="text-xs font-bold text-brand-700 tracking-[0.2em] uppercase">Loading</span>
+        </div>
+      </motion.div>
     </div>
   )
 }
@@ -61,7 +91,7 @@ export function SplashLoader({ onDone }: { onDone: () => void }) {
 
       {/* Logo SVG — drawing itself */}
       <motion.div
-        className="relative z-10 w-28 h-28 sm:w-40 sm:h-40"
+        className="relative z-10 w-36 h-36 sm:w-52 sm:h-52"
         initial={{ opacity: 0, scale: 0.7 }}
         animate={{ opacity: 1, scale: 1 }}
         transition={{ duration: 0.7, ease: [0.22, 1, 0.36, 1] }}

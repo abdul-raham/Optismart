@@ -141,7 +141,12 @@ export function LandingPage() {
                   transition={{ duration: 0.8, delay: 0.4, ease: [0.22, 1, 0.36, 1] }}
                   className="relative z-10 w-52 h-52 rounded-3xl bg-white ring-1 ring-surface-200 shadow-card-xl flex items-center justify-center p-6"
                 >
-                  <img src={optismartCatalogProducts[1].image_url} alt={optismartCatalogProducts[1].name} className="w-full h-full object-contain" />
+                  <img 
+                    src={optismartCatalogProducts[1].image_url} 
+                    alt={optismartCatalogProducts[1].name} 
+                    className="w-full h-full object-contain" 
+                    fetchpriority="high"
+                  />
                 </motion.div>
 
                 {/* Top-left floating card */}
@@ -152,7 +157,7 @@ export function LandingPage() {
                   className="absolute top-4 left-4 w-40 rounded-2xl bg-white ring-1 ring-surface-200 shadow-card-lg p-4"
                 >
                   <div className="w-10 h-10 rounded-xl bg-surface-50 flex items-center justify-center mb-2">
-                    <img src={optismartCatalogProducts[0].image_url} alt="" className="w-8 h-8 object-contain" />
+                    <img src={optismartCatalogProducts[0].image_url} alt="" className="w-8 h-8 object-contain" fetchpriority="high" />
                   </div>
                   <p className="text-xs font-black text-surface-800 leading-tight">{optismartCatalogProducts[0].name}</p>
                   <p className="text-xs font-bold text-brand-600 mt-1">{formatCurrency(optismartCatalogProducts[0].retail_price)}</p>
@@ -166,7 +171,7 @@ export function LandingPage() {
                   className="absolute top-8 right-0 w-40 rounded-2xl bg-white ring-1 ring-surface-200 shadow-card-lg p-4"
                 >
                   <div className="w-10 h-10 rounded-xl bg-surface-50 flex items-center justify-center mb-2">
-                    <img src={optismartCatalogProducts[2].image_url} alt="" className="w-8 h-8 object-contain" />
+                    <img src={optismartCatalogProducts[2].image_url} alt="" className="w-8 h-8 object-contain" fetchpriority="high" />
                   </div>
                   <p className="text-xs font-black text-surface-800 leading-tight">{optismartCatalogProducts[2].name}</p>
                   <p className="text-xs font-bold text-brand-600 mt-1">{formatCurrency(optismartCatalogProducts[2].retail_price)}</p>
@@ -322,7 +327,7 @@ export function LandingPage() {
 
       <footer className="bg-white border-t border-surface-200 py-10">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <img src={optismartLogo} alt="OptiSmart" className="h-6 w-auto opacity-50 grayscale" />
+          <img src={optismartLogo} alt="OptiSmart" className="h-6 w-auto opacity-100" />
           <p className="text-sm font-medium text-surface-400">
             &copy; {new Date().getFullYear()} OptiSmart Portal. All rights reserved.
           </p>
