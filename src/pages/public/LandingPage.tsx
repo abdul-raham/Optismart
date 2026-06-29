@@ -145,7 +145,7 @@ export function LandingPage() {
                     src={optismartCatalogProducts[1].image_url} 
                     alt={optismartCatalogProducts[1].name} 
                     className="w-full h-full object-contain" 
-                    fetchpriority="high"
+                    fetchPriority="high"
                   />
                 </motion.div>
 
@@ -157,7 +157,7 @@ export function LandingPage() {
                   className="absolute top-4 left-4 w-40 rounded-2xl bg-white ring-1 ring-surface-200 shadow-card-lg p-4"
                 >
                   <div className="w-10 h-10 rounded-xl bg-surface-50 flex items-center justify-center mb-2">
-                    <img src={optismartCatalogProducts[0].image_url} alt="" className="w-8 h-8 object-contain" fetchpriority="high" />
+                    <img src={optismartCatalogProducts[0].image_url} alt="" className="w-8 h-8 object-contain" fetchPriority="high" />
                   </div>
                   <p className="text-xs font-black text-surface-800 leading-tight">{optismartCatalogProducts[0].name}</p>
                   <p className="text-xs font-bold text-brand-600 mt-1">{formatCurrency(optismartCatalogProducts[0].retail_price)}</p>
@@ -171,7 +171,7 @@ export function LandingPage() {
                   className="absolute top-8 right-0 w-40 rounded-2xl bg-white ring-1 ring-surface-200 shadow-card-lg p-4"
                 >
                   <div className="w-10 h-10 rounded-xl bg-surface-50 flex items-center justify-center mb-2">
-                    <img src={optismartCatalogProducts[2].image_url} alt="" className="w-8 h-8 object-contain" fetchpriority="high" />
+                    <img src={optismartCatalogProducts[2].image_url} alt="" className="w-8 h-8 object-contain" fetchPriority="high" />
                   </div>
                   <p className="text-xs font-black text-surface-800 leading-tight">{optismartCatalogProducts[2].name}</p>
                   <p className="text-xs font-bold text-brand-600 mt-1">{formatCurrency(optismartCatalogProducts[2].retail_price)}</p>
