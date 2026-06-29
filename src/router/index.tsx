@@ -23,6 +23,7 @@ import { AdminUsers } from '@/pages/admin/Users'
 import { AdminExpenses } from '@/pages/admin/Expenses'
 import { AdminInstallers } from '@/pages/admin/Installers'
 import { AdminAnalytics } from '@/pages/admin/Analytics'
+import { AdminTraining } from '@/pages/admin/Training'
 
 // DSA pages
 import { DSADashboard } from '@/pages/dsa/Dashboard'
@@ -47,6 +48,7 @@ import { ProNetLessons } from '@/pages/pronet/Lessons'
 import { ProNetQuiz } from '@/pages/pronet/Quiz'
 import { ProNetEbooks } from '@/pages/pronet/Ebooks'
 import { ProNetCertificate } from '@/pages/pronet/Certificate'
+import { CourseView } from '@/pages/pronet/CourseView'
 import { ProductCatalog } from '@/pages/products/ProductCatalog'
 
 // Settings
@@ -155,6 +157,7 @@ export function AppRouter() {
             <Route path="/app/admin/expenses"   element={<AdminExpenses />} />
             <Route path="/app/admin/installers" element={<AdminInstallers />} />
             <Route path="/app/admin/analytics"  element={<AdminAnalytics />} />
+            <Route path="/app/admin/training"   element={<AdminTraining />} />
           </Route>
 
           {/* DSA */}
@@ -183,6 +186,7 @@ export function AppRouter() {
           {/* ProNet — accessible to all roles */}
           <Route path="/app/products"             element={<ProductCatalog />} />
           <Route path="/app/training"             element={<ProNetDashboard />} />
+          <Route path="/app/training/:courseId"   element={<CourseView />} />
           <Route path="/app/training/lessons"     element={<ProNetLessons />} />
           <Route path="/app/training/quiz"        element={<ProNetQuiz />} />
           <Route path="/app/training/ebooks"      element={<ProNetEbooks />} />

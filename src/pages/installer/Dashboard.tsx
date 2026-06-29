@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { CalendarDays, Power, Wrench, CheckCircle2, DollarSign } from 'lucide-react'
+import { CalendarDays, Power, Wrench, CheckCircle2, DollarSign, MapPin, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { StatCard } from '@/components/shared/StatCard'
@@ -22,6 +22,7 @@ export function InstallerDashboard() {
   const [jobs, setJobs] = useState<JobRow[]>([])
   const [loading, setLoading] = useState(true)
   const [toggling, setToggling] = useState(false)
+  const [sharingLocation, setSharingLocation] = useState(false)
 
   useEffect(() => {
     if (user?.id) fetchData(user.id)
@@ -73,6 +74,43 @@ export function InstallerDashboard() {
     }
   }
 
+  const shareLocation = () => {
+    if (!user?.id) return
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser")
+      return
+    }
+
+    setSharingLocation(true)
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const { error } = await supabase
+            .from('installer_profiles')
+            .update({ 
+              lat: position.coords.latitude, 
+              lng: position.coords.longitude 
+            })
+            .eq('user_id', user.id)
+
+          if (error) throw error
+          alert("Location shared successfully! Admins can now see your live location on the map.")
+        } catch (err) {
+          console.error('Error sharing location:', err)
+          alert('Failed to share location.')
+        } finally {
+          setSharingLocation(false)
+        }
+      },
+      (error) => {
+        console.error("Geolocation error:", error)
+        alert("Unable to retrieve your location. Please check your browser permissions.")
+        setSharingLocation(false)
+      },
+      { enableHighAccuracy: true, maximumAge: 0 }
+    )
+  }
+
   const handleUpdateJobStatus = async (jobId: string, newStatus: string) => {
     try {
       const { error } = await supabase.from('installer_jobs').update({ status: newStatus }).eq('id', jobId)
@@ -106,10 +144,20 @@ export function InstallerDashboard() {
             <h1 className="mt-1 text-2xl font-black tracking-tight text-surface-900">Hi, {user?.full_name?.split(' ')[0] ?? 'Installer'}</h1>
             <p className="mt-1 text-sm text-surface-500">{profile?.location ?? 'Location not set'} field coverage</p>
           </div>
-          <button onClick={toggleAvailability} disabled={toggling} className={`inline-flex h-12 items-center justify-center gap-2 rounded-2xl px-5 text-sm font-black transition ${profile?.is_available ? 'bg-success-50 text-success-700 hover:bg-success-100' : 'bg-surface-100 text-surface-600 hover:bg-surface-200'}`}>
-            <Power className="h-4 w-4" />
-            {profile?.is_available ? 'Available' : 'Offline'}
-          </button>
+          <div className="flex items-center gap-3">
+            <button 
+              onClick={shareLocation} 
+              disabled={sharingLocation} 
+              className="inline-flex h-12 items-center justify-center gap-2 rounded-2xl px-5 text-sm font-black transition bg-brand-50 text-brand-700 hover:bg-brand-100"
+            >
+              {sharingLocation ? <Loader2 className="h-4 w-4 animate-spin" /> : <MapPin className="h-4 w-4" />}
+              Share Location
+            </button>
+            <button onClick={toggleAvailability} disabled={toggling} className={`inline-flex h-12 items-center justify-center gap-2 rounded-2xl px-5 text-sm font-black transition ${profile?.is_available ? 'bg-success-50 text-success-700 hover:bg-success-100' : 'bg-surface-100 text-surface-600 hover:bg-surface-200'}`}>
+              <Power className="h-4 w-4" />
+              {profile?.is_available ? 'Available' : 'Offline'}
+            </button>
+          </div>
         </div>
       </div>
 

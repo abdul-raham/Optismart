@@ -1,51 +1,72 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { BookOpen, PlayCircle, FileText, Award, CheckCircle2, Lock } from 'lucide-react'
+import { useAuthStore } from '@/stores/authStore'
 
 export function ProNetDashboard() {
-  const [modules, setModules] = useState<any[]>([])
+  const { user } = useAuthStore()
+  const [courses, setCourses] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
-  // Mocking the training modules for the UI demo since we don't have seed data for LMS yet
-  const mockModules = [
-    {
-      id: '1',
-      title: 'CCTV Installation Basics',
-      description: 'Learn the fundamentals of camera positioning, wiring, and DVR setup.',
-      duration: '45 mins',
-      progress: 100,
-      lessons: 5,
-      completed: true,
-    },
-    {
-      id: '2',
-      title: 'Advanced IP Systems',
-      description: 'Master NVR configuration, network topology, and remote viewing setup.',
-      duration: '1h 20m',
-      progress: 40,
-      lessons: 8,
-      completed: false,
-    },
-    {
-      id: '3',
-      title: 'Sales & Customer Relations',
-      description: 'How to pitch OptiSmart products to enterprise clients and close deals.',
-      duration: '35 mins',
-      progress: 0,
-      lessons: 4,
-      completed: false,
-      locked: true,
-    }
-  ]
-
   useEffect(() => {
-    // In production, fetch from 'training_modules' and 'user_progress'
-    setTimeout(() => {
-      setModules(mockModules)
-      setLoading(false)
-    }, 800)
+    fetchCourses()
   }, [])
+
+  const fetchCourses = async () => {
+    setLoading(true)
+    try {
+      const { data: courseData, error } = await supabase
+        .from('lms_courses')
+        .select(`
+          *,
+          lms_modules (
+            id,
+            lms_lessons (
+              id,
+              lms_user_progress (status)
+            )
+          )
+        `)
+        .eq('is_published', true)
+        .order('created_at', { ascending: true })
+
+      if (error) throw error
+
+      const mapped = (courseData || []).map((course: any) => {
+        let totalLessons = 0
+        let completedLessons = 0
+        
+        course.lms_modules?.forEach((mod: any) => {
+          mod.lms_lessons?.forEach((lesson: any) => {
+            totalLessons++
+            const progress = lesson.lms_user_progress?.find((p: any) => p.user_id === user?.id)
+            if (progress && progress.status === 'completed') {
+              completedLessons++
+            }
+          })
+        })
+
+        const progressPercent = totalLessons === 0 ? 0 : Math.round((completedLessons / totalLessons) * 100)
+
+        return {
+          ...course,
+          lessonsCount: totalLessons,
+          progress: progressPercent,
+          completed: totalLessons > 0 && completedLessons === totalLessons,
+          locked: false, // We can add tier logic here later if needed
+          duration: 'Various', // Should ideally sum up durations, but keeping simple
+        }
+      })
+
+      setCourses(mapped)
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -57,23 +78,7 @@ export function ProNetDashboard() {
       </div>
 
       <div className="relative mt-8">
-        {/* Blur overlay for "Coming Soon" */}
-        <div className="absolute inset-0 z-20 backdrop-blur-sm bg-white/40 flex items-center justify-center rounded-3xl">
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-white px-8 py-6 rounded-2xl shadow-card-xl border border-surface-200 text-center max-w-sm mx-4"
-          >
-            <div className="w-16 h-16 rounded-full bg-brand-50 mx-auto flex items-center justify-center mb-4">
-              <BookOpen className="w-8 h-8 text-brand-600" />
-            </div>
-            <h2 className="text-2xl font-black text-surface-900 mb-2">Coming Soon</h2>
-            <p className="text-surface-500 font-medium">We are currently building the full certification and training curriculum. Check back later!</p>
-          </motion.div>
-        </div>
-
-        {/* Blurred Content */}
-        <div className="grid grid-cols-2 lg:grid-cols-3 gap-6 opacity-30 select-none pointer-events-none blur-[2px]">
+        <div className="grid grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Main Content: Courses */}
           <div className="lg:col-span-2 space-y-4">
             <h2 className="text-sm font-bold text-surface-900 uppercase tracking-wider">Your Learning Path</h2>
@@ -82,54 +87,61 @@ export function ProNetDashboard() {
               <div className="space-y-4">
                 {[1,2,3].map(i => <div key={i} className="h-32 bg-surface-50/50 rounded-2xl animate-pulse" />)}
               </div>
+            ) : courses.length === 0 ? (
+              <div className="glass-card p-12 text-center flex flex-col items-center">
+                <BookOpen className="w-12 h-12 text-surface-300 mb-4" />
+                <h3 className="text-lg font-bold text-surface-900 mb-1">No courses available</h3>
+                <p className="text-sm text-surface-500">Check back later for new training content.</p>
+              </div>
             ) : (
               <div className="space-y-4">
-                {modules.map((mod, i) => (
-                  <motion.div
-                    key={mod.id}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.1 }}
-                    className={`glass-card p-5 relative overflow-hidden transition-all ${mod.locked ? 'opacity-70 grayscale-[0.3]' : 'hover:border-brand-200 hover:-translate-y-0.5'}`}
-                  >
-                    {mod.locked && (
-                      <div className="absolute top-4 right-4 bg-surface-100 p-2 rounded-lg text-surface-500">
-                        <Lock className="w-4 h-4" />
-                      </div>
-                    )}
-                    {mod.completed && (
-                      <div className="absolute top-4 right-4 text-success-500">
-                        <CheckCircle2 className="w-6 h-6" />
-                      </div>
-                    )}
+                {courses.map((course, i) => (
+                  <Link to={`/app/training/${course.id}`} key={course.id}>
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.1 }}
+                      className={`glass-card p-5 relative overflow-hidden transition-all mb-4 block ${course.locked ? 'opacity-70 grayscale-[0.3]' : 'hover:border-brand-200 hover:-translate-y-0.5'}`}
+                    >
+                      {course.locked && (
+                        <div className="absolute top-4 right-4 bg-surface-100 p-2 rounded-lg text-surface-500">
+                          <Lock className="w-4 h-4" />
+                        </div>
+                      )}
+                      {course.completed && (
+                        <div className="absolute top-4 right-4 text-success-500">
+                          <CheckCircle2 className="w-6 h-6" />
+                        </div>
+                      )}
 
-                    <div className="flex items-start gap-4">
-                      <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm ${mod.completed ? 'bg-success-50 text-success-600' : 'bg-brand-50 text-brand-600'}`}>
-                        <PlayCircle className="w-7 h-7" />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="text-lg font-bold text-surface-900">{mod.title}</h3>
-                        <p className="text-sm text-surface-500 mt-1 mb-4 pr-8">{mod.description}</p>
-                        
-                        <div className="flex items-center gap-4 text-xs font-semibold text-surface-500 mb-4">
-                          <span className="flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5" /> {mod.lessons} Lessons</span>
-                          <span className="flex items-center gap-1.5"><PlayCircle className="w-3.5 h-3.5" /> {mod.duration}</span>
+                      <div className="flex items-start gap-4">
+                        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-sm ${course.completed ? 'bg-success-50 text-success-600' : 'bg-brand-50 text-brand-600'}`}>
+                          <PlayCircle className="w-7 h-7" />
                         </div>
+                        <div className="flex-1">
+                          <h3 className="text-lg font-bold text-surface-900">{course.title}</h3>
+                          <p className="text-sm text-surface-500 mt-1 mb-4 pr-8">{course.description}</p>
+                          
+                          <div className="flex items-center gap-4 text-xs font-semibold text-surface-500 mb-4">
+                            <span className="flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5" /> {course.lessonsCount} Lessons</span>
+                            <span className="flex items-center gap-1.5"><PlayCircle className="w-3.5 h-3.5" /> {course.duration}</span>
+                          </div>
 
-                        {/* Progress bar */}
-                        <div className="w-full h-2 bg-surface-100 rounded-full overflow-hidden">
-                          <div 
-                            className={`h-full rounded-full ${mod.completed ? 'bg-success-500' : 'bg-brand-500'}`}
-                            style={{ width: `${mod.progress}%` }}
-                          />
-                        </div>
-                        <div className="flex justify-between mt-1.5 text-[10px] font-bold text-surface-400 uppercase">
-                          <span>{mod.progress}% Complete</span>
-                          {mod.locked && <span>Locked</span>}
+                          {/* Progress bar */}
+                          <div className="w-full h-2 bg-surface-100 rounded-full overflow-hidden">
+                            <div 
+                              className={`h-full rounded-full ${course.completed ? 'bg-success-500' : 'bg-brand-500'}`}
+                              style={{ width: `${course.progress}%` }}
+                            />
+                          </div>
+                          <div className="flex justify-between mt-1.5 text-[10px] font-bold text-surface-400 uppercase">
+                            <span>{course.progress}% Complete</span>
+                            {course.locked && <span>Locked</span>}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </motion.div>
+                    </motion.div>
+                  </Link>
                 ))}
               </div>
             )}
