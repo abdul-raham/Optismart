@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { User, Lock, Save, Bell, Palette } from 'lucide-react'
+import { User, Lock, Save, Bell, Palette, Building2 } from 'lucide-react'
 
 export function SettingsPage() {
   const { user } = useAuthStore()
@@ -15,6 +15,61 @@ export function SettingsPage() {
     newPassword: '',
     confirmPassword: ''
   })
+  
+  const [systemSettings, setSystemSettings] = useState({
+    moniepointAccountName: '',
+    moniepointAccountNumber: ''
+  })
+  const [savingSettings, setSavingSettings] = useState(false)
+
+  const isAdmin = user?.role === 'admin' || user?.role === 'super_admin'
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetchSystemSettings()
+    }
+  }, [isAdmin])
+
+  const fetchSystemSettings = async () => {
+    try {
+      const { data, error } = await supabase.from('system_settings').select('*').eq('id', 'default').single()
+      if (data && !error) {
+        setSystemSettings({
+          moniepointAccountName: data.moniepoint_account_name || '',
+          moniepointAccountNumber: data.moniepoint_account_number || ''
+        })
+      }
+    } catch (err) {
+      console.error('Error fetching system settings:', err)
+    }
+  }
+
+  const handleUpdateSystemSettings = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSavingSettings(true)
+    setError('')
+    setSuccess('')
+
+    try {
+      const { error: dbError } = await supabase
+        .from('system_settings')
+        .upsert({
+          id: 'default',
+          moniepoint_account_name: systemSettings.moniepointAccountName,
+          moniepoint_account_number: systemSettings.moniepointAccountNumber,
+          updated_at: new Date().toISOString()
+        })
+      
+      if (dbError) throw dbError
+      setSuccess('System settings updated successfully!')
+      setTimeout(() => setSuccess(''), 3000)
+    } catch (err: any) {
+      console.error('Error updating system settings:', err)
+      setError(err.message || 'Failed to update system settings')
+    } finally {
+      setSavingSettings(false)
+    }
+  }
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -166,6 +221,45 @@ export function SettingsPage() {
               </div>
             </form>
           </div>
+
+          {/* Admin System Settings */}
+          {isAdmin && (
+            <div className="glass-card p-6">
+              <h2 className="text-lg font-bold text-surface-900 mb-6 flex items-center gap-2">
+                <Building2 className="w-5 h-5 text-brand-600" /> Payment Gateway (Bank Transfer)
+              </h2>
+              <form onSubmit={handleUpdateSystemSettings} className="space-y-4">
+                <div>
+                  <label className="label">Moniepoint Account Name</label>
+                  <input 
+                    type="text" 
+                    className="input" 
+                    value={systemSettings.moniepointAccountName}
+                    onChange={e => setSystemSettings({...systemSettings, moniepointAccountName: e.target.value})}
+                    placeholder="e.g. Optismart Networks Ltd"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="label">Moniepoint Account Number</label>
+                  <input 
+                    type="text" 
+                    className="input" 
+                    value={systemSettings.moniepointAccountNumber}
+                    onChange={e => setSystemSettings({...systemSettings, moniepointAccountNumber: e.target.value})}
+                    placeholder="e.g. 1234567890"
+                    required
+                  />
+                </div>
+
+                <div className="pt-4 flex justify-end">
+                  <button type="submit" disabled={savingSettings} className="btn-primary w-full sm:w-auto px-6 flex items-center justify-center gap-2">
+                    <Save className="w-4 h-4" /> Save Bank Details
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
         </div>
 
         {/* Preferences Sidebar */}

@@ -1,7 +1,18 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
-import { Search, MapPin, Phone, Mail, Wrench } from 'lucide-react'
+import { Search, MapPin, Phone, Mail, Wrench, List, Map as MapIcon } from 'lucide-react'
+import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
+import L from 'leaflet'
+
+// Fix for default leaflet icons in React
+delete (L.Icon.Default.prototype as any)._getIconUrl
+L.Icon.Default.mergeOptions({
+  iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png',
+  iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png',
+  shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png'
+})
 import { formatDate } from '@/lib/utils'
 
 interface Installer {
@@ -12,12 +23,15 @@ interface Installer {
   phone: string | null
   status: string
   created_at: string
+  lat?: number
+  lng?: number
 }
 
 export function AdminInstallers() {
   const [installers, setInstallers] = useState<Installer[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list')
 
   useEffect(() => {
     fetchInstallers()
@@ -28,12 +42,22 @@ export function AdminInstallers() {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('*')
+        .select(`
+          *,
+          installer_profiles (lat, lng)
+        `)
         .eq('role', 'installer')
         .order('created_at', { ascending: false })
       
       if (error) throw error
-      setInstallers(data || [])
+      
+      const mappedInstallers = (data || []).map(u => ({
+        ...u,
+        lat: u.installer_profiles?.[0]?.lat,
+        lng: u.installer_profiles?.[0]?.lng
+      }))
+      
+      setInstallers(mappedInstallers as Installer[])
     } catch (err) {
       console.error('Error fetching installers:', err)
     } finally {
@@ -73,13 +97,49 @@ export function AdminInstallers() {
               className="w-full h-10 pl-9 pr-4 rounded-xl border border-surface-200 bg-surface-50 text-sm focus:border-brand-400 focus:ring-4 focus:ring-brand-500/10 outline-none transition-all"
             />
           </div>
-          <div className="text-sm font-medium text-surface-500">
-            {filteredInstallers.length} {filteredInstallers.length === 1 ? 'Installer' : 'Installers'}
+          <div className="flex items-center gap-4">
+            <div className="flex bg-surface-100 rounded-lg p-1">
+              <button 
+                onClick={() => setViewMode('list')}
+                className={`px-3 py-1.5 rounded-md text-sm font-bold transition-all flex items-center gap-2 ${viewMode === 'list' ? 'bg-white text-brand-600 shadow-sm' : 'text-surface-500 hover:text-surface-900'}`}
+              >
+                <List className="w-4 h-4" /> List
+              </button>
+              <button 
+                onClick={() => setViewMode('map')}
+                className={`px-3 py-1.5 rounded-md text-sm font-bold transition-all flex items-center gap-2 ${viewMode === 'map' ? 'bg-white text-brand-600 shadow-sm' : 'text-surface-500 hover:text-surface-900'}`}
+              >
+                <MapIcon className="w-4 h-4" /> Map
+              </button>
+            </div>
+            <div className="text-sm font-medium text-surface-500 hidden sm:block">
+              {filteredInstallers.length} {filteredInstallers.length === 1 ? 'Installer' : 'Installers'}
+            </div>
           </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[800px]">
+        {viewMode === 'map' ? (
+          <div className="h-[600px] w-full bg-surface-50 relative z-0">
+            <MapContainer center={[6.5244, 3.3792]} zoom={11} scrollWheelZoom={false} className="h-full w-full">
+              <TileLayer
+                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+              />
+              {filteredInstallers.map(installer => installer.lat && installer.lng && (
+                <Marker key={installer.id} position={[installer.lat, installer.lng]}>
+                  <Popup>
+                    <div className="p-1">
+                      <p className="font-bold text-sm mb-1">{installer.full_name}</p>
+                      <p className="text-xs text-surface-500 flex items-center gap-1"><Phone className="w-3 h-3" /> {installer.phone || 'N/A'}</p>
+                    </div>
+                  </Popup>
+                </Marker>
+              ))}
+            </MapContainer>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[800px]">
             <thead>
               <tr className="bg-surface-50/50">
                 <th className="py-3 px-5 text-xs font-semibold text-surface-500 uppercase tracking-wider">Installer</th>
@@ -148,6 +208,7 @@ export function AdminInstallers() {
             </tbody>
           </table>
         </div>
+        )}
       </motion.div>
     </div>
   )

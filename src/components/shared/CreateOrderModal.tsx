@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Loader2, Package, User, Phone, MapPin } from 'lucide-react'
+import { X, Loader2, Package, User, Phone, MapPin, Building2, CheckCircle2, Copy } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { sendEmail } from '@/lib/email'
 import { useAuthStore } from '@/stores/authStore'
@@ -26,6 +26,13 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
   const [quantity, setQuantity] = useState(1)
   const [error, setError] = useState<string | null>(null)
 
+  // Payment Flow State
+  const [showPayment, setShowPayment] = useState(false)
+  const [createdOrderNumber, setCreatedOrderNumber] = useState('')
+  const [createdOrderAmount, setCreatedOrderAmount] = useState(0)
+  const [systemSettings, setSystemSettings] = useState({ moniepointAccountName: '', moniepointAccountNumber: '' })
+  const [copied, setCopied] = useState(false)
+
   useEffect(() => {
     if (isOpen) {
       fetchProducts()
@@ -46,6 +53,24 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
       setFetchingProducts(false)
     }
   }
+
+  const fetchSystemSettings = async () => {
+    try {
+      const { data } = await supabase.from('system_settings').select('*').eq('id', 'default').single()
+      if (data) {
+        setSystemSettings({
+          moniepointAccountName: data.moniepoint_account_name,
+          moniepointAccountNumber: data.moniepoint_account_number
+        })
+      }
+    } catch (err) {
+      console.error('Error fetching system settings:', err)
+    }
+  }
+
+  useEffect(() => {
+    if (isOpen) fetchSystemSettings()
+  }, [isOpen])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -84,13 +109,29 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
         customerName: customerName
       }, { onError: (e) => console.warn('Email failed:', e) })
 
-      onSuccess()
-      onClose()
+      setCreatedOrderNumber(orderNumber)
+      setCreatedOrderAmount(totalAmount)
+      setShowPayment(true)
     } catch (err: any) {
       setError(err.message || 'Failed to create order')
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleFinishPayment = () => {
+    onSuccess()
+    onClose()
+    setShowPayment(false)
+    setCustomerName('')
+    setCustomerPhone('')
+    setCustomerAddress('')
+  }
+
+  const handleCopy = (text: string) => {
+    navigator.clipboard.writeText(text)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   if (!isOpen) return null
@@ -109,18 +150,78 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
           className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-visible"
         >
           <div className="flex items-center justify-between p-6 border-b border-surface-100 bg-surface-50">
-            <h2 className="text-xl font-bold text-surface-900">Create New Order</h2>
+            <h2 className="text-xl font-bold text-surface-900">
+              {showPayment ? 'Complete Payment' : 'Create New Order'}
+            </h2>
             <button onClick={onClose} className="p-2 text-surface-400 hover:text-surface-600 hover:bg-surface-200 rounded-full transition-colors">
               <X className="w-5 h-5" />
             </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="p-6 space-y-5">
-            {error && (
-              <div className="p-3 text-sm font-semibold text-danger-700 bg-danger-50 border border-danger-100 rounded-xl">
-                {error}
+          {showPayment ? (
+            <div className="p-8 flex flex-col items-center">
+              <div className="w-16 h-16 bg-success-50 rounded-full flex items-center justify-center mb-6">
+                <CheckCircle2 className="w-8 h-8 text-success-600" />
               </div>
-            )}
+              <h3 className="text-xl font-bold text-surface-900 text-center mb-2">Order Created!</h3>
+              <p className="text-surface-500 text-center mb-6">
+                Order <span className="font-bold text-surface-900">#{createdOrderNumber}</span> is pending. Please make a bank transfer to process this order.
+              </p>
+
+              <div className="w-full bg-surface-50 border border-surface-200 rounded-2xl p-6 space-y-4 mb-8 relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-1 h-full bg-brand-500" />
+                <div className="flex items-center justify-between border-b border-surface-200 pb-4">
+                  <div className="flex items-center gap-3">
+                    <Building2 className="w-5 h-5 text-surface-400" />
+                    <div>
+                      <p className="text-xs text-surface-500 font-semibold uppercase tracking-wider">Bank Name</p>
+                      <p className="font-bold text-surface-900">Moniepoint Microfinance Bank</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between border-b border-surface-200 pb-4">
+                  <div>
+                    <p className="text-xs text-surface-500 font-semibold uppercase tracking-wider">Account Name</p>
+                    <p className="font-bold text-surface-900">{systemSettings.moniepointAccountName || 'Optismart Networks Ltd'}</p>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-1">
+                  <div>
+                    <p className="text-xs text-surface-500 font-semibold uppercase tracking-wider">Account Number</p>
+                    <p className="text-2xl font-black text-brand-700 tracking-wider font-mono">
+                      {systemSettings.moniepointAccountNumber || '1234567890'}
+                    </p>
+                  </div>
+                  <button 
+                    onClick={() => handleCopy(systemSettings.moniepointAccountNumber || '1234567890')}
+                    className="p-2.5 rounded-xl bg-surface-200 hover:bg-surface-300 text-surface-700 transition-colors flex items-center gap-2"
+                  >
+                    <Copy className="w-4 h-4" />
+                    <span className="text-sm font-bold">{copied ? 'Copied!' : 'Copy'}</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-warning-50 text-warning-800 p-4 rounded-xl text-sm font-medium mb-8 w-full border border-warning-200 text-center">
+                Transfer exactly <strong>₦{createdOrderAmount.toLocaleString()}</strong> to the account above.
+              </div>
+
+              <button 
+                onClick={handleFinishPayment} 
+                className="w-full py-3.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white font-bold shadow-brand flex items-center justify-center gap-2 transition-colors"
+              >
+                I have made the transfer
+              </button>
+            </div>
+          ) : (
+            <form onSubmit={handleSubmit} className="p-6 space-y-5">
+              {error && (
+                <div className="p-3 text-sm font-semibold text-danger-700 bg-danger-50 border border-danger-100 rounded-xl">
+                  {error}
+                </div>
+              )}
 
             <div className="space-y-4">
               <div>
@@ -173,15 +274,16 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
               </div>
             )}
 
-            <div className="pt-4 flex gap-3">
-              <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border border-surface-200 text-sm font-bold text-surface-700 hover:bg-surface-50 transition-colors">
-                Cancel
-              </button>
-              <button type="submit" disabled={loading} className="flex-1 px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-bold shadow-brand flex items-center justify-center gap-2 transition-colors">
-                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create Order'}
-              </button>
-            </div>
-          </form>
+              <div className="pt-4 flex gap-3">
+                <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border border-surface-200 text-sm font-bold text-surface-700 hover:bg-surface-50 transition-colors">
+                  Cancel
+                </button>
+                <button type="submit" disabled={loading} className="flex-1 px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-bold shadow-brand flex items-center justify-center gap-2 transition-colors">
+                  {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create Order'}
+                </button>
+              </div>
+            </form>
+          )}
         </motion.div>
       </div>
     </AnimatePresence>

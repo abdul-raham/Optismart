@@ -18,5 +18,5 @@ export function getProductImage(name: string, imageUrl?: string | null) {
   if (lowerName.includes('indoor') || lowerName.includes('mini')) return '/products/wifi_indoor_3mp.jpg'
   
   const shortName = name.split(' ').slice(0,2).join(' ')
-  return productImageFallbacks[lowerName] || imageUrl || `https://placehold.co/400x400/f1f5f9/0A74FF?text=${encodeURIComponent(shortName)}`
+  return productImageFallbacks[lowerName] || imageUrl || '/products/wifi_indoor_3mp.jpg'
 }
