@@ -10,7 +10,7 @@ export function SettingsPage() {
   const [error, setError] = useState('')
   
   const [form, setForm] = useState({
-    fullName: user?.user_metadata?.full_name || '',
+    fullName: user?.full_name || '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
