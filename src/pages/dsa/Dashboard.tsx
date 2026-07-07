@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { StatCard } from '@/components/shared/StatCard'
 import { OrderStatusBadge } from '@/components/shared/Badges'
 import { CreateOrderModal } from '@/components/shared/CreateOrderModal'
-import { ShoppingBag, Target, DollarSign, CalendarDays, ArrowRight } from 'lucide-react'
+import { ShoppingBag, Target, Banknote, CalendarDays, ArrowRight } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { MobileDashboardNav } from '@/components/layout/MobileDashboardNav'
 import type { Order } from '@/types'
@@ -99,7 +99,7 @@ export function DSADashboard() {
           <StatCard
             title="Pending Commissions"
             value={formatCurrency(stats.pendingCommissions)}
-            icon={DollarSign}
+            icon={Banknote}
             color="success"
             delay={0.2}
           />

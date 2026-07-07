@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
-import { CalendarDays, Power, Wrench, CheckCircle2, DollarSign, MapPin, Loader2 } from 'lucide-react'
+import { CalendarDays, Power, Wrench, CheckCircle2, Banknote, MapPin, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { StatCard } from '@/components/shared/StatCard'
@@ -164,7 +164,7 @@ export function InstallerDashboard() {
       <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
         <StatCard title="Active Jobs" value={activeJobs.length} icon={Wrench} color="brand" delay={0.05} />
         <StatCard title="Completed" value={completedJobs.length} icon={CheckCircle2} color="success" delay={0.1} />
-        <StatCard title="Earnings" value={formatCurrency(earnings)} icon={DollarSign} color="warning" delay={0.15} />
+        <StatCard title="Earnings" value={formatCurrency(earnings)} icon={Banknote} color="warning" delay={0.15} />
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">

@@ -3,7 +3,7 @@ import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid,
   Tooltip, ResponsiveContainer, Cell
 } from 'recharts'
-import { TrendingUp, TrendingDown, DollarSign, PieChart } from 'lucide-react'
+import { TrendingUp, TrendingDown, Banknote, PieChart } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 
 const monthlyData = [
@@ -36,7 +36,7 @@ export function AdminFinance() {
   const profitMargin = Math.round((totalProfit / totalRevenue) * 100)
 
   const summaryCards = [
-    { label: 'Total Revenue (H1)', value: totalRevenue, icon: DollarSign, color: 'brand', positive: true },
+    { label: 'Total Revenue (H1)', value: totalRevenue, icon: Banknote, color: 'brand', positive: true },
     { label: 'Total Expenses (H1)', value: totalExpenses, icon: TrendingDown, color: 'danger', positive: false },
     { label: 'Net Profit (H1)', value: totalProfit, icon: TrendingUp, color: 'success', positive: true },
     { label: 'Profit Margin', value: `${profitMargin}%`, icon: PieChart, color: 'purple', positive: true, isPercent: true },

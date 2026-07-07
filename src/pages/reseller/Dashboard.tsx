@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
-import { Package, ShoppingCart, Search, TrendingUp, DollarSign } from 'lucide-react'
+import { Package, ShoppingCart, Search, TrendingUp, Banknote } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { MobileDashboardNav } from '@/components/layout/MobileDashboardNav'
 import type { Product } from '@/types'

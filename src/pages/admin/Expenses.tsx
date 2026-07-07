@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { Plus, Search, DollarSign, Wallet, TrendingDown, Calendar, FileText, X } from 'lucide-react'
+import { Plus, Search, Banknote, Wallet, TrendingDown, Calendar, FileText, X } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type { Expense, ExpenseCategory } from '@/types'
 
@@ -129,7 +129,7 @@ export function AdminExpenses() {
         ) : filteredExpenses.length === 0 ? (
           <div className="p-12 flex flex-col items-center justify-center text-center">
             <div className="w-16 h-16 rounded-2xl bg-surface-100 flex items-center justify-center mb-4">
-              <DollarSign className="w-8 h-8 text-surface-400" />
+              <Banknote className="w-8 h-8 text-surface-400" />
             </div>
             <h3 className="text-lg font-bold text-surface-900 mb-2">No expenses logged</h3>
             <p className="text-surface-500 max-w-md">Keep track of your company's operational spending here.</p>

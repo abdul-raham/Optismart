@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Target, ShoppingBag, Users, Package,
   CreditCard, Receipt, TrendingUp, Wrench, BookOpen,
   FileText, Award, Settings, ChevronLeft, ChevronRight,
-  CalendarDays, DollarSign, BarChart3, UserCheck,
+  CalendarDays, Banknote, BarChart3, UserCheck,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { useUIStore } from '@/stores/uiStore'
@@ -50,7 +50,7 @@ export const NAV_ITEMS: Record<UserRole, NavItem[]> = {
     { label: 'Orders',     href: '/app/dsa/orders',      icon: ShoppingBag },
     { label: 'Products',   href: '/app/products',        icon: Package },
     { label: 'Installers', href: '/app/dsa/installers',  icon: UserCheck },
-    { label: 'Commission', href: '/app/dsa/commission',  icon: DollarSign },
+    { label: 'Commission', href: '/app/dsa/commission',  icon: Banknote },
     { label: 'Reminders',  href: '/app/dsa/reminders',   icon: CalendarDays },
     { label: 'Training',   href: '/app/training',        icon: BookOpen },
     { label: 'Settings',   href: '/app/settings',        icon: Settings },

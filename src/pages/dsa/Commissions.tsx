@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { DollarSign, Target, TrendingUp, Calendar, ArrowRight, CheckCircle2 } from 'lucide-react'
+import { Banknote, Target, TrendingUp, Calendar, ArrowRight, CheckCircle2 } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 
 interface Commission {
@@ -127,14 +127,14 @@ export function DSACommissions() {
           <div className="grid grid-cols-2 gap-4">
             <div className="glass-card p-4">
               <div className="w-10 h-10 rounded-lg bg-orange-50 flex items-center justify-center mb-3">
-                <DollarSign className="w-5 h-5 text-orange-600" />
+                <Banknote className="w-5 h-5 text-orange-600" />
               </div>
               <p className="text-xs font-bold text-surface-500 uppercase">Pending</p>
               <p className="text-lg font-bold text-surface-900 mt-1">{formatCurrency(pendingAmount)}</p>
             </div>
             <div className="glass-card p-4">
               <div className="w-10 h-10 rounded-lg bg-success-50 flex items-center justify-center mb-3">
-                <DollarSign className="w-5 h-5 text-success-600" />
+                <Banknote className="w-5 h-5 text-success-600" />
               </div>
               <p className="text-xs font-bold text-surface-500 uppercase">Earned (This Mo)</p>
               <p className="text-lg font-bold text-surface-900 mt-1">{formatCurrency(totalEarned)}</p>
@@ -157,7 +157,7 @@ export function DSACommissions() {
               ) : commissions.length === 0 ? (
                 <div className="h-full flex flex-col items-center justify-center text-center">
                   <div className="w-16 h-16 rounded-full bg-surface-50 flex items-center justify-center mb-4">
-                    <DollarSign className="w-8 h-8 text-surface-300" />
+                    <Banknote className="w-8 h-8 text-surface-300" />
                   </div>
                   <h3 className="text-sm font-bold text-surface-900 mb-1">No commissions yet</h3>
                   <p className="text-xs text-surface-500 max-w-[250px]">Commissions are generated automatically when your orders are marked as delivered.</p>
@@ -168,7 +168,7 @@ export function DSACommissions() {
                     <div key={comm.id} className="flex items-center justify-between p-4 rounded-xl border border-surface-100 hover:border-brand-200 transition-all">
                       <div className="flex items-center gap-4">
                         <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${comm.status === 'paid' ? 'bg-success-50 text-success-600' : 'bg-surface-100 text-surface-500'}`}>
-                          <DollarSign className="w-5 h-5" />
+                          <Banknote className="w-5 h-5" />
                         </div>
                         <div>
                           <p className="text-sm font-bold text-surface-900">Order #{comm.orders?.order_number}</p>

@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { StatCard } from '@/components/shared/StatCard'
 import { OrderStatusBadge } from '@/components/shared/Badges'
-import { ShoppingBag, Users, DollarSign, Wrench, ArrowUpRight } from 'lucide-react'
+import { ShoppingBag, Users, Banknote, Wrench, ArrowUpRight } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { MobileDashboardNav } from '@/components/layout/MobileDashboardNav'
 import type { Order } from '@/types'
@@ -76,7 +76,7 @@ export function AdminDashboard() {
           <StatCard
             title="Total Revenue"
             value={formatCurrency(stats.totalRevenue)}
-            icon={DollarSign}
+            icon={Banknote}
             color="brand"
             trend={{ value: 12.5, isPositive: true }}
             delay={0.1}

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Package, TrendingUp, DollarSign, Store, ShoppingBag, Plus } from 'lucide-react'
+import { Package, TrendingUp, Banknote, Store, ShoppingBag, Plus } from 'lucide-react'
 import { StatCard } from '@/components/shared/StatCard'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
@@ -48,7 +48,7 @@ export function OutletDashboard() {
 
       {/* Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard title="Today's Sales" value={stats.todaySales} icon={DollarSign} color="success" prefix="₦" delay={0} />
+        <StatCard title="Today's Sales" value={stats.todaySales} icon={Banknote} color="success" prefix="₦" delay={0} />
         <StatCard title="Monthly Sales" value={stats.monthSales} icon={TrendingUp} color="brand" prefix="₦" delay={0.05} />
         <StatCard title="Low Stock Items" value={stats.lowStock} icon={Package} color="danger" delay={0.1} />
         <StatCard title="Total Orders" value={stats.totalOrders} icon={ShoppingBag} color="brand" delay={0.15} />
