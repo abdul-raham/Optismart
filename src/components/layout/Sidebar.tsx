@@ -11,6 +11,7 @@ import { useUIStore } from '@/stores/uiStore'
 import { cn, getInitials } from '@/lib/utils'
 import type { UserRole } from '@/types'
 import optismartLogo from '@/assets/optismart-logo.png'
+import { NotificationBell } from '@/components/shared/NotificationBell'
 
 export interface NavItem {
   label: string
@@ -218,10 +219,13 @@ export function Sidebar() {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 exit={{ opacity: 0 }}
-                className="overflow-hidden flex-1 min-w-0"
+                className="overflow-hidden flex-1 min-w-0 flex items-center justify-between gap-2"
               >
-                <p className="text-sm font-semibold text-surface-800 truncate">{user?.full_name ?? 'User'}</p>
-                <p className="text-[11px] text-surface-400 truncate">{user?.email}</p>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-surface-800 truncate">{user?.full_name ?? 'User'}</p>
+                  <p className="text-[11px] text-surface-400 truncate">{user?.email}</p>
+                </div>
+                <NotificationBell />
               </motion.div>
             )}
           </AnimatePresence>
