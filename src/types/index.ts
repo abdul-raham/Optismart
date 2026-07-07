@@ -84,6 +84,7 @@ export interface Order {
   id: string
   order_number: string
   dsa_id: string | null
+  unregistered_dsa_name?: string | null
   reseller_id?: string | null
   dsa?: User
   customer_name: string
