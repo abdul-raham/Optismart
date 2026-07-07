@@ -24,6 +24,15 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
   const [customerAddress, setCustomerAddress] = useState('')
   const [selectedProductId, setSelectedProductId] = useState('')
   const [quantity, setQuantity] = useState(1)
+  
+  // Sync fields
+  const [isDsaRegistered, setIsDsaRegistered] = useState(true)
+  const [unregisteredDsaName, setUnregisteredDsaName] = useState('')
+  const [installationNeeded, setInstallationNeeded] = useState(false)
+  const [installationPrice, setInstallationPrice] = useState(0)
+  const [expectedDeliveryDate, setExpectedDeliveryDate] = useState('')
+  const [notes, setNotes] = useState('')
+
   const [error, setError] = useState<string | null>(null)
 
   // Payment Flow State
@@ -84,12 +93,13 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
       if (!product) throw new Error('Please select a product')
 
       const unitPrice = product.retail_price
-      const totalAmount = unitPrice * quantity
+      const totalAmount = totalProductPrice + (installationNeeded ? installationPrice : 0)
       const orderNumber = `ORD-${Date.now().toString().slice(-6)}`
 
       const { error: insertError } = await supabase.from('orders').insert({
         order_number: orderNumber,
-        dsa_id: user.id,
+        dsa_id: isDsaRegistered ? user.id : null,
+        unregistered_dsa_name: !isDsaRegistered ? unregisteredDsaName : null,
         customer_name: customerName,
         customer_phone: customerPhone,
         customer_address: customerAddress,
@@ -97,6 +107,10 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
         quantity,
         unit_price: unitPrice,
         total_amount: totalAmount,
+        installation_needed: installationNeeded,
+        installation_price: installationNeeded ? installationPrice : 0,
+        expected_delivery_date: expectedDeliveryDate || null,
+        notes: notes,
         status: 'pending'
       })
 
@@ -225,6 +239,36 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
 
             <div className="space-y-4">
               <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-sm font-bold text-surface-700 mb-0">DSA In Charge *</label>
+                  <label className="flex items-center gap-2 text-xs font-medium text-surface-600 cursor-pointer">
+                    <input 
+                      type="checkbox" 
+                      checked={!isDsaRegistered} 
+                      onChange={e => setIsDsaRegistered(!e.target.checked)} 
+                      className="rounded border-surface-300 text-brand-600 focus:ring-brand-500"
+                    />
+                    Unregistered / External Agent
+                  </label>
+                </div>
+                {isDsaRegistered ? (
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
+                    <input type="text" readOnly value={user?.full_name || ''} className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-surface-200 bg-surface-50 text-surface-500 text-sm" />
+                  </div>
+                ) : (
+                  <input 
+                    required 
+                    type="text" 
+                    className="w-full px-4 py-2.5 rounded-xl border border-surface-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none text-sm transition-all" 
+                    placeholder="Type the full name of the agent" 
+                    value={unregisteredDsaName} 
+                    onChange={e => setUnregisteredDsaName(e.target.value)} 
+                  />
+                )}
+              </div>
+
+              <div>
                 <label className="block text-sm font-bold text-surface-700 mb-1.5">Customer Name</label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
@@ -241,10 +285,10 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
               </div>
 
               <div>
-                <label className="block text-sm font-bold text-surface-700 mb-1.5">Installation Address</label>
+                <label className="block text-sm font-bold text-surface-700 mb-1.5">Delivery Address</label>
                 <div className="relative">
                   <MapPin className="absolute left-3 top-3 w-4 h-4 text-surface-400" />
-                  <textarea required value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} rows={3} className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-surface-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none text-sm transition-all resize-none" placeholder="Full address for installer..." />
+                  <textarea required value={customerAddress} onChange={e => setCustomerAddress(e.target.value)} rows={3} className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-surface-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none text-sm transition-all resize-none" placeholder="Full delivery address..." />
                 </div>
               </div>
 
@@ -267,10 +311,44 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
               </div>
             </div>
 
+            <div className="border-t border-surface-100 pt-4 pb-2 mt-4">
+              <div className="flex items-center gap-3 mb-4">
+                <input 
+                  type="checkbox" 
+                  id="install_needed_modal"
+                  checked={installationNeeded} 
+                  onChange={e => setInstallationNeeded(e.target.checked)} 
+                  className="w-5 h-5 rounded border-surface-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
+                />
+                <label htmlFor="install_needed_modal" className="block text-sm font-bold text-surface-700 mb-0 cursor-pointer">Yes, Installation is Needed</label>
+              </div>
+              
+              {installationNeeded && (
+                <div className="mb-4">
+                  <label className="block text-sm font-bold text-surface-700 mb-1.5">Installation Price (₦) *</label>
+                  <input required type="number" min={0} value={installationPrice} onChange={e => setInstallationPrice(Number(e.target.value))} className="w-full px-4 py-2.5 rounded-xl border border-surface-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none text-sm transition-all" />
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4 border-t border-surface-100 pt-4">
+              <div>
+                <label className="block text-sm font-bold text-surface-700 mb-1.5">Expected Delivery Date</label>
+                <input type="date" value={expectedDeliveryDate} onChange={e => setExpectedDeliveryDate(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-surface-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none text-sm transition-all" />
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-surface-700 mb-1.5">Additional Notes</label>
+                <textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-surface-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none text-sm transition-all resize-none" placeholder="Special instructions?" />
+              </div>
+            </div>
+
             {selectedProduct && (
-              <div className="bg-surface-50 p-4 rounded-xl border border-surface-100 flex justify-between items-center mt-2">
+              <div className="bg-surface-50 p-4 rounded-xl border border-surface-100 flex justify-between items-center mt-4">
                 <span className="text-sm font-semibold text-surface-600">Total Amount:</span>
-                <span className="text-xl font-black text-brand-700">₦{(selectedProduct.retail_price * quantity).toLocaleString()}</span>
+                <span className="text-xl font-black text-brand-700">
+                  ₦{((selectedProduct.retail_price * quantity) + (installationNeeded ? installationPrice : 0)).toLocaleString()}
+                </span>
               </div>
             )}
 

@@ -48,8 +48,13 @@ export function Topbar() {
         </div>
       </div>
 
-      <div className="md:hidden flex-1">
-        <img src={optismartLogo} alt="OptiSmart" className="h-9 w-auto object-contain" />
+      <div className="md:hidden flex-1 flex items-center gap-2">
+        <img src={optismartLogo} alt="OptiSmart" className="h-8 w-auto object-contain" />
+        {user?.role && (
+          <span className="px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 text-[10px] font-black uppercase tracking-wider whitespace-nowrap">
+            {user.role.replace('_', ' ')}
+          </span>
+        )}
       </div>
 
       {/* Right side actions */}
