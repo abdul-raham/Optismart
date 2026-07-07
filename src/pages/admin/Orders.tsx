@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
-import { ShoppingBag, Search, Calendar, Check, X, ArrowRightLeft } from 'lucide-react'
+import { ShoppingBag, Search, Calendar, Check, X, ArrowRightLeft, Plus, MapPin, Package, User } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { OrderStatusBadge } from '@/components/shared/Badges'
 import { AssignInstallerModal } from '@/components/shared/AssignInstallerModal'
 import { sendEmail } from '@/lib/email'
 import { sendWebPush } from '@/lib/push'
-import type { Order, OrderStatus } from '@/types'
+import type { Order, OrderStatus, Product, User as AppUser } from '@/types'
 
 export function AdminOrders() {
   const [orders, setOrders] = useState<Order[]>([])
@@ -15,33 +15,104 @@ export function AdminOrders() {
   const [search, setSearch] = useState('')
   const [updating, setUpdating] = useState<string | null>(null)
   const [assigningOrderId, setAssigningOrderId] = useState<string | null>(null)
+  const [products, setProducts] = useState<Product[]>([])
+  const [dsas, setDsas] = useState<AppUser[]>([])
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+
+  const [form, setForm] = useState({
+    dsa_id: '',
+    customer_name: '',
+    customer_phone: '',
+    customer_address: '',
+    product_id: '',
+    quantity: 1,
+    amount: 0,
+    installation_needed: false,
+    installation_price: 0,
+    expected_delivery_date: '',
+    notes: '',
+  })
   
   // A simple mapping for the allowed status transitions in the lifecycle
   const allowedTransitions: Record<OrderStatus, OrderStatus[]> = {
-    pending: ['confirmed', 'cancelled'],
+    pending: ['approved', 'cancelled'],
+    approved: ['processing'],
     confirmed: ['processing'],
     processing: ['dispatched'],
-    dispatched: ['delivered'],
+    dispatched: ['delivered', 'rescheduled'],
+    rescheduled: ['delivered', 'cancelled'],
     delivered: [],
     cancelled: []
   }
 
   useEffect(() => {
-    fetchOrders()
+    fetchData()
   }, [])
 
-  const fetchOrders = async () => {
+  const fetchData = async () => {
     try {
-      const { data } = await supabase
-        .from('orders')
-        .select('*, dsa:users!orders_dsa_id_fkey(email, full_name)')
-        .order('created_at', { ascending: false })
+      const [ordersRes, productsRes, dsasRes] = await Promise.all([
+        supabase.from('orders').select('*, dsa:users!orders_dsa_id_fkey(email, full_name)').order('created_at', { ascending: false }),
+        supabase.from('products').select('*').eq('is_active', true),
+        supabase.from('users').select('*').eq('role', 'dsa')
+      ])
       
-      if (data) setOrders(data)
+      if (ordersRes.data) setOrders(ordersRes.data)
+      if (productsRes.data) setProducts(productsRes.data)
+      if (dsasRes.data) setDsas(dsasRes.data)
     } catch (err) {
       console.error('Error fetching admin orders:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleCreateOrder = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!form.product_id) return
+    
+    setSubmitting(true)
+    try {
+      const product = products.find(p => p.id === form.product_id)
+      if (!product) throw new Error('Product not found')
+
+      const orderNumber = `ORD-${Date.now().toString().slice(-6)}`
+      const productTotal = form.amount > 0 ? form.amount : Number(product.retail_price) * form.quantity
+      const totalAmount = productTotal + (form.installation_needed ? form.installation_price : 0)
+
+      const { data, error } = await supabase
+        .from('orders')
+        .insert([{
+          order_number: orderNumber,
+          dsa_id: form.dsa_id || null,
+          customer_name: form.customer_name,
+          customer_phone: form.customer_phone,
+          customer_address: form.customer_address,
+          product_id: form.product_id,
+          quantity: form.quantity,
+          unit_price: product.retail_price,
+          total_amount: totalAmount,
+          installation_needed: form.installation_needed,
+          installation_price: form.installation_needed ? form.installation_price : 0,
+          expected_delivery_date: form.expected_delivery_date || null,
+          status: 'pending',
+          notes: form.notes
+        }])
+        .select('*, dsa:users!orders_dsa_id_fkey(email, full_name)')
+        .single()
+
+      if (error) throw error
+      if (data) {
+        setOrders([data, ...orders])
+        setIsModalOpen(false)
+        setForm({ dsa_id: '', customer_name: '', customer_phone: '', customer_address: '', product_id: '', quantity: 1, amount: 0, installation_needed: false, installation_price: 0, expected_delivery_date: '', notes: '' })
+      }
+    } catch (err) {
+      console.error('Error creating order:', err)
+      alert('Failed to create order')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -112,6 +183,13 @@ export function AdminOrders() {
               className="pl-9 pr-4 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none w-full sm:w-64 transition-all"
             />
           </div>
+          <button 
+            onClick={() => setIsModalOpen(true)}
+            className="btn-primary flex items-center gap-2 py-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Create Order</span>
+          </button>
         </div>
       </div>
 
@@ -254,7 +332,7 @@ export function AdminOrders() {
                         </button>
                       ))
                     )}
-                    {(order.status === 'confirmed' || order.status === 'processing') && !updating && (
+                    {(order.status === 'confirmed' || order.status === 'approved' || order.status === 'processing') && !updating && (
                       <button
                         onClick={() => setAssigningOrderId(order.id)}
                         className="text-xs font-bold px-3 py-1.5 rounded-lg border bg-surface-50 border-surface-200 text-surface-700 hover:bg-surface-100 transition-colors flex items-center gap-1"
@@ -273,9 +351,139 @@ export function AdminOrders() {
         <AssignInstallerModal 
           isOpen={!!assigningOrderId} 
           onClose={() => setAssigningOrderId(null)} 
-          onSuccess={fetchOrders}
+          onSuccess={fetchData}
           order={orders.find(o => o.id === assigningOrderId) || null}
         />
+
+      {/* CREATE ORDER MODAL */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm"
+              onClick={() => !submitting && setIsModalOpen(false)}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-2xl shadow-card-xl w-full max-w-lg relative z-10 overflow-hidden"
+            >
+              <div className="px-6 py-4 border-b border-surface-100 flex items-center justify-between bg-surface-50/50">
+                <h2 className="text-lg font-bold text-surface-900">Create New Order</h2>
+                <button onClick={() => !submitting && setIsModalOpen(false)} className="text-surface-400 hover:text-surface-900 transition-colors p-1 rounded-md hover:bg-surface-100">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateOrder} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+                <div>
+                  <label className="label">DSA In Charge *</label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
+                    <select required className="input pl-10" value={form.dsa_id} onChange={e => setForm({...form, dsa_id: e.target.value})}>
+                      <option value="">Select a DSA</option>
+                      {dsas.map(dsa => (
+                        <option key={dsa.id} value={dsa.id}>{dsa.full_name} ({dsa.email})</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="label">Customer Name *</label>
+                  <input required type="text" className="input" placeholder="e.g. John Smith" value={form.customer_name} onChange={e => setForm({...form, customer_name: e.target.value})} />
+                </div>
+                
+                <div>
+                  <label className="label">Customer Phone *</label>
+                  <input required type="tel" className="input" placeholder="080..." value={form.customer_phone} onChange={e => setForm({...form, customer_phone: e.target.value.replace(/[^\d+]/g, '')})} />
+                </div>
+
+                <div>
+                  <label className="label">Delivery Address *</label>
+                  <div className="relative">
+                    <MapPin className="absolute left-3 top-3 w-5 h-5 text-surface-400" />
+                    <textarea required rows={2} className="input pl-10" placeholder="Full delivery address" value={form.customer_address} onChange={e => setForm({...form, customer_address: e.target.value})} />
+                  </div>
+                </div>
+
+                <div className="border-t border-surface-100 pt-4">
+                  <label className="label">Select Model / Product *</label>
+                  <div className="relative">
+                    <Package className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
+                    <select required className="input pl-10" value={form.product_id} onChange={e => {
+                      const pId = e.target.value
+                      const p = products.find(prod => prod.id === pId)
+                      setForm({...form, product_id: pId, amount: p ? p.retail_price * form.quantity : 0})
+                    }}>
+                      <option value="">Select a product model</option>
+                      {products.map(p => (
+                        <option key={p.id} value={p.id}>{p.name} - {formatCurrency(p.retail_price)}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">Quantity *</label>
+                    <input required type="number" min={1} className="input" value={form.quantity} onChange={e => {
+                      const qty = parseInt(e.target.value) || 1
+                      const p = products.find(prod => prod.id === form.product_id)
+                      setForm({...form, quantity: qty, amount: p ? p.retail_price * qty : form.amount})
+                    }} />
+                  </div>
+                  <div>
+                    <label className="label">Product Amount (₦)</label>
+                    <input type="number" min={0} className="input" value={form.amount} onChange={e => setForm({...form, amount: Number(e.target.value)})} />
+                  </div>
+                </div>
+
+                <div className="border-t border-surface-100 pt-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <label className="label mb-0">Is Installation Needed?</label>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={form.installation_needed}
+                      onClick={() => setForm({...form, installation_needed: !form.installation_needed})}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.installation_needed ? 'bg-brand-500' : 'bg-surface-200'}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${form.installation_needed ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                  
+                  {form.installation_needed && (
+                    <div className="mb-4">
+                      <label className="label">Installation Price (₦) *</label>
+                      <input required type="number" min={0} className="input" value={form.installation_price} onChange={e => setForm({...form, installation_price: Number(e.target.value)})} />
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="label">Expected Delivery Date</label>
+                  <input type="date" className="input" value={form.expected_delivery_date} onChange={e => setForm({...form, expected_delivery_date: e.target.value})} />
+                </div>
+
+                <div>
+                  <label className="label">Additional Notes</label>
+                  <textarea rows={2} className="input resize-none" placeholder="Special instructions?" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
+                </div>
+
+                <div className="pt-4 flex items-center justify-end gap-3 border-t border-surface-100">
+                  <button type="button" onClick={() => setIsModalOpen(false)} disabled={submitting} className="btn-outline">Cancel</button>
+                  <button type="submit" disabled={submitting} className="btn-primary w-36 flex items-center justify-center">
+                    {submitting ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Confirm Order'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

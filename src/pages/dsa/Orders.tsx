@@ -11,18 +11,23 @@ export function DSAOrders() {
   const { user } = useAuthStore()
   const [orders, setOrders] = useState<Order[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  const [dsas, setDsas] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
   const [form, setForm] = useState({
+    dsa_id: user?.id || '',
     customer_name: '',
     customer_phone: '',
     customer_address: '',
     product_id: '',
     quantity: 1,
     amount: 0,
+    installation_needed: false,
+    installation_price: 0,
+    expected_delivery_date: '',
     notes: '',
   })
 
@@ -34,13 +39,15 @@ export function DSAOrders() {
 
   const fetchData = async () => {
     try {
-      const [ordersRes, productsRes] = await Promise.all([
+      const [ordersRes, productsRes, dsasRes] = await Promise.all([
         supabase.from('orders').select('*').eq('dsa_id', user?.id).order('created_at', { ascending: false }),
-        supabase.from('products').select('*').eq('is_active', true)
+        supabase.from('products').select('*').eq('is_active', true),
+        supabase.from('users').select('id, full_name, email').eq('role', 'dsa')
       ])
       
       if (ordersRes.data) setOrders(ordersRes.data)
       if (productsRes.data) setProducts(productsRes.data)
+      if (dsasRes.data) setDsas(dsasRes.data)
     } catch (err) {
       console.error('Error fetching data:', err)
     } finally {
@@ -58,13 +65,14 @@ export function DSAOrders() {
       if (!product) throw new Error('Product not found')
 
       const orderNumber = `ORD-${Date.now().toString().slice(-6)}`
-      const totalAmount = form.amount > 0 ? form.amount : Number(product.retail_price) * form.quantity
+      const productTotal = form.amount > 0 ? form.amount : Number(product.retail_price) * form.quantity
+      const totalAmount = productTotal + (form.installation_needed ? form.installation_price : 0)
 
       const { data, error } = await supabase
         .from('orders')
         .insert([{
           order_number: orderNumber,
-          dsa_id: user.id,
+          dsa_id: form.dsa_id || user.id,
           customer_name: form.customer_name,
           customer_phone: form.customer_phone,
           customer_address: form.customer_address,
@@ -72,6 +80,9 @@ export function DSAOrders() {
           quantity: form.quantity,
           unit_price: product.retail_price,
           total_amount: totalAmount,
+          installation_needed: form.installation_needed,
+          installation_price: form.installation_needed ? form.installation_price : 0,
+          expected_delivery_date: form.expected_delivery_date || null,
           status: 'pending',
           notes: form.notes
         }])
@@ -82,7 +93,7 @@ export function DSAOrders() {
       if (data) {
         setOrders([data, ...orders])
         setIsModalOpen(false)
-        setForm({ customer_name: '', customer_phone: '', customer_address: '', product_id: '', quantity: 1, amount: 0, notes: '' })
+        setForm({ dsa_id: user?.id || '', customer_name: '', customer_phone: '', customer_address: '', product_id: '', quantity: 1, amount: 0, installation_needed: false, installation_price: 0, expected_delivery_date: '', notes: '' })
       }
     } catch (err) {
       console.error('Error creating order:', err)
@@ -253,6 +264,18 @@ export function DSAOrders() {
 
               <form onSubmit={handleCreateOrder} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
                 <div>
+                  <label className="label">DSA In Charge *</label>
+                  <div className="relative">
+                    <select required className="input" value={form.dsa_id} onChange={e => setForm({...form, dsa_id: e.target.value})}>
+                      <option value="">Select a DSA</option>
+                      {dsas.map(dsa => (
+                        <option key={dsa.id} value={dsa.id}>{dsa.full_name} ({dsa.email})</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div>
                   <label className="label">Customer Name *</label>
                   <input required type="text" className="input" placeholder="e.g. John Smith" value={form.customer_name} onChange={e => setForm({...form, customer_name: e.target.value})} />
                 </div>
@@ -263,7 +286,7 @@ export function DSAOrders() {
                 </div>
 
                 <div>
-                  <label className="label">Installation Address *</label>
+                  <label className="label">Delivery Address *</label>
                   <div className="relative">
                     <MapPin className="absolute left-3 top-3 w-5 h-5 text-surface-400" />
                     <textarea required rows={2} className="input pl-10" placeholder="Full delivery address" value={form.customer_address} onChange={e => setForm({...form, customer_address: e.target.value})} />
@@ -297,9 +320,36 @@ export function DSAOrders() {
                     }} />
                   </div>
                   <div>
-                    <label className="label">Total Amount (₦) *</label>
-                    <input required type="number" min={0} className="input" value={form.amount} onChange={e => setForm({...form, amount: Number(e.target.value)})} />
+                    <label className="label">Product Amount (₦)</label>
+                    <input type="number" min={0} className="input" value={form.amount} onChange={e => setForm({...form, amount: Number(e.target.value)})} />
                   </div>
+                </div>
+
+                <div className="border-t border-surface-100 pt-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <label className="label mb-0">Is Installation Needed?</label>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={form.installation_needed}
+                      onClick={() => setForm({...form, installation_needed: !form.installation_needed})}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.installation_needed ? 'bg-brand-500' : 'bg-surface-200'}`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${form.installation_needed ? 'translate-x-6' : 'translate-x-1'}`} />
+                    </button>
+                  </div>
+                  
+                  {form.installation_needed && (
+                    <div className="mb-4">
+                      <label className="label">Installation Price (₦) *</label>
+                      <input required type="number" min={0} className="input" value={form.installation_price} onChange={e => setForm({...form, installation_price: Number(e.target.value)})} />
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <label className="label">Expected Delivery Date</label>
+                  <input type="date" className="input" value={form.expected_delivery_date} onChange={e => setForm({...form, expected_delivery_date: e.target.value})} />
                 </div>
 
                 <div>

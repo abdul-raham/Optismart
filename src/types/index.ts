@@ -72,10 +72,12 @@ export interface Lead {
 // --- ORDERS ---
 export type OrderStatus =
   | 'pending'
+  | 'approved'
   | 'confirmed'
   | 'processing'
   | 'dispatched'
   | 'delivered'
+  | 'rescheduled'
   | 'cancelled'
 
 export interface Order {
@@ -93,6 +95,9 @@ export interface Order {
   unit_price: number
   total_amount: number
   status: OrderStatus
+  installation_needed: boolean
+  installation_price: number
+  expected_delivery_date: string | null
   notes: string | null
   payment_confirmed_at: string | null
   delivered_at?: string | null
