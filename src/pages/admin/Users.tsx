@@ -63,6 +63,16 @@ export function AdminUsers() {
     return matchesSearch && matchesRole
   })
 
+  const canModifyUser = (targetRole: string) => {
+    if (currentUser?.role === 'super_admin') {
+      return targetRole !== 'super_admin'
+    }
+    if (currentUser?.role === 'admin') {
+      return !['admin', 'super_admin'].includes(targetRole)
+    }
+    return false
+  }
+
   const getRoleColor = (role: string) => {
     switch(role) {
       case 'super_admin': return 'bg-purple-100 text-purple-700 border-purple-200'
@@ -162,22 +172,29 @@ export function AdminUsers() {
                     Joined {formatDate(user.created_at)}
                   </span>
                   
-                  <button 
-                    onClick={() => toggleUserStatus(user.id, user.status)}
-                    disabled={user.id === currentUser?.id}
-                    className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-colors flex items-center gap-1.5 ${
-                      user.id === currentUser?.id ? 'opacity-50 cursor-not-allowed bg-surface-100 border-surface-200 text-surface-400' :
-                      user.status === 'active' 
-                        ? 'bg-white border-surface-200 text-danger-600 hover:border-danger-200 hover:bg-danger-50'
-                        : 'bg-white border-surface-200 text-success-600 hover:border-success-200 hover:bg-success-50'
-                    }`}
-                  >
-                    {user.status === 'active' ? (
-                      <><Ban className="w-3.5 h-3.5" /> Suspend</>
-                    ) : (
-                      <><CheckCircle2 className="w-3.5 h-3.5" /> Reactivate</>
-                    )}
-                  </button>
+                  {canModifyUser(user.role) && user.id !== currentUser?.id ? (
+                    <button 
+                      onClick={() => toggleUserStatus(user.id, user.status)}
+                      className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-colors flex items-center gap-1.5 ${
+                        user.status === 'active' 
+                          ? 'bg-white border-surface-200 text-danger-600 hover:border-danger-200 hover:bg-danger-50'
+                          : 'bg-white border-surface-200 text-success-600 hover:border-success-200 hover:bg-success-50'
+                      }`}
+                    >
+                      {user.status === 'active' ? (
+                        <><Ban className="w-3.5 h-3.5" /> Suspend</>
+                      ) : (
+                        <><CheckCircle2 className="w-3.5 h-3.5" /> Reactivate</>
+                      )}
+                    </button>
+                  ) : (
+                    <button 
+                      disabled
+                      className="text-xs font-bold px-3 py-1.5 rounded-lg border border-surface-200 bg-surface-100 text-surface-400 opacity-50 cursor-not-allowed flex items-center gap-1.5"
+                    >
+                      <ShieldAlert className="w-3.5 h-3.5" /> Restricted
+                    </button>
+                  )}
                 </div>
               </motion.div>
             ))}

@@ -319,42 +319,56 @@ CREATE TABLE IF NOT EXISTS public.certificates (
 -- ==========================================
 CREATE OR REPLACE FUNCTION public.current_app_user_id()
 RETURNS UUID
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT id FROM public.users WHERE auth_id = auth.uid() LIMIT 1
+DECLARE
+  app_id UUID;
+BEGIN
+  SELECT id INTO app_id FROM public.users WHERE auth_id = auth.uid() LIMIT 1;
+  RETURN app_id;
+END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.current_app_role()
 RETURNS user_role
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT role FROM public.users WHERE auth_id = auth.uid() LIMIT 1
+DECLARE
+  app_role user_role;
+BEGIN
+  SELECT role INTO app_role FROM public.users WHERE auth_id = auth.uid() LIMIT 1;
+  RETURN app_role;
+END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS BOOLEAN
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT COALESCE(public.current_app_role() IN ('admin', 'super_admin'), false)
+BEGIN
+  RETURN COALESCE(public.current_app_role() IN ('admin', 'super_admin'), false);
+END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.is_super_admin()
 RETURNS BOOLEAN
-LANGUAGE sql
+LANGUAGE plpgsql
 STABLE
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT COALESCE(public.current_app_role() = 'super_admin', false)
+BEGIN
+  RETURN COALESCE(public.current_app_role() = 'super_admin', false);
+END;
 $$;
 
 CREATE OR REPLACE FUNCTION public.set_updated_at()
