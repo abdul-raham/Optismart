@@ -99,7 +99,7 @@ export function Sidebar() {
     <motion.aside
       animate={{ width: W }}
       transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-      className="fixed left-3 top-3 bottom-3 h-[calc(100%-24px)] z-30 flex flex-col overflow-hidden rounded-[24px]"
+      className="fixed left-3 top-3 bottom-3 h-[calc(100%-24px)] z-30 flex flex-col rounded-[24px]"
       style={{
         width: W,
         backdropFilter: 'blur(20px)',
@@ -228,18 +228,22 @@ export function Sidebar() {
         </div>
       </div>
 
-      {/* Toggle button */}
-      <button
+      {/* Cutout Notch Toggle */}
+      <div 
         onClick={toggleSidebar}
-        className="absolute -right-3 top-[72px] w-6 h-6 rounded-full bg-white border border-surface-200
-                   flex items-center justify-center text-surface-400 hover:text-brand-600
-                   hover:border-brand-300 shadow-sm transition-all z-40"
+        className="absolute top-[80px] w-[24px] h-[48px] bg-[#f8fbff] border-y border-l border-surface-400 z-40 flex items-center justify-start cursor-pointer hover:bg-[#eef5fc] transition-all"
+        style={{ 
+          right: '-1px', // overlap the sidebar border exactly
+          borderTopLeftRadius: '100px', 
+          borderBottomLeftRadius: '100px',
+          boxShadow: 'inset 4px 0 6px rgba(0,0,0,0.05)'
+        }}
+        title="Toggle Sidebar"
       >
-        {sidebarCollapsed
-          ? <ChevronRight className="w-3.5 h-3.5" />
-          : <ChevronLeft className="w-3.5 h-3.5" />
-        }
-      </button>
+        <div className="text-surface-600 pl-[4px] transition-transform hover:scale-110">
+          {sidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+        </div>
+      </div>
     </motion.aside>
   )
 }

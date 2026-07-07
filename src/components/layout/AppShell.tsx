@@ -4,12 +4,16 @@ import { Sidebar } from './Sidebar'
 import { Topbar } from './Topbar'
 import { MobileNavBar } from './MobileNavBar'
 import { useUIStore } from '@/stores/uiStore'
+import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { InstallPWA } from '@/components/pwa/InstallPWA'
 
 export function AppShell() {
-  const { sidebarCollapsed } = useUIStore()
+  const { sidebarCollapsed, toggleSidebar } = useUIStore()
 
   return (
     <div className="flex h-screen overflow-hidden bg-[linear-gradient(180deg,#f8fbff_0%,#f8fafc_44%,#eef7fb_100%)]">
+      <InstallPWA />
+      
       {/* Sidebar — desktop only */}
       <div className="hidden md:block">
         <Sidebar />

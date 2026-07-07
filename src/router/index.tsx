@@ -10,6 +10,7 @@ import { LandingPage } from '@/pages/public/LandingPage'
 import { LoginPage } from '@/pages/auth/LoginPage'
 import { RegisterPage } from '@/pages/auth/RegisterPage'
 import { ForgotPasswordPage } from '@/pages/auth/ForgotPasswordPage'
+import { UpdatePasswordPage } from '@/pages/auth/UpdatePasswordPage'
 
 // Shared / loading
 import { FullPageLoader } from '@/components/shared/FullPageLoader'
@@ -131,6 +132,7 @@ export function AppRouter() {
       <Route path="/auth/login"           element={<LoginPage />} />
       <Route path="/auth/register"        element={<RegisterPage />} />
       <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/auth/update-password" element={<UpdatePasswordPage />} />
 
       {/* Public Landing Page */}
       <Route path="/" element={<LandingPage />} />
