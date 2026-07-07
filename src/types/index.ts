@@ -88,6 +88,7 @@ export interface Order {
   reseller_id?: string | null
   dsa?: User
   customer_name: string
+  customer_email?: string | null
   customer_phone: string
   customer_address: string
   product_id: string

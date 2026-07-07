@@ -51,6 +51,7 @@ export const NAV_ITEMS: Record<UserRole, NavItem[]> = {
     { label: 'Products',   href: '/app/products',        icon: Package },
     { label: 'Installers', href: '/app/dsa/installers',  icon: UserCheck },
     { label: 'Commission', href: '/app/dsa/commission',  icon: Banknote },
+    { label: 'Reports',    href: '/app/dsa/reports',     icon: BarChart3 },
     { label: 'Reminders',  href: '/app/dsa/reminders',   icon: CalendarDays },
     { label: 'Training',   href: '/app/training',        icon: BookOpen },
     { label: 'Settings',   href: '/app/settings',        icon: Settings },

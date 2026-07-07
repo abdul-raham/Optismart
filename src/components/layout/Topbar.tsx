@@ -61,59 +61,6 @@ export function Topbar() {
       <div className="flex items-center gap-2 md:gap-4 ml-auto">
         
         <div className="relative">
-          <button
-            onClick={() => {
-              setShowNotifications(!showNotifications)
-              setShowDropdown(false)
-            }}
-            className="relative p-2 text-surface-500 hover:bg-surface-50 hover:text-surface-800 rounded-full transition-colors"
-          >
-            <Bell className="w-5 h-5" />
-            {unreadCount > 0 && (
-              <span className="absolute -right-0.5 -top-0.5 min-w-5 rounded-full bg-danger-500 px-1.5 py-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white">
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </span>
-            )}
-          </button>
-
-          <AnimatePresence>
-            {showNotifications && (
-              <>
-                <div className="fixed inset-0 z-30" onClick={() => setShowNotifications(false)} />
-                <motion.div
-                  initial={{ opacity: 0, y: 10, scale: 0.96 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 10, scale: 0.96 }}
-                  className="absolute right-0 top-full z-40 mt-2 w-80 overflow-hidden rounded-2xl border border-surface-100 bg-white shadow-card-lg"
-                >
-                  <div className="flex items-center justify-between border-b border-surface-100 px-4 py-3">
-                    <p className="text-sm font-black text-surface-900">Notifications</p>
-                    {unreadCount > 0 && user?.id && (
-                      <button onClick={() => markAllRead(user.id)} className="text-xs font-black text-brand-600 hover:text-brand-700">
-                        Mark all read
-                      </button>
-                    )}
-                  </div>
-                  <div className="max-h-96 overflow-y-auto">
-                    {notifications.slice(0, 8).map((notification) => (
-                      <div key={notification.id} className="border-b border-surface-50 px-4 py-3 last:border-b-0">
-                        <div className="flex items-start gap-3">
-                          <span className={`mt-1 h-2 w-2 rounded-full ${notification.is_read ? 'bg-surface-200' : 'bg-brand-500'}`} />
-                          <div>
-                            <p className="text-sm font-bold text-surface-900">{notification.title}</p>
-                            <p className="mt-0.5 text-xs leading-5 text-surface-500">{notification.message}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                    {notifications.length === 0 && (
-                      <div className="px-4 py-8 text-center text-sm font-semibold text-surface-500">No notifications yet.</div>
-                    )}
-                  </div>
-                </motion.div>
-              </>
-            )}
-          </AnimatePresence>
         </div>
 
         <div className="h-6 w-px bg-surface-200 hidden md:block"></div>

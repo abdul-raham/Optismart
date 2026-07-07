@@ -33,6 +33,7 @@ import { DSAOrders } from '@/pages/dsa/Orders'
 import { DSAInstallerBooking } from '@/pages/dsa/InstallerBooking'
 import { DSACommissions } from '@/pages/dsa/Commissions'
 import { DSAReminders } from '@/pages/dsa/Reminders'
+import { DSAReports } from '@/pages/dsa/Reports'
 
 // Installer pages
 import { InstallerDashboard } from '@/pages/installer/Dashboard'
@@ -169,6 +170,7 @@ export function AppRouter() {
             <Route path="/app/dsa/orders"     element={<DSAOrders />} />
             <Route path="/app/dsa/installers" element={<DSAInstallerBooking />} />
             <Route path="/app/dsa/commission" element={<DSACommissions />} />
+            <Route path="/app/dsa/reports"    element={<DSAReports />} />
             <Route path="/app/dsa/reminders"  element={<DSAReminders />} />
           </Route>
 

@@ -22,6 +22,7 @@ export function DSAOrders() {
     dsa_id: user?.id || '',
     unregistered_dsa_name: '',
     customer_name: '',
+    customer_email: '',
     customer_phone: '',
     customer_address: '',
     product_id: '',
@@ -77,6 +78,7 @@ export function DSAOrders() {
           dsa_id: form.is_dsa_registered ? (form.dsa_id || user.id) : null,
           unregistered_dsa_name: !form.is_dsa_registered ? form.unregistered_dsa_name : null,
           customer_name: form.customer_name,
+          customer_email: form.customer_email || null,
           customer_phone: form.customer_phone,
           customer_address: form.customer_address,
           product_id: form.product_id,
@@ -96,7 +98,7 @@ export function DSAOrders() {
       if (data) {
         setOrders([data, ...orders])
         setIsModalOpen(false)
-        setForm({ is_dsa_registered: true, unregistered_dsa_name: '', dsa_id: user?.id || '', customer_name: '', customer_phone: '', customer_address: '', product_id: '', quantity: 1, amount: 0, installation_needed: false, installation_price: 0, expected_delivery_date: '', notes: '' })
+        setForm({ is_dsa_registered: true, unregistered_dsa_name: '', dsa_id: user?.id || '', customer_name: '', customer_email: '', customer_phone: '', customer_address: '', product_id: '', quantity: 1, amount: 0, installation_needed: false, installation_price: 0, expected_delivery_date: '', notes: '' })
       }
     } catch (err) {
       console.error('Error creating order:', err)
@@ -309,6 +311,13 @@ export function DSAOrders() {
                 <div>
                   <label className="label">Customer Phone *</label>
                   <input required type="tel" className="input" placeholder="080..." value={form.customer_phone} onChange={e => setForm({...form, customer_phone: e.target.value.replace(/[^\d+]/g, '')})} />
+                </div>
+
+                <div>
+                  <label className="label">Customer Email (Optional)</label>
+                  <div className="relative">
+                    <input type="email" className="input" placeholder="customer@example.com" value={form.customer_email} onChange={e => setForm({...form, customer_email: e.target.value})} />
+                  </div>
                 </div>
 
                 <div>

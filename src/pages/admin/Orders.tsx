@@ -25,6 +25,7 @@ export function AdminOrders() {
     dsa_id: '',
     unregistered_dsa_name: '',
     customer_name: '',
+    customer_email: '',
     customer_phone: '',
     customer_address: '',
     product_id: '',
@@ -90,6 +91,7 @@ export function AdminOrders() {
           dsa_id: form.is_dsa_registered ? (form.dsa_id || null) : null,
           unregistered_dsa_name: !form.is_dsa_registered ? form.unregistered_dsa_name : null,
           customer_name: form.customer_name,
+          customer_email: form.customer_email || null,
           customer_phone: form.customer_phone,
           customer_address: form.customer_address,
           product_id: form.product_id,
@@ -109,7 +111,7 @@ export function AdminOrders() {
       if (data) {
         setOrders([data, ...orders])
         setIsModalOpen(false)
-        setForm({ is_dsa_registered: true, unregistered_dsa_name: '', dsa_id: '', customer_name: '', customer_phone: '', customer_address: '', product_id: '', quantity: 1, amount: 0, installation_needed: false, installation_price: 0, expected_delivery_date: '', notes: '' })
+        setForm({ is_dsa_registered: true, unregistered_dsa_name: '', dsa_id: '', customer_name: '', customer_email: '', customer_phone: '', customer_address: '', product_id: '', quantity: 1, amount: 0, installation_needed: false, installation_price: 0, expected_delivery_date: '', notes: '' })
       }
     } catch (err) {
       console.error('Error creating order:', err)
@@ -148,6 +150,16 @@ export function AdminOrders() {
           `Order ${updatedOrder.order_number} for ${updatedOrder.customer_name} is now ${newStatus.toUpperCase()}`,
           '/app/dsa/orders'
         ).catch(console.error);
+      }
+
+      // Send Notification to Customer
+      if (updatedOrder?.customer_email) {
+        sendEmail('order_status_update', {
+          recipientEmail: updatedOrder.customer_email,
+          customerName: updatedOrder.customer_name,
+          orderNumber: updatedOrder.order_number,
+          status: newStatus
+        }).catch(console.error);
       }
 
       // Update local state
@@ -428,6 +440,14 @@ export function AdminOrders() {
                 <div>
                   <label className="label">Customer Phone *</label>
                   <input required type="tel" className="input" placeholder="080..." value={form.customer_phone} onChange={e => setForm({...form, customer_phone: e.target.value.replace(/[^\d+]/g, '')})} />
+                </div>
+
+                <div>
+                  <label className="label">Customer Email (Optional)</label>
+                  <div className="relative">
+                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
+                    <input type="email" className="input pl-10" placeholder="customer@example.com" value={form.customer_email} onChange={e => setForm({...form, customer_email: e.target.value})} />
+                  </div>
                 </div>
 
                 <div>

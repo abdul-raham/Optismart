@@ -20,6 +20,7 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
 
   // Form State
   const [customerName, setCustomerName] = useState('')
+  const [customerEmail, setCustomerEmail] = useState('')
   const [customerPhone, setCustomerPhone] = useState('')
   const [customerAddress, setCustomerAddress] = useState('')
   const [selectedProductId, setSelectedProductId] = useState('')
@@ -93,7 +94,7 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
       if (!product) throw new Error('Please select a product')
 
       const unitPrice = product.retail_price
-      const totalAmount = totalProductPrice + (installationNeeded ? installationPrice : 0)
+      const totalAmount = (unitPrice * quantity) + (installationNeeded ? installationPrice : 0)
       const orderNumber = `ORD-${Date.now().toString().slice(-6)}`
 
       const { error: insertError } = await supabase.from('orders').insert({
@@ -101,6 +102,7 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
         dsa_id: isDsaRegistered ? user.id : null,
         unregistered_dsa_name: !isDsaRegistered ? unregisteredDsaName : null,
         customer_name: customerName,
+        customer_email: customerEmail || null,
         customer_phone: customerPhone,
         customer_address: customerAddress,
         product_id: product.id,
@@ -117,11 +119,23 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
       if (insertError) throw insertError
 
       // Trigger email notification in background
+      // This sends a "receipt / invoice" email to the customer if email is provided
+      if (customerEmail) {
+        sendEmail('new_order', {
+          recipientEmail: customerEmail,
+          orderNumber: orderNumber,
+          customerName: customerName,
+          totalAmount: totalAmount
+        }, { onError: (e) => console.warn('Customer Receipt Email failed:', e) })
+      }
+
+      // Also notify the DSA/Agent
       sendEmail('new_order', {
         recipientEmail: user.email,
         orderNumber: orderNumber,
-        customerName: customerName
-      }, { onError: (e) => console.warn('Email failed:', e) })
+        customerName: customerName,
+        totalAmount: totalAmount
+      }, { onError: (e) => console.warn('DSA Email failed:', e) })
 
       setCreatedOrderNumber(orderNumber)
       setCreatedOrderAmount(totalAmount)
@@ -138,6 +152,7 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
     onClose()
     setShowPayment(false)
     setCustomerName('')
+    setCustomerEmail('')
     setCustomerPhone('')
     setCustomerAddress('')
   }
@@ -273,6 +288,14 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
                   <input required type="text" value={customerName} onChange={e => setCustomerName(e.target.value)} className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-surface-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none text-sm transition-all" placeholder="John Doe" />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-bold text-surface-700 mb-1.5">Customer Email (Optional)</label>
+                <div className="relative">
+                  <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
+                  <input type="email" value={customerEmail} onChange={e => setCustomerEmail(e.target.value)} className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-surface-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none text-sm transition-all" placeholder="customer@example.com (For Receipt)" />
                 </div>
               </div>
 
