@@ -21,7 +21,9 @@ export function AdminOrders() {
   const [submitting, setSubmitting] = useState(false)
 
   const [form, setForm] = useState({
+    is_dsa_registered: true,
     dsa_id: '',
+    unregistered_dsa_name: '',
     customer_name: '',
     customer_phone: '',
     customer_address: '',
@@ -85,7 +87,8 @@ export function AdminOrders() {
         .from('orders')
         .insert([{
           order_number: orderNumber,
-          dsa_id: form.dsa_id || null,
+          dsa_id: form.is_dsa_registered ? (form.dsa_id || null) : null,
+          unregistered_dsa_name: !form.is_dsa_registered ? form.unregistered_dsa_name : null,
           customer_name: form.customer_name,
           customer_phone: form.customer_phone,
           customer_address: form.customer_address,
@@ -106,7 +109,7 @@ export function AdminOrders() {
       if (data) {
         setOrders([data, ...orders])
         setIsModalOpen(false)
-        setForm({ dsa_id: '', customer_name: '', customer_phone: '', customer_address: '', product_id: '', quantity: 1, amount: 0, installation_needed: false, installation_price: 0, expected_delivery_date: '', notes: '' })
+        setForm({ is_dsa_registered: true, unregistered_dsa_name: '', dsa_id: '', customer_name: '', customer_phone: '', customer_address: '', product_id: '', quantity: 1, amount: 0, installation_needed: false, installation_price: 0, expected_delivery_date: '', notes: '' })
       }
     } catch (err) {
       console.error('Error creating order:', err)
@@ -228,7 +231,10 @@ export function AdminOrders() {
                     >
                       <td className="py-4 px-6">
                         <p className="text-sm font-bold text-brand-600">{order.order_number}</p>
-                        <p className="text-xs text-surface-500 flex items-center gap-1 mt-0.5">
+                        <p className="text-[10px] text-surface-500 font-medium uppercase mt-0.5 tracking-wide">
+                          By: {order.dsa?.full_name || order.unregistered_dsa_name || 'System'}
+                        </p>
+                        <p className="text-xs text-surface-400 flex items-center gap-1 mt-1">
                           <Calendar className="w-3 h-3" /> {formatDate(order.created_at)}
                         </p>
                       </td>
@@ -379,16 +385,39 @@ export function AdminOrders() {
 
               <form onSubmit={handleCreateOrder} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
                 <div>
-                  <label className="label">DSA In Charge *</label>
-                  <div className="relative">
-                    <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
-                    <select required className="input pl-10" value={form.dsa_id} onChange={e => setForm({...form, dsa_id: e.target.value})}>
-                      <option value="">Select a DSA</option>
-                      {dsas.map(dsa => (
-                        <option key={dsa.id} value={dsa.id}>{dsa.full_name} ({dsa.email})</option>
-                      ))}
-                    </select>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="label mb-0">DSA In Charge *</label>
+                    <label className="flex items-center gap-2 text-xs font-medium text-surface-600 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={!form.is_dsa_registered} 
+                        onChange={e => setForm({...form, is_dsa_registered: !e.target.checked})} 
+                        className="rounded border-surface-300 text-brand-600 focus:ring-brand-500"
+                      />
+                      Unregistered / External Agent
+                    </label>
                   </div>
+
+                  {form.is_dsa_registered ? (
+                    <div className="relative">
+                      <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
+                      <select required className="input pl-10" value={form.dsa_id} onChange={e => setForm({...form, dsa_id: e.target.value})}>
+                        <option value="">Select a DSA</option>
+                        {dsas.map(dsa => (
+                          <option key={dsa.id} value={dsa.id}>{dsa.full_name} ({dsa.email})</option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <input 
+                      required 
+                      type="text" 
+                      className="input" 
+                      placeholder="Type the full name of the agent" 
+                      value={form.unregistered_dsa_name} 
+                      onChange={e => setForm({...form, unregistered_dsa_name: e.target.value})} 
+                    />
+                  )}
                 </div>
 
                 <div>

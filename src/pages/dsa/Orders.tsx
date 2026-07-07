@@ -18,7 +18,9 @@ export function DSAOrders() {
   const [submitting, setSubmitting] = useState(false)
 
   const [form, setForm] = useState({
+    is_dsa_registered: true,
     dsa_id: user?.id || '',
+    unregistered_dsa_name: '',
     customer_name: '',
     customer_phone: '',
     customer_address: '',
@@ -72,7 +74,8 @@ export function DSAOrders() {
         .from('orders')
         .insert([{
           order_number: orderNumber,
-          dsa_id: form.dsa_id || user.id,
+          dsa_id: form.is_dsa_registered ? (form.dsa_id || user.id) : null,
+          unregistered_dsa_name: !form.is_dsa_registered ? form.unregistered_dsa_name : null,
           customer_name: form.customer_name,
           customer_phone: form.customer_phone,
           customer_address: form.customer_address,
@@ -93,7 +96,7 @@ export function DSAOrders() {
       if (data) {
         setOrders([data, ...orders])
         setIsModalOpen(false)
-        setForm({ dsa_id: user?.id || '', customer_name: '', customer_phone: '', customer_address: '', product_id: '', quantity: 1, amount: 0, installation_needed: false, installation_price: 0, expected_delivery_date: '', notes: '' })
+        setForm({ is_dsa_registered: true, unregistered_dsa_name: '', dsa_id: user?.id || '', customer_name: '', customer_phone: '', customer_address: '', product_id: '', quantity: 1, amount: 0, installation_needed: false, installation_price: 0, expected_delivery_date: '', notes: '' })
       }
     } catch (err) {
       console.error('Error creating order:', err)
@@ -264,15 +267,38 @@ export function DSAOrders() {
 
               <form onSubmit={handleCreateOrder} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
                 <div>
-                  <label className="label">DSA In Charge *</label>
-                  <div className="relative">
-                    <select required className="input" value={form.dsa_id} onChange={e => setForm({...form, dsa_id: e.target.value})}>
-                      <option value="">Select a DSA</option>
-                      {dsas.map(dsa => (
-                        <option key={dsa.id} value={dsa.id}>{dsa.full_name} ({dsa.email})</option>
-                      ))}
-                    </select>
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="label mb-0">DSA In Charge *</label>
+                    <label className="flex items-center gap-2 text-xs font-medium text-surface-600 cursor-pointer">
+                      <input 
+                        type="checkbox" 
+                        checked={!form.is_dsa_registered} 
+                        onChange={e => setForm({...form, is_dsa_registered: !e.target.checked})} 
+                        className="rounded border-surface-300 text-brand-600 focus:ring-brand-500"
+                      />
+                      Unregistered / External Agent
+                    </label>
                   </div>
+                  
+                  {form.is_dsa_registered ? (
+                    <div className="relative">
+                      <select required className="input" value={form.dsa_id} onChange={e => setForm({...form, dsa_id: e.target.value})}>
+                        <option value="">Select a DSA</option>
+                        {dsas.map(dsa => (
+                          <option key={dsa.id} value={dsa.id}>{dsa.full_name} ({dsa.email})</option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <input 
+                      required 
+                      type="text" 
+                      className="input" 
+                      placeholder="Type the full name of the agent" 
+                      value={form.unregistered_dsa_name} 
+                      onChange={e => setForm({...form, unregistered_dsa_name: e.target.value})} 
+                    />
+                  )}
                 </div>
 
                 <div>
