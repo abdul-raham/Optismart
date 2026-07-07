@@ -22,6 +22,7 @@ export function DSAOrders() {
     customer_address: '',
     product_id: '',
     quantity: 1,
+    amount: 0,
     notes: '',
   })
 
@@ -57,7 +58,7 @@ export function DSAOrders() {
       if (!product) throw new Error('Product not found')
 
       const orderNumber = `ORD-${Date.now().toString().slice(-6)}`
-      const totalAmount = Number(product.retail_price) * form.quantity
+      const totalAmount = form.amount > 0 ? form.amount : Number(product.retail_price) * form.quantity
 
       const { data, error } = await supabase
         .from('orders')
@@ -81,7 +82,7 @@ export function DSAOrders() {
       if (data) {
         setOrders([data, ...orders])
         setIsModalOpen(false)
-        setForm({ customer_name: '', customer_phone: '', customer_address: '', product_id: '', quantity: 1, notes: '' })
+        setForm({ customer_name: '', customer_phone: '', customer_address: '', product_id: '', quantity: 1, amount: 0, notes: '' })
       }
     } catch (err) {
       console.error('Error creating order:', err)
@@ -270,11 +271,15 @@ export function DSAOrders() {
                 </div>
 
                 <div className="border-t border-surface-100 pt-4">
-                  <label className="label">Select Product *</label>
+                  <label className="label">Select Model / Product *</label>
                   <div className="relative">
                     <Package className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
-                    <select required className="input pl-10" value={form.product_id} onChange={e => setForm({...form, product_id: e.target.value})}>
-                      <option value="">Select a product</option>
+                    <select required className="input pl-10" value={form.product_id} onChange={e => {
+                      const pId = e.target.value
+                      const p = products.find(prod => prod.id === pId)
+                      setForm({...form, product_id: pId, amount: p ? p.retail_price * form.quantity : 0})
+                    }}>
+                      <option value="">Select a product model</option>
                       {products.map(p => (
                         <option key={p.id} value={p.id}>{p.name} - {formatCurrency(p.retail_price)}</option>
                       ))}
@@ -282,9 +287,19 @@ export function DSAOrders() {
                   </div>
                 </div>
 
-                <div>
-                  <label className="label">Quantity *</label>
-                  <input required type="number" min={1} className="input" value={form.quantity} onChange={e => setForm({...form, quantity: parseInt(e.target.value)})} />
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">Quantity *</label>
+                    <input required type="number" min={1} className="input" value={form.quantity} onChange={e => {
+                      const qty = parseInt(e.target.value) || 1
+                      const p = products.find(prod => prod.id === form.product_id)
+                      setForm({...form, quantity: qty, amount: p ? p.retail_price * qty : form.amount})
+                    }} />
+                  </div>
+                  <div>
+                    <label className="label">Total Amount (₦) *</label>
+                    <input required type="number" min={0} className="input" value={form.amount} onChange={e => setForm({...form, amount: Number(e.target.value)})} />
+                  </div>
                 </div>
 
                 <div>

@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { UserPlus, Target, TrendingUp, MoreVertical, Search, Plus, X, Phone, Mail, MapPin, Calendar, Clock, Banknote } from 'lucide-react'
 import { sendEmail } from '@/lib/email'
+import { sendWebPush } from '@/lib/push'
 import { formatDate } from '@/lib/utils'
 import type { Lead } from '@/types'
 
@@ -75,6 +76,13 @@ export function DSALeads() {
           dsaName: user.full_name,
           customerName: form.customer_name
         }, { onError: (e) => console.warn('Email failed:', e) })
+        
+        sendWebPush(
+          user.id,
+          'Lead Captured',
+          `Successfully saved ${form.customer_name} to your pipeline.`,
+          '/app/dsa/leads'
+        ).catch(console.warn)
 
         setLeads([data, ...leads])
         setIsModalOpen(false)

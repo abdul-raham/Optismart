@@ -76,7 +76,7 @@ export function InstallPWA() {
         initial={{ y: 100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         exit={{ y: 100, opacity: 0 }}
-        className="fixed bottom-20 left-4 right-4 md:left-auto md:right-8 md:bottom-8 md:w-96 z-50 bg-white/90 backdrop-blur-xl border border-surface-200 shadow-2xl rounded-2xl p-4"
+        className="fixed bottom-28 left-4 right-4 md:left-auto md:right-8 md:bottom-8 md:w-96 z-[100] bg-white/90 backdrop-blur-xl border border-surface-200 shadow-2xl rounded-2xl p-4"
       >
         <button 
           onClick={handleDismiss}

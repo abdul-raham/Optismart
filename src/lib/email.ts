@@ -10,7 +10,7 @@ export interface SendEmailOptions {
  * For non-critical mail, omit await and pass an onError callback.
  */
 export async function sendEmail(
-  type: 'welcome' | 'new_lead' | 'new_order',
+  type: 'welcome' | 'new_lead' | 'new_order' | 'order_status_update' | 'commission_paid' | 'job_assigned' | 'account_approved',
   data: Record<string, any>,
   options: SendEmailOptions = {}
 ) {

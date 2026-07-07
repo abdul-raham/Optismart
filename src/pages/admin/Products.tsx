@@ -284,22 +284,22 @@ export function AdminProducts() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="label">Retail Price (₦) *</label>
-                    <input required type="number" min={0} className="input" value={form.retail_price || ''} onChange={e => setForm({...form, retail_price: Number(e.target.value)})} />
+                    <input required type="number" min={0} className="input" value={form.retail_price} onChange={e => setForm({...form, retail_price: Number(e.target.value)})} />
                   </div>
                   <div>
                     <label className="label">Wholesale Price (₦) *</label>
-                    <input required type="number" min={0} className="input" value={form.wholesale_price || ''} onChange={e => setForm({...form, wholesale_price: Number(e.target.value)})} />
+                    <input required type="number" min={0} className="input" value={form.wholesale_price} onChange={e => setForm({...form, wholesale_price: Number(e.target.value)})} />
                   </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="label">Initial Stock *</label>
-                    <input required type="number" min={0} className="input" value={form.stock_quantity || ''} onChange={e => setForm({...form, stock_quantity: Number(e.target.value)})} />
+                    <input required type="number" min={0} className="input" value={form.stock_quantity} onChange={e => setForm({...form, stock_quantity: Number(e.target.value)})} />
                   </div>
                   <div>
                     <label className="label">Low Stock Alert *</label>
-                    <input required type="number" min={0} className="input" value={form.min_stock_level || ''} onChange={e => setForm({...form, min_stock_level: Number(e.target.value)})} />
+                    <input required type="number" min={0} className="input" value={form.min_stock_level} onChange={e => setForm({...form, min_stock_level: Number(e.target.value)})} />
                   </div>
                 </div>
 

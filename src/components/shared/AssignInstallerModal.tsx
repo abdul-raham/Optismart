@@ -2,15 +2,17 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Loader2, User, Wrench } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { sendEmail } from '@/lib/email'
+import { sendWebPush } from '@/lib/push'
 
 interface AssignInstallerModalProps {
   isOpen: boolean
   onClose: () => void
   onSuccess: () => void
-  orderId: string | null
+  order: any | null
 }
 
-export function AssignInstallerModal({ isOpen, onClose, onSuccess, orderId }: AssignInstallerModalProps) {
+export function AssignInstallerModal({ isOpen, onClose, onSuccess, order }: AssignInstallerModalProps) {
   const [installers, setInstallers] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(true)
@@ -19,7 +21,7 @@ export function AssignInstallerModal({ isOpen, onClose, onSuccess, orderId }: As
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (isOpen && orderId) {
+    if (isOpen && order?.id) {
       fetchInstallers()
       
       // Default to tomorrow
@@ -27,7 +29,7 @@ export function AssignInstallerModal({ isOpen, onClose, onSuccess, orderId }: As
       tomorrow.setDate(tomorrow.getDate() + 1)
       setScheduledDate(tomorrow.toISOString().split('T')[0])
     }
-  }, [isOpen, orderId])
+  }, [isOpen, order])
 
   const fetchInstallers = async () => {
     setFetching(true)
@@ -60,12 +62,32 @@ export function AssignInstallerModal({ isOpen, onClose, onSuccess, orderId }: As
 
       const { error: insertError } = await supabase.from('installer_jobs').insert({
         installer_id: selectedInstallerId,
-        order_id: orderId,
+        order_id: order?.id,
         scheduled_date: new Date(scheduledDate).toISOString(),
         status: 'assigned'
       })
 
       if (insertError) throw insertError
+
+      const assignedInstaller = installers.find(i => i.id === selectedInstallerId)
+      if (assignedInstaller && order) {
+        if (assignedInstaller.email) {
+          sendEmail('job_assigned', {
+            installerEmail: assignedInstaller.email,
+            installerName: assignedInstaller.full_name,
+            orderNumber: order.order_number,
+            customerName: order.customer_name,
+            location: order.customer_address
+          }).catch(console.error)
+        }
+        
+        sendWebPush(
+          selectedInstallerId,
+          'New Installation Job',
+          `You have been assigned to order ${order.order_number} for ${order.customer_name}.`,
+          '/app/installer/dashboard'
+        ).catch(console.error)
+      }
 
       onSuccess()
       onClose()

@@ -5,6 +5,8 @@ import { ShoppingBag, Search, Calendar, Check, X, ArrowRightLeft } from 'lucide-
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { OrderStatusBadge } from '@/components/shared/Badges'
 import { AssignInstallerModal } from '@/components/shared/AssignInstallerModal'
+import { sendEmail } from '@/lib/email'
+import { sendWebPush } from '@/lib/push'
 import type { Order, OrderStatus } from '@/types'
 
 export function AdminOrders() {
@@ -32,7 +34,7 @@ export function AdminOrders() {
     try {
       const { data } = await supabase
         .from('orders')
-        .select('*')
+        .select('*, dsa:users!orders_dsa_id_fkey(email, full_name)')
         .order('created_at', { ascending: false })
       
       if (data) setOrders(data)
@@ -53,6 +55,27 @@ export function AdminOrders() {
 
       if (error) throw error
       
+      const updatedOrder = orders.find(o => o.id === orderId)
+      
+      // Send Notifications to DSA
+      if (updatedOrder?.dsa_id) {
+        const dsa = (updatedOrder as any).dsa;
+        if (dsa?.email) {
+          sendEmail('order_status_update', {
+            recipientEmail: dsa.email,
+            customerName: updatedOrder.customer_name,
+            orderNumber: updatedOrder.order_number,
+            status: newStatus
+          }).catch(console.error);
+        }
+        sendWebPush(
+          updatedOrder.dsa_id,
+          'Order Status Updated',
+          `Order ${updatedOrder.order_number} for ${updatedOrder.customer_name} is now ${newStatus.toUpperCase()}`,
+          '/app/dsa/orders'
+        ).catch(console.error);
+      }
+
       // Update local state
       setOrders(orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o))
       
@@ -247,12 +270,12 @@ export function AdminOrders() {
         </div>
       )}
 
-      <AssignInstallerModal 
-        isOpen={!!assigningOrderId} 
-        onClose={() => setAssigningOrderId(null)} 
-        onSuccess={fetchOrders} 
-        orderId={assigningOrderId} 
-      />
+        <AssignInstallerModal 
+          isOpen={!!assigningOrderId} 
+          onClose={() => setAssigningOrderId(null)} 
+          onSuccess={fetchOrders}
+          order={orders.find(o => o.id === assigningOrderId) || null}
+        />
     </div>
   )
 }

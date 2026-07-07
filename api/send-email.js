@@ -129,6 +129,60 @@ const templates = {
       ${button(`${appUrl}/app/orders`, 'Track Order')}
     `),
   }),
+
+  order_status_update: ({ recipientEmail, customerName, orderNumber, status }) => ({
+    to: recipientEmail,
+    subject: `Order Status Updated: ${status.toUpperCase()} - ${orderNumber}`,
+    html: layout('Order Status Update', `
+      <h2>Order Status Changed</h2>
+      <p>The status of order <strong>${escapeHtml(orderNumber)}</strong> for <strong>${escapeHtml(customerName)}</strong> has been updated to <strong style="text-transform: uppercase; color: #0A74FF;">${escapeHtml(status)}</strong>.</p>
+      <p>Log in to view the full details of this order.</p>
+      ${button(`${appUrl}/app/orders`, 'View Order')}
+    `),
+  }),
+
+  commission_paid: ({ dsaEmail, dsaName, amount, orderNumber }) => ({
+    to: dsaEmail,
+    subject: `Commission Paid! 💰`,
+    html: layout('Commission Paid', `
+      <h2>Hello ${escapeHtml(dsaName)},</h2>
+      <p>Great news! Your commission of <strong>${escapeHtml(amount)}</strong> for order <strong>${escapeHtml(orderNumber)}</strong> has been marked as PAID.</p>
+      <p>Keep up the great work and check your dashboard for the latest pipeline updates.</p>
+      ${button(`${appUrl}/app/dsa/commission`, 'View Commissions')}
+    `),
+  }),
+
+  job_assigned: ({ installerEmail, installerName, orderNumber, customerName, location }) => ({
+    to: installerEmail,
+    subject: `New Job Assigned: ${orderNumber}`,
+    html: layout('New Installation Job', `
+      <h2>Hello ${escapeHtml(installerName)},</h2>
+      <p>You have been assigned a new installation job.</p>
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin: 24px 0;">
+        <p style="margin: 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 700; letter-spacing: 1px;">Order Reference</p>
+        <p style="margin: 4px 0 0 0; font-size: 20px; font-weight: 800; color: #0f172a;">${escapeHtml(orderNumber)}</p>
+        <div style="margin-top: 16px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
+          <p style="margin: 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 700; letter-spacing: 1px;">Customer</p>
+          <p style="margin: 4px 0 0 0; font-size: 16px; font-weight: 600; color: #334155;">${escapeHtml(customerName)}</p>
+          <p style="margin: 8px 0 0 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 700; letter-spacing: 1px;">Location</p>
+          <p style="margin: 4px 0 0 0; font-size: 16px; font-weight: 600; color: #334155;">${escapeHtml(location)}</p>
+        </div>
+      </div>
+      <p>Please log in to your portal to review the job details and contact the customer to arrange a time.</p>
+      ${button(`${appUrl}/app/installer/dashboard`, 'View Job Details')}
+    `),
+  }),
+
+  account_approved: ({ recipientEmail, recipientName, role }) => ({
+    to: recipientEmail,
+    subject: `Your ${escapeHtml(role).toUpperCase()} Account is Approved!`,
+    html: layout('Account Approved', `
+      <h2>Welcome, ${escapeHtml(recipientName)}!</h2>
+      <p>Your <strong>${escapeHtml(role)}</strong> account has been reviewed and approved by the admin team.</p>
+      <p>You can now log in to the OptiSmart portal and access all your tools.</p>
+      ${button(`${appUrl}/login`, 'Login Now')}
+    `),
+  }),
 }
 
 function setCors(req, res) {

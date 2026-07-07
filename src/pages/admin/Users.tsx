@@ -3,6 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { Users, Search, Shield, ShieldAlert, Mail, MapPin, MoreVertical, Ban, CheckCircle2 } from 'lucide-react'
 import { formatDate } from '@/lib/utils'
+import { sendEmail } from '@/lib/email'
+import { sendWebPush } from '@/lib/push'
 
 import { useAuthStore } from '@/stores/authStore'
 
@@ -50,6 +52,23 @@ export function AdminUsers() {
         .eq('id', userId)
 
       if (error) throw error
+      
+      const updatedUser = users.find(u => u.id === userId)
+      if (updatedUser && newStatus === 'active') {
+        sendEmail('account_approved', {
+          recipientEmail: updatedUser.email,
+          recipientName: updatedUser.full_name,
+          role: updatedUser.role
+        }).catch(console.error)
+        
+        sendWebPush(
+          userId,
+          'Account Approved',
+          `Your ${updatedUser.role} account has been activated! Welcome to Optismart.`,
+          '/app'
+        ).catch(console.error)
+      }
+
       setUsers(users.map(u => u.id === userId ? { ...u, status: newStatus } : u))
     } catch (err) {
       console.error('Error updating user status:', err)
@@ -95,7 +114,7 @@ export function AdminUsers() {
 
       <div className="glass-card p-4 flex flex-col sm:flex-row gap-4 items-center justify-between">
         <div className="flex items-center gap-2 overflow-x-auto w-full sm:w-auto pb-2 sm:pb-0 hide-scrollbar">
-          {['all', 'dsa', 'installer', 'admin', 'reseller'].map(role => (
+          {['all', 'super_admin', 'admin', 'dsa', 'installer', 'reseller'].map(role => (
             <button
               key={role}
               onClick={() => setRoleFilter(role)}
