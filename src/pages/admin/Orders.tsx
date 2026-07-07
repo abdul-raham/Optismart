@@ -471,17 +471,15 @@ export function AdminOrders() {
                 </div>
 
                 <div className="border-t border-surface-100 pt-4">
-                  <div className="flex items-center justify-between mb-4">
-                    <label className="label mb-0">Is Installation Needed?</label>
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={form.installation_needed}
-                      onClick={() => setForm({...form, installation_needed: !form.installation_needed})}
-                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${form.installation_needed ? 'bg-brand-500' : 'bg-surface-200'}`}
-                    >
-                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${form.installation_needed ? 'translate-x-6' : 'translate-x-1'}`} />
-                    </button>
+                  <div className="flex items-center gap-3 mb-4">
+                    <input 
+                      type="checkbox" 
+                      id="install_needed_admin"
+                      checked={form.installation_needed} 
+                      onChange={e => setForm({...form, installation_needed: e.target.checked})} 
+                      className="w-5 h-5 rounded border-surface-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
+                    />
+                    <label htmlFor="install_needed_admin" className="label mb-0 cursor-pointer">Yes, Installation is Needed</label>
                   </div>
                   
                   {form.installation_needed && (
