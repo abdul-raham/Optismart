@@ -37,6 +37,10 @@ export function InstallPWA() {
       setDeferredPrompt(e as BeforeInstallPromptEvent)
     }
 
+    if ((window as any).deferredPWAEvent) {
+      setDeferredPrompt((window as any).deferredPWAEvent)
+    }
+
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt)
     window.addEventListener('appinstalled', () => {
       setIsStandalone(true)

@@ -5,6 +5,13 @@
     <link rel="icon" type="image/png" href="/fav.png" />
     <link rel="apple-touch-icon" href="/fav.png" />
     <meta name="theme-color" content="#f8fafc" />
+    <script>
+      window.deferredPWAEvent = null;
+      window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        window.deferredPWAEvent = e;
+      });
+    </script>
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="description" content="OptiSmart Portal — Enterprise Operations Platform for OptiSmart Nigeria" />
     <title>OptiSmart Portal</title>
