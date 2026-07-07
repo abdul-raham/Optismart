@@ -11,6 +11,9 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.js',
       registerType: 'autoUpdate',
+      devOptions: {
+        enabled: true
+      },
       includeAssets: ['fav.svg', 'fav.png'],
       manifest: {
         name: 'OptiSmart Portal',
