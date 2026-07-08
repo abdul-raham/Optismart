@@ -1,4 +1,4 @@
-import { Bell, Search, LogOut, User as UserIcon } from 'lucide-react'
+import { Bell, Search, LogOut, User as UserIcon, ChevronDown } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { useAuthStore } from '@/stores/authStore'
@@ -69,11 +69,12 @@ export function Topbar() {
         <div className="relative">
           <button 
             onClick={() => setShowDropdown(!showDropdown)}
-            className="flex items-center gap-2 hover:bg-surface-50 p-1 pr-2 rounded-full transition-colors border border-transparent hover:border-surface-200"
+            className="flex items-center gap-1.5 hover:bg-surface-50 p-1 pr-2 rounded-full transition-colors border border-transparent hover:border-surface-200"
           >
             <div className="w-8 h-8 rounded-full bg-brand-gradient flex items-center justify-center text-white text-xs font-bold shadow-sm">
               {getInitials(user?.full_name ?? 'U')}
             </div>
+            <ChevronDown className={`w-3.5 h-3.5 text-surface-400 transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`} />
           </button>
 
           <AnimatePresence>

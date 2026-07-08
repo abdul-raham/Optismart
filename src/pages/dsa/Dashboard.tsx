@@ -241,7 +241,7 @@ export function DSADashboard() {
         >
           <h2 className="text-lg font-bold text-surface-900 mb-4">Quick Actions</h2>
           <div className="space-y-2 mb-8">
-            <button className="w-full flex items-center gap-3 p-3 rounded-xl bg-brand-50 text-brand-700 hover:bg-brand-100 transition-colors font-semibold text-sm">
+            <button onClick={() => window.location.href = '/app/dsa/leads'} className="w-full flex items-center gap-3 p-3 rounded-xl bg-brand-50 text-brand-700 hover:bg-brand-100 transition-colors font-semibold text-sm">
               <div className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center">
                 <Target className="w-4 h-4 text-brand-600" />
               </div>

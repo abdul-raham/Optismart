@@ -3,6 +3,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { AppRouter } from './router'
 import { useAuthStore } from './stores/authStore'
 import { FullPageLoader } from './components/shared/FullPageLoader'
+import { PWAReloadPrompt } from './components/shared/PWAReloadPrompt'
 
 export default function App() {
   const initialize = useAuthStore((s) => s.initialize)
@@ -25,6 +26,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AppRouter />
+      <PWAReloadPrompt />
     </BrowserRouter>
   )
 }

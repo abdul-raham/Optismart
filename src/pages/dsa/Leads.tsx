@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { UserPlus, Target, TrendingUp, MoreVertical, Search, Plus, X, Phone, Mail, MapPin, Calendar, Clock, Banknote } from 'lucide-react'
+import { UserPlus, Target, TrendingUp, MoreVertical, Search, Plus, X, Phone, Mail, MapPin, Calendar, Clock, Banknote, Edit2, Trash2 } from 'lucide-react'
 import { sendEmail } from '@/lib/email'
 import { sendWebPush } from '@/lib/push'
 import { formatDate } from '@/lib/utils'
@@ -15,6 +15,7 @@ export function DSALeads() {
   const [search, setSearch] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
+  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
 
   const [form, setForm] = useState({
     customer_name: '',
@@ -108,6 +109,18 @@ export function DSALeads() {
     } catch (err) {
       console.error('Error stopping reminders:', err)
       alert('Failed to stop reminders')
+    }
+  }
+
+  const handleDeleteLead = async (leadId: string) => {
+    if (!window.confirm('Are you sure you want to delete this lead?')) return
+    try {
+      const { error } = await supabase.from('leads').delete().eq('id', leadId)
+      if (error) throw error
+      setLeads(leads.filter(l => l.id !== leadId))
+    } catch (err) {
+      console.error('Failed to delete lead:', err)
+      alert('Failed to delete lead')
     }
   }
 
@@ -205,9 +218,31 @@ export function DSALeads() {
                         {lead.status}
                     </span>
                   </div>
-                  <button className="text-surface-400 hover:text-surface-900 p-1 rounded-md hover:bg-surface-50 transition-colors">
-                    <MoreVertical className="w-4 h-4" />
-                  </button>
+                  <div className="relative">
+                    <button 
+                      onClick={() => setOpenDropdownId(openDropdownId === lead.id ? null : lead.id)}
+                      className="text-surface-400 hover:text-surface-900 p-1 rounded-md hover:bg-surface-50 transition-colors"
+                    >
+                      <MoreVertical className="w-4 h-4" />
+                    </button>
+                    <AnimatePresence>
+                      {openDropdownId === lead.id && (
+                        <motion.div
+                          initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                          animate={{ opacity: 1, scale: 1, y: 0 }}
+                          exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                          className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-surface-100 z-10 py-1"
+                        >
+                          <a href={`tel:${lead.phone}`} className="w-full text-left px-4 py-2 text-sm text-surface-700 hover:bg-surface-50 hover:text-brand-600 transition-colors flex items-center gap-2">
+                            <Phone className="w-4 h-4" /> Call Customer
+                          </a>
+                          <button onClick={() => { handleDeleteLead(lead.id); setOpenDropdownId(null); }} className="w-full text-left px-4 py-2 text-sm text-danger-600 hover:bg-danger-50 transition-colors flex items-center gap-2">
+                            <Trash2 className="w-4 h-4" /> Delete Lead
+                          </button>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
                 </div>
 
                 <div className="space-y-2 mb-4">

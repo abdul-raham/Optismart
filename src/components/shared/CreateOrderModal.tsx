@@ -245,7 +245,8 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
               </button>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="p-6 space-y-5 overflow-y-auto flex-1">
+            <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
+              <div className="p-6 space-y-5 overflow-y-auto flex-1">
               {error && (
                 <div className="p-3 text-sm font-semibold text-danger-700 bg-danger-50 border border-danger-100 rounded-xl">
                   {error}
@@ -375,8 +376,10 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
               </div>
             )}
 
-              <div className="pt-4 flex gap-3">
-                <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border border-surface-200 text-sm font-bold text-surface-700 hover:bg-surface-50 transition-colors">
+              </div>
+              
+              <div className="p-6 pt-4 border-t border-surface-100 flex gap-3 shrink-0 bg-surface-50 mt-auto">
+                <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border border-surface-200 text-sm font-bold text-surface-700 hover:bg-surface-200 transition-colors bg-white">
                   Cancel
                 </button>
                 <button type="submit" disabled={loading} className="flex-1 px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-bold shadow-brand flex items-center justify-center gap-2 transition-colors">
