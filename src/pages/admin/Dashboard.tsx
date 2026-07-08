@@ -61,7 +61,7 @@ export function AdminDashboard() {
           <p className="text-sm text-surface-500 mt-1">Real-time metrics and operations control.</p>
         </div>
         <div className="flex items-center gap-3">
-          <button className="btn-outline h-10 px-4 text-sm font-semibold">Generate Report</button>
+          <button onClick={() => window.print()} className="btn-outline h-10 px-4 text-sm font-semibold">Generate Report</button>
         </div>
       </div>
 
