@@ -12,7 +12,7 @@ export default defineConfig({
       filename: 'sw.js',
       registerType: 'prompt',
       devOptions: {
-        enabled: true
+        enabled: false
       },
       includeAssets: ['fav.svg', 'fav.png'],
       manifest: {

@@ -112,6 +112,16 @@ export function AdminProducts() {
         const { error } = await supabase.from('products').insert(newProducts)
         if (error) throw error
       }
+
+      // Also update existing products to ensure their image_url, specs, and source_url are correct
+      for (const p of optismartCatalogProducts) {
+        if (existingNames.has(p.name)) {
+          await supabase.from('products').update({
+            image_url: p.image_url,
+            source_url: p.source_url
+          }).eq('name', p.name)
+        }
+      }
       
       await fetchProducts()
     } catch (err) {
