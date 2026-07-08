@@ -11,7 +11,6 @@ import { useUIStore } from '@/stores/uiStore'
 import { cn, getInitials } from '@/lib/utils'
 import type { UserRole } from '@/types'
 import optismartLogo from '@/assets/optismart-logo.png'
-import { NotificationBell } from '@/components/shared/NotificationBell'
 
 export interface NavItem {
   label: string
@@ -52,6 +51,7 @@ export const NAV_ITEMS: Record<UserRole, NavItem[]> = {
     { label: 'Installers', href: '/app/dsa/installers',  icon: UserCheck },
     { label: 'Commission', href: '/app/dsa/commission',  icon: Banknote },
     { label: 'Reports',    href: '/app/dsa/reports',     icon: BarChart3 },
+    { label: 'Leaderboard',href: '/app/dsa/leaderboard', icon: Award },
     { label: 'Reminders',  href: '/app/dsa/reminders',   icon: CalendarDays },
     { label: 'Training',   href: '/app/training',        icon: BookOpen },
     { label: 'Settings',   href: '/app/settings',        icon: Settings },
@@ -226,7 +226,6 @@ export function Sidebar() {
                   <p className="text-sm font-semibold text-surface-800 truncate">{user?.full_name ?? 'User'}</p>
                   <p className="text-[11px] text-surface-400 truncate">{user?.email}</p>
                 </div>
-                <NotificationBell />
               </motion.div>
             )}
           </AnimatePresence>

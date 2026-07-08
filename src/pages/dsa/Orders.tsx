@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { ShoppingBag, Plus, Search, Calendar, MapPin, X, Package } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { OrderStatusBadge } from '@/components/shared/Badges'
+import { sendEmail } from '@/lib/email'
 import type { Order, Product } from '@/types'
 
 export function DSAOrders() {
@@ -96,6 +97,15 @@ export function DSAOrders() {
 
       if (error) throw error
       if (data) {
+        if (form.customer_email) {
+          sendEmail('new_order', {
+            recipientEmail: form.customer_email,
+            orderNumber: data.order_number,
+            customerName: data.customer_name,
+            totalAmount: data.total_amount
+          }).catch(console.error);
+        }
+
         setOrders([data, ...orders])
         setIsModalOpen(false)
         setForm({ is_dsa_registered: true, unregistered_dsa_name: '', dsa_id: user?.id || '', customer_name: '', customer_email: '', customer_phone: '', customer_address: '', product_id: '', quantity: 1, amount: 0, installation_needed: false, installation_price: 0, expected_delivery_date: '', notes: '' })
@@ -258,7 +268,7 @@ export function DSAOrders() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white rounded-2xl shadow-card-xl w-full max-w-lg relative z-10 overflow-hidden"
+              className="bg-white rounded-2xl shadow-card-xl w-full max-w-lg relative z-10 overflow-hidden max-h-[90vh] flex flex-col"
             >
               <div className="px-6 py-4 border-b border-surface-100 flex items-center justify-between bg-surface-50/50">
                 <h2 className="text-lg font-bold text-surface-900">Create New Order</h2>
@@ -267,7 +277,7 @@ export function DSAOrders() {
                 </button>
               </div>
 
-              <form onSubmit={handleCreateOrder} className="p-6 space-y-4 max-h-[70vh] overflow-y-auto">
+              <form onSubmit={handleCreateOrder} className="p-6 space-y-4 overflow-y-auto flex-1">
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="label mb-0">DSA In Charge *</label>

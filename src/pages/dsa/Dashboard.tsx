@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { StatCard } from '@/components/shared/StatCard'
 import { OrderStatusBadge } from '@/components/shared/Badges'
 import { CreateOrderModal } from '@/components/shared/CreateOrderModal'
-import { ShoppingBag, Target, Banknote, CalendarDays, ArrowRight } from 'lucide-react'
+import { ShoppingBag, Target, Banknote, CalendarDays, ArrowRight, Trophy, Medal, Award } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { MobileDashboardNav } from '@/components/layout/MobileDashboardNav'
 import type { Order } from '@/types'
@@ -28,6 +28,7 @@ export function DSADashboard() {
   const [recentOrders, setRecentOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
+  const [leaderboard, setLeaderboard] = useState<any[]>([])
 
   useEffect(() => {
     if (user?.id) {
@@ -84,6 +85,25 @@ export function DSADashboard() {
         const pending = commissions.filter(c => c.status === 'pending').reduce((sum, c) => sum + Number(c.amount), 0)
         const paid = commissions.filter(c => c.status === 'paid').reduce((sum, c) => sum + Number(c.amount), 0)
         setStats(prev => ({ ...prev, pendingCommissions: pending, totalRemittance: paid }))
+      }
+
+      // Fetch Leaderboard Preview
+      const { data: allDsas } = await supabase.from('users').select('id, full_name, email').eq('role', 'dsa')
+      const { data: allDeliveredOrders } = await supabase.from('orders').select('dsa_id, total_amount').eq('status', 'delivered')
+
+      if (allDsas && allDeliveredOrders) {
+        let aggregated = allDsas.map(dsa => {
+          const dsaOrders = allDeliveredOrders.filter(o => o.dsa_id === dsa.id)
+          const revenue = dsaOrders.reduce((sum, o) => sum + Number(o.total_amount), 0)
+          return {
+            id: dsa.id,
+            name: dsa.full_name || dsa.email.split('@')[0],
+            deliveredOrders: dsaOrders.length,
+            totalRevenue: revenue
+          }
+        })
+        aggregated.sort((a, b) => b.deliveredOrders - a.deliveredOrders || b.totalRevenue - a.totalRevenue)
+        setLeaderboard(aggregated.slice(0, 5).map((e, i) => ({ ...e, rank: i + 1 })))
       }
 
     } catch (error) {
@@ -323,6 +343,55 @@ export function DSADashboard() {
                 )}
               </tbody>
             </table>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Global Leaderboard Preview */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.7, duration: 0.4 }}
+        className="glass-card overflow-hidden mt-6"
+      >
+        <div className="p-5 border-b border-surface-100 flex items-center justify-between bg-surface-50">
+          <div className="flex items-center gap-2">
+            <Trophy className="w-5 h-5 text-yellow-500" />
+            <h2 className="text-lg font-bold text-surface-900">Top 5 Global Agents</h2>
+          </div>
+          <button 
+            onClick={() => window.location.href = '/app/dsa/leaderboard'}
+            className="text-sm font-semibold text-brand-600 hover:text-brand-700 flex items-center gap-1"
+          >
+            View Leaderboard <ArrowRight className="w-4 h-4" />
+          </button>
+        </div>
+        
+        <div className="p-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
+            {leaderboard.map(agent => {
+              const isFirst = agent.rank === 1
+              const isSecond = agent.rank === 2
+              const isThird = agent.rank === 3
+              
+              let RankIcon = null
+              let rankColor = "text-surface-500 bg-surface-100"
+              if (isFirst) { RankIcon = Trophy; rankColor = "text-yellow-600 bg-yellow-100" }
+              else if (isSecond) { RankIcon = Medal; rankColor = "text-slate-500 bg-slate-100" }
+              else if (isThird) { RankIcon = Award; rankColor = "text-amber-700 bg-amber-100" }
+
+              return (
+                <div key={agent.id} className="relative p-4 rounded-xl border border-surface-100 bg-white shadow-sm flex flex-col items-center text-center">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-3 ${rankColor}`}>
+                    {RankIcon ? <RankIcon className="w-5 h-5" /> : <span className="font-bold">#{agent.rank}</span>}
+                  </div>
+                  <p className={`font-bold text-sm ${agent.id === user?.id ? 'text-brand-600' : 'text-surface-900'} truncate w-full`}>
+                    {agent.name} {agent.id === user?.id && '(You)'}
+                  </p>
+                  <p className="text-xs text-surface-500 mt-1">{agent.deliveredOrders} Delivered</p>
+                </div>
+              )
+            })}
           </div>
         </div>
       </motion.div>

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
@@ -6,18 +6,16 @@ import { OrderStatusBadge } from '@/components/shared/Badges'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type { Order } from '@/types'
 import { MobileDashboardNav } from '@/components/layout/MobileDashboardNav'
+import { Calendar as CalendarIcon, Clock, Package, CheckCircle2, AlertCircle, Banknote, Percent } from 'lucide-react'
+
+type TimeFilter = 'total' | 'year' | 'month' | 'week' | 'day'
 
 export function DSAReports() {
   const { user } = useAuthStore()
-  const [stats, setStats] = useState({
-    totalOrdersMonth: 0,
-    deliveredOrdersMonth: 0,
-    totalDeliveredTillDate: 0,
-    totalOrdersTillDate: 0,
-    totalRemittance: 0,
-    percentDelivered: 0,
-  })
+  
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('month')
   const [allOrders, setAllOrders] = useState<Order[]>([])
+  const [allCommissions, setAllCommissions] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -30,37 +28,13 @@ export function DSAReports() {
     setLoading(true)
     try {
       const { data: orders } = await supabase.from('orders').select('*').eq('dsa_id', userId)
-      const { data: commissions } = await supabase.from('commissions').select('amount, status').eq('dsa_id', userId)
+      const { data: commissions } = await supabase.from('commissions').select('amount, status, created_at').eq('dsa_id', userId)
 
       if (orders) {
-        const deliveredOrders = orders.filter(o => o.status === 'delivered')
-        
-        const now = new Date()
-        const currentMonthOrders = orders.filter(o => {
-          const d = new Date(o.created_at)
-          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
-        })
-        const currentMonthDelivered = currentMonthOrders.filter(o => o.status === 'delivered')
-        
-        const totalDelivered = deliveredOrders.length
-        const totalOrders = orders.length
-        const percentDelivered = totalOrders > 0 ? Math.round((totalDelivered / totalOrders) * 100) : 0
-
-        setStats(prev => ({ 
-          ...prev, 
-          totalOrdersMonth: currentMonthOrders.length,
-          deliveredOrdersMonth: currentMonthDelivered.length,
-          totalDeliveredTillDate: totalDelivered,
-          totalOrdersTillDate: totalOrders,
-          percentDelivered: percentDelivered
-        }))
-        
         setAllOrders(orders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()))
       }
-
       if (commissions) {
-        const paid = commissions.filter(c => c.status === 'paid').reduce((sum, c) => sum + Number(c.amount), 0)
-        setStats(prev => ({ ...prev, totalRemittance: paid }))
+        setAllCommissions(commissions)
       }
     } catch (error) {
       console.error('Error fetching DSA reports:', error)
@@ -69,6 +43,44 @@ export function DSAReports() {
     }
   }
 
+  const { filteredOrders, filteredCommissions } = useMemo(() => {
+    const now = new Date()
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const startOfWeek = new Date(startOfDay)
+    startOfWeek.setDate(now.getDate() - now.getDay()) // Sunday
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+    const startOfYear = new Date(now.getFullYear(), 0, 1)
+
+    const filterByDate = (dateString: string) => {
+      const d = new Date(dateString)
+      switch (timeFilter) {
+        case 'day': return d >= startOfDay
+        case 'week': return d >= startOfWeek
+        case 'month': return d >= startOfMonth
+        case 'year': return d >= startOfYear
+        case 'total': return true
+        default: return true
+      }
+    }
+
+    return {
+      filteredOrders: allOrders.filter(o => filterByDate(o.created_at)),
+      filteredCommissions: allCommissions.filter(c => filterByDate(c.created_at))
+    }
+  }, [allOrders, allCommissions, timeFilter])
+
+  const stats = useMemo(() => {
+    const totalOrders = filteredOrders.length
+    const deliveredOrders = filteredOrders.filter(o => o.status === 'delivered').length
+    // Outstanding = pending, processing, confirmed, shipped (anything not delivered or cancelled)
+    const outstandingOrders = filteredOrders.filter(o => !['delivered', 'cancelled', 'returned'].includes(o.status)).length
+    
+    const percentDelivered = totalOrders > 0 ? Math.round((deliveredOrders / totalOrders) * 100) : 0
+    const totalRemittance = filteredCommissions.filter(c => c.status === 'paid').reduce((sum, c) => sum + Number(c.amount), 0)
+
+    return { totalOrders, deliveredOrders, outstandingOrders, percentDelivered, totalRemittance }
+  }, [filteredOrders, filteredCommissions])
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -76,46 +88,99 @@ export function DSAReports() {
           <h1 className="text-2xl font-bold text-surface-900 tracking-tight">Analytics & Reports</h1>
           <p className="text-sm text-surface-500 mt-1">Detailed performance metrics and historical data.</p>
         </div>
+        
+        {/* Time Filters */}
+        <div className="flex items-center gap-2 bg-surface-100 p-1 rounded-xl overflow-x-auto hide-scrollbar">
+          {(['total', 'year', 'month', 'week', 'day'] as TimeFilter[]).map(filter => (
+            <button
+              key={filter}
+              onClick={() => setTimeFilter(filter)}
+              className={`px-4 py-2 text-sm font-bold rounded-lg whitespace-nowrap transition-all ${
+                timeFilter === filter 
+                  ? 'bg-white text-brand-700 shadow-sm' 
+                  : 'text-surface-600 hover:text-surface-900 hover:bg-surface-200/50'
+              }`}
+            >
+              {filter.charAt(0).toUpperCase() + filter.slice(1)}
+            </button>
+          ))}
+        </div>
       </div>
 
       {loading ? (
         <div className="glass-card h-64 animate-pulse bg-surface-100/50" />
       ) : (
         <>
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            <div className="p-4 rounded-xl bg-brand-50 border border-brand-100">
-              <p className="text-xs font-bold text-brand-600 uppercase tracking-wider mb-1">Orders (Month)</p>
-              <p className="text-2xl font-black text-brand-900">{stats.totalOrdersMonth}</p>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+            <div className="p-5 rounded-2xl bg-white border border-surface-200 shadow-sm relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-16 h-16 bg-blue-50 rounded-bl-full -z-0 transition-transform group-hover:scale-110" />
+              <div className="relative z-10">
+                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center mb-4 text-blue-600">
+                  <Package className="w-5 h-5" />
+                </div>
+                <p className="text-xs font-bold text-surface-500 uppercase tracking-wider mb-1">Total Orders</p>
+                <p className="text-3xl font-black text-surface-900">{stats.totalOrders}</p>
+              </div>
             </div>
-            <div className="p-4 rounded-xl bg-success-50 border border-success-100">
-              <p className="text-xs font-bold text-success-600 uppercase tracking-wider mb-1">Delivered (Month)</p>
-              <p className="text-2xl font-black text-success-900">{stats.deliveredOrdersMonth}</p>
+
+            <div className="p-5 rounded-2xl bg-white border border-surface-200 shadow-sm relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-16 h-16 bg-success-50 rounded-bl-full -z-0 transition-transform group-hover:scale-110" />
+              <div className="relative z-10">
+                <div className="w-10 h-10 rounded-full bg-success-100 flex items-center justify-center mb-4 text-success-600">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <p className="text-xs font-bold text-surface-500 uppercase tracking-wider mb-1">Delivered</p>
+                <p className="text-3xl font-black text-surface-900">{stats.deliveredOrders}</p>
+              </div>
             </div>
-            <div className="p-4 rounded-xl bg-blue-50 border border-blue-100">
-              <p className="text-xs font-bold text-blue-600 uppercase tracking-wider mb-1">Total Orders</p>
-              <p className="text-2xl font-black text-blue-900">{stats.totalOrdersTillDate}</p>
+
+            <div className="p-5 rounded-2xl bg-white border border-surface-200 shadow-sm relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-16 h-16 bg-warning-50 rounded-bl-full -z-0 transition-transform group-hover:scale-110" />
+              <div className="relative z-10">
+                <div className="w-10 h-10 rounded-full bg-warning-100 flex items-center justify-center mb-4 text-warning-600">
+                  <AlertCircle className="w-5 h-5" />
+                </div>
+                <p className="text-xs font-bold text-surface-500 uppercase tracking-wider mb-1">Outstanding</p>
+                <p className="text-3xl font-black text-surface-900">{stats.outstandingOrders}</p>
+              </div>
             </div>
-            <div className="p-4 rounded-xl bg-indigo-50 border border-indigo-100">
-              <p className="text-xs font-bold text-indigo-600 uppercase tracking-wider mb-1">Total Delivered</p>
-              <p className="text-2xl font-black text-indigo-900">{stats.totalDeliveredTillDate}</p>
+
+            <div className="p-5 rounded-2xl bg-white border border-surface-200 shadow-sm relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-16 h-16 bg-brand-50 rounded-bl-full -z-0 transition-transform group-hover:scale-110" />
+              <div className="relative z-10">
+                <div className="w-10 h-10 rounded-full bg-brand-100 flex items-center justify-center mb-4 text-brand-600">
+                  <Percent className="w-5 h-5" />
+                </div>
+                <p className="text-xs font-bold text-surface-500 uppercase tracking-wider mb-1">% Delivered</p>
+                <p className="text-3xl font-black text-surface-900">{stats.percentDelivered}%</p>
+              </div>
             </div>
-            <div className="p-4 rounded-xl bg-purple-50 border border-purple-100">
-              <p className="text-xs font-bold text-purple-600 uppercase tracking-wider mb-1">Total Remittance</p>
-              <p className="text-xl font-black text-purple-900">{formatCurrency(stats.totalRemittance)}</p>
-            </div>
-            <div className="p-4 rounded-xl bg-orange-50 border border-orange-100">
-              <p className="text-xs font-bold text-orange-600 uppercase tracking-wider mb-1">% Delivered</p>
-              <p className="text-2xl font-black text-orange-900">{stats.percentDelivered}%</p>
+
+            <div className="p-5 rounded-2xl bg-white border border-surface-200 shadow-sm relative overflow-hidden group">
+              <div className="absolute top-0 right-0 w-16 h-16 bg-purple-50 rounded-bl-full -z-0 transition-transform group-hover:scale-110" />
+              <div className="relative z-10">
+                <div className="w-10 h-10 rounded-full bg-purple-100 flex items-center justify-center mb-4 text-purple-600">
+                  <Banknote className="w-5 h-5" />
+                </div>
+                <p className="text-xs font-bold text-surface-500 uppercase tracking-wider mb-1">Remittance</p>
+                <p className="text-2xl font-black text-surface-900">{formatCurrency(stats.totalRemittance)}</p>
+              </div>
             </div>
           </div>
 
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="glass-card overflow-hidden"
+            className="glass-card overflow-hidden mt-8"
           >
-            <div className="p-5 border-b border-surface-100 bg-surface-50">
-              <h2 className="text-lg font-bold text-surface-900">All Historical Orders</h2>
+            <div className="p-5 border-b border-surface-100 bg-surface-50 flex items-center justify-between">
+              <h2 className="text-lg font-bold text-surface-900 flex items-center gap-2">
+                <Clock className="w-5 h-5 text-brand-600" />
+                Filtered Orders
+              </h2>
+              <span className="text-xs font-bold text-surface-500 bg-surface-200 px-3 py-1 rounded-full uppercase">
+                {timeFilter === 'total' ? 'All Time' : `This ${timeFilter}`}
+              </span>
             </div>
             
             <div className="overflow-x-auto">
@@ -130,18 +195,28 @@ export function DSAReports() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-surface-100">
-                  {allOrders.map(order => (
+                  {filteredOrders.map(order => (
                     <tr key={order.id} className="hover:bg-surface-50 transition-colors">
-                      <td className="px-4 py-3 text-surface-600">{formatDate(order.created_at)}</td>
+                      <td className="px-4 py-3 text-surface-600">
+                        <div className="flex items-center gap-1.5">
+                          <CalendarIcon className="w-3.5 h-3.5" />
+                          {formatDate(order.created_at)}
+                        </div>
+                      </td>
                       <td className="px-4 py-3 font-medium text-surface-900">{order.order_number}</td>
                       <td className="px-4 py-3 text-surface-900">{order.customer_name}</td>
                       <td className="px-4 py-3"><OrderStatusBadge status={order.status} /></td>
                       <td className="px-4 py-3 font-bold text-brand-700 text-right">{formatCurrency(order.total_amount)}</td>
                     </tr>
                   ))}
-                  {allOrders.length === 0 && (
+                  {filteredOrders.length === 0 && (
                     <tr>
-                      <td colSpan={5} className="px-4 py-8 text-center text-surface-500">No orders found.</td>
+                      <td colSpan={5} className="px-4 py-12 text-center text-surface-500">
+                        <div className="flex flex-col items-center justify-center">
+                          <Package className="w-12 h-12 text-surface-300 mb-3" />
+                          <p className="font-semibold text-surface-600">No orders found for this {timeFilter}.</p>
+                        </div>
+                      </td>
                     </tr>
                   )}
                 </tbody>

@@ -57,7 +57,7 @@ export function NotificationPrompt() {
               
               <h3 className="text-xl font-bold text-surface-900 mb-2">Turn on Notifications?</h3>
               <p className="text-sm text-surface-500 mb-6">
-                Would you like to receive instant notifications when your orders are updated or delivered?
+                Would you like to receive instant notifications when your orders are updated, or when your Leaderboard ranking changes?
               </p>
               
               <div className="space-y-3">
