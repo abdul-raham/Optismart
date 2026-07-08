@@ -195,108 +195,200 @@ export function DSALeads() {
           <button onClick={() => setIsModalOpen(true)} className="btn-primary mt-6">Add Your First Lead</button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          <AnimatePresence>
-            {filteredLeads.map((lead) => (
-              <motion.div
-                key={lead.id}
-                layout
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="glass-card p-5 group hover:border-brand-200 transition-colors"
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <div className="flex items-center gap-3">
-                      <h3 className="text-lg font-black text-surface-900 group-hover:text-brand-600 transition-colors">{lead.customer_name}</h3>
-                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border ${getTempColor(lead.temperature)}`}>
-                        {getPriorityLabel(lead.temperature)}
+        <>
+          {/* Mobile/Tablet Grid View */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:hidden gap-4">
+            <AnimatePresence>
+              {filteredLeads.map((lead) => (
+                <motion.div
+                  key={lead.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="glass-card p-5 group hover:border-brand-200 transition-colors"
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div>
+                      <div className="flex items-center gap-3">
+                        <h3 className="text-lg font-black text-surface-900 group-hover:text-brand-600 transition-colors">{lead.customer_name}</h3>
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border ${getTempColor(lead.temperature)}`}>
+                          {getPriorityLabel(lead.temperature)}
+                        </span>
+                      </div>
+                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${getStatusColor(lead.status)} mt-1 inline-block`}>
+                          {lead.status}
                       </span>
                     </div>
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${getStatusColor(lead.status)} mt-1 inline-block`}>
-                        {lead.status}
-                    </span>
-                  </div>
-                  <div className="relative">
-                    <button 
-                      onClick={() => setOpenDropdownId(openDropdownId === lead.id ? null : lead.id)}
-                      className="text-surface-400 hover:text-surface-900 p-1 rounded-md hover:bg-surface-50 transition-colors"
-                    >
-                      <MoreVertical className="w-4 h-4" />
-                    </button>
-                    <AnimatePresence>
-                      {openDropdownId === lead.id && (
-                        <motion.div
-                          initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                          animate={{ opacity: 1, scale: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                          className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-surface-100 z-10 py-1"
-                        >
-                          <a href={`tel:${lead.phone}`} className="w-full text-left px-4 py-2 text-sm text-surface-700 hover:bg-surface-50 hover:text-brand-600 transition-colors flex items-center gap-2">
-                            <Phone className="w-4 h-4" /> Call Customer
-                          </a>
-                          <button onClick={() => { handleDeleteLead(lead.id); setOpenDropdownId(null); }} className="w-full text-left px-4 py-2 text-sm text-danger-600 hover:bg-danger-50 transition-colors flex items-center gap-2">
-                            <Trash2 className="w-4 h-4" /> Delete Lead
-                          </button>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </div>
-                </div>
-
-                <div className="space-y-2 mb-4">
-                  <div className="flex items-center gap-2 text-sm text-surface-600">
-                    <Phone className="w-4 h-4 text-surface-400" />
-                    <span>{lead.phone}</span>
-                  </div>
-                  {lead.email && (
-                    <div className="flex items-center gap-2 text-sm text-surface-600">
-                      <Mail className="w-4 h-4 text-surface-400" />
-                      <span className="truncate">{lead.email}</span>
-                    </div>
-                  )}
-                  {lead.location && (
-                    <div className="flex items-center gap-2 text-sm text-surface-600">
-                      <MapPin className="w-4 h-4 text-surface-400" />
-                      <span className="truncate">{lead.location}</span>
-                    </div>
-                  )}
-                </div>
-
-                <div className="pt-4 border-t border-surface-100 flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs text-surface-400 font-medium">
-                    <Calendar className="w-3.5 h-3.5" />
-                    Added {formatDate(lead.created_at)}
-                  </div>
-                  {lead.status !== 'converted' && (
-                    <div className="flex items-center gap-3">
-                      {lead.follow_up_date && !lead.follow_up_stopped && (
-                        <button onClick={() => handleStopReminders(lead.id)} className="text-[10px] font-bold text-danger-600 hover:text-danger-700 bg-danger-50 px-2 py-1 rounded transition-colors">
-                          Stop Reminders
-                        </button>
-                      )}
-                      <button className="text-xs font-bold text-brand-600 hover:text-brand-700 transition-colors">
-                        Convert to Order
+                    <div className="relative">
+                      <button 
+                        onClick={() => setOpenDropdownId(openDropdownId === lead.id ? null : lead.id)}
+                        className="text-surface-400 hover:text-surface-900 p-1 rounded-md hover:bg-surface-50 transition-colors"
+                      >
+                        <MoreVertical className="w-4 h-4" />
                       </button>
+                      <AnimatePresence>
+                        {openDropdownId === lead.id && (
+                          <motion.div
+                            initial={{ opacity: 0, scale: 0.95, y: 10 }}
+                            animate={{ opacity: 1, scale: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95, y: 10 }}
+                            className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-surface-100 z-10 py-1"
+                          >
+                            <a href={`tel:${lead.phone}`} className="w-full text-left px-4 py-2 text-sm text-surface-700 hover:bg-surface-50 hover:text-brand-600 transition-colors flex items-center gap-2">
+                              <Phone className="w-4 h-4" /> Call Customer
+                            </a>
+                            <button onClick={() => { handleDeleteLead(lead.id); setOpenDropdownId(null); }} className="w-full text-left px-4 py-2 text-sm text-danger-600 hover:bg-danger-50 transition-colors flex items-center gap-2">
+                              <Trash2 className="w-4 h-4" /> Delete Lead
+                            </button>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2 mb-4">
+                    <div className="flex items-center gap-2 text-sm text-surface-600">
+                      <Phone className="w-4 h-4 text-surface-400" />
+                      <span>{lead.phone}</span>
+                    </div>
+                    {lead.email && (
+                      <div className="flex items-center gap-2 text-sm text-surface-600">
+                        <Mail className="w-4 h-4 text-surface-400" />
+                        <span className="truncate">{lead.email}</span>
+                      </div>
+                    )}
+                    {lead.location && (
+                      <div className="flex items-center gap-2 text-sm text-surface-600">
+                        <MapPin className="w-4 h-4 text-surface-400" />
+                        <span className="truncate">{lead.location}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-4 border-t border-surface-100 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs text-surface-400 font-medium">
+                      <Calendar className="w-3.5 h-3.5" />
+                      Added {formatDate(lead.created_at)}
+                    </div>
+                    {lead.status !== 'converted' && (
+                      <div className="flex items-center gap-3">
+                        {lead.follow_up_date && !lead.follow_up_stopped && (
+                          <button onClick={() => handleStopReminders(lead.id)} className="text-[10px] font-bold text-danger-600 hover:text-danger-700 bg-danger-50 px-2 py-1 rounded transition-colors">
+                            Stop Reminders
+                          </button>
+                        )}
+                        <button className="text-xs font-bold text-brand-600 hover:text-brand-700 transition-colors">
+                          Convert to Order
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                  {lead.follow_up_date && (
+                    <div className={`mt-3 pt-3 border-t border-surface-100 flex items-center justify-between text-xs ${lead.follow_up_stopped ? 'text-surface-400' : 'text-brand-600 font-medium'}`}>
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5" />
+                        Follow-up: {formatDate(lead.follow_up_date)}
+                      </div>
+                      {lead.follow_up_interval_days ? (
+                        <span>Every {lead.follow_up_interval_days} days</span>
+                      ) : null}
                     </div>
                   )}
-                </div>
-                {lead.follow_up_date && (
-                  <div className={`mt-3 pt-3 border-t border-surface-100 flex items-center justify-between text-xs ${lead.follow_up_stopped ? 'text-surface-400' : 'text-brand-600 font-medium'}`}>
-                    <div className="flex items-center gap-1.5">
-                      <Clock className="w-3.5 h-3.5" />
-                      Follow-up: {formatDate(lead.follow_up_date)}
-                    </div>
-                    {lead.follow_up_interval_days ? (
-                      <span>Every {lead.follow_up_interval_days} days</span>
-                    ) : null}
-                  </div>
-                )}
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden lg:block glass-card overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="bg-surface-50/50 text-surface-500 font-semibold border-b border-surface-100">
+                  <tr>
+                    <th className="px-6 py-4">Customer Name</th>
+                    <th className="px-6 py-4">Contact Info</th>
+                    <th className="px-6 py-4">Priority & Status</th>
+                    <th className="px-6 py-4">Follow-up</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-surface-100">
+                  {filteredLeads.map((lead) => (
+                    <tr key={lead.id} className="hover:bg-surface-50/50 transition-colors group">
+                      <td className="px-6 py-4">
+                        <div className="font-bold text-surface-900">{lead.customer_name}</div>
+                        <div className="text-xs text-surface-400 mt-0.5 flex items-center gap-1">
+                          <Calendar className="w-3 h-3" /> Added {formatDate(lead.created_at)}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 space-y-1">
+                        <div className="flex items-center gap-2 text-surface-700">
+                          <Phone className="w-3.5 h-3.5 text-surface-400" /> {lead.phone}
+                        </div>
+                        {lead.email && (
+                          <div className="flex items-center gap-2 text-surface-500 text-xs">
+                            <Mail className="w-3.5 h-3.5 text-surface-400" /> {lead.email}
+                          </div>
+                        )}
+                        {lead.location && (
+                          <div className="flex items-center gap-2 text-surface-500 text-xs">
+                            <MapPin className="w-3.5 h-3.5 text-surface-400" /> {lead.location}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 space-y-2">
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border inline-block mr-2 ${getTempColor(lead.temperature)}`}>
+                          {getPriorityLabel(lead.temperature)}
+                        </span>
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider inline-block ${getStatusColor(lead.status)}`}>
+                          {lead.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4">
+                        {lead.follow_up_date ? (
+                          <div className={lead.follow_up_stopped ? 'text-surface-400' : 'text-brand-600 font-medium'}>
+                            <div className="flex items-center gap-1.5 text-sm">
+                              <Clock className="w-3.5 h-3.5" />
+                              {formatDate(lead.follow_up_date)}
+                            </div>
+                            {lead.follow_up_interval_days ? (
+                              <div className="text-xs mt-1">Every {lead.follow_up_interval_days} days</div>
+                            ) : null}
+                          </div>
+                        ) : (
+                          <span className="text-surface-400 text-xs italic">No follow-up set</span>
+                        )}
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="flex items-center justify-end gap-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {lead.status !== 'converted' && (
+                            <>
+                              {lead.follow_up_date && !lead.follow_up_stopped && (
+                                <button onClick={() => handleStopReminders(lead.id)} className="text-[10px] font-bold text-danger-600 hover:text-danger-700 bg-danger-50 px-2 py-1 rounded transition-colors" title="Stop Reminders">
+                                  Stop
+                                </button>
+                              )}
+                              <button className="text-xs font-bold text-brand-600 hover:text-brand-700 transition-colors">
+                                Convert
+                              </button>
+                            </>
+                          )}
+                          <a href={`tel:${lead.phone}`} className="p-1.5 text-surface-400 hover:text-brand-600 hover:bg-brand-50 rounded-md transition-colors" title="Call Customer">
+                            <Phone className="w-4 h-4" />
+                          </a>
+                          <button onClick={() => handleDeleteLead(lead.id)} className="p-1.5 text-surface-400 hover:text-danger-600 hover:bg-danger-50 rounded-md transition-colors" title="Delete Lead">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
       )}
 
       {/* CREATE MODAL */}
