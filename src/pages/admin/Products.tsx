@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
-import { Package, Plus, Search, Edit2, X, RefreshCw, ExternalLink } from 'lucide-react'
+import { Package, Plus, Search, Edit2, Trash2, X, RefreshCw, ExternalLink } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import type { Product } from '@/types'
 import { optismartCatalogProducts } from '@/data/optismartProducts'
@@ -92,6 +92,18 @@ export function AdminProducts() {
       setProducts(products.map(p => p.id === id ? { ...p, is_active: !currentStatus } : p))
     } catch (err) {
       console.error('Failed to toggle status:', err)
+    }
+  }
+
+  const handleDeleteProduct = async (id: string, name: string) => {
+    if (!window.confirm(`Are you sure you want to delete "${name}"? This action cannot be undone.`)) return
+    try {
+      const { error } = await supabase.from('products').delete().eq('id', id)
+      if (error) throw error
+      setProducts(products.filter(p => p.id !== id))
+    } catch (err) {
+      console.error('Failed to delete product:', err)
+      alert('Failed to delete product. It might be linked to existing orders.')
     }
   }
 
@@ -214,8 +226,16 @@ export function AdminProducts() {
                         setIsModalOpen(true)
                       }}
                       className="p-1.5 text-surface-400 hover:text-brand-600 hover:bg-brand-50 rounded-md transition-colors"
+                      title="Edit Product"
                     >
                       <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button 
+                      onClick={() => handleDeleteProduct(product.id, product.name)}
+                      className="p-1.5 text-surface-400 hover:text-danger-600 hover:bg-danger-50 rounded-md transition-colors"
+                      title="Delete Product"
+                    >
+                      <Trash2 className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
