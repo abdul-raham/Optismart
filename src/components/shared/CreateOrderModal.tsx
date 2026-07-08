@@ -13,10 +13,11 @@ interface CreateOrderModalProps {
 }
 
 export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModalProps) {
-  const { user } = useAuthStore()
+  const { user, role } = useAuthStore()
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(false)
   const [fetchingProducts, setFetchingProducts] = useState(true)
+  const [dsas, setDsas] = useState<any[]>([])
 
   // Form State
   const [customerName, setCustomerName] = useState('')
@@ -24,6 +25,7 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
   const [customerPhone, setCustomerPhone] = useState('')
   const [customerAddress, setCustomerAddress] = useState('')
   const [selectedProductId, setSelectedProductId] = useState('')
+  const [selectedDsaId, setSelectedDsaId] = useState('')
   const [quantity, setQuantity] = useState(1)
   
   // Sync fields
@@ -46,8 +48,25 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
   useEffect(() => {
     if (isOpen) {
       fetchProducts()
+      if (role === 'admin' || role === 'super_admin') {
+        fetchDsas()
+      } else {
+        if (user?.id) setSelectedDsaId(user.id)
+      }
     }
-  }, [isOpen])
+  }, [isOpen, role, user?.id])
+
+  const fetchDsas = async () => {
+    try {
+      const { data } = await supabase.from('users').select('id, full_name').eq('role', 'dsa')
+      if (data) {
+        setDsas(data)
+        if (data.length > 0 && !selectedDsaId) setSelectedDsaId(data[0].id)
+      }
+    } catch (err) {
+      console.error('Error fetching DSAs:', err)
+    }
+  }
 
   const fetchProducts = async () => {
     setFetchingProducts(true)
@@ -99,7 +118,7 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
 
       const { error: insertError } = await supabase.from('orders').insert({
         order_number: orderNumber,
-        dsa_id: isDsaRegistered ? user.id : null,
+        dsa_id: isDsaRegistered ? (selectedDsaId || user.id) : null,
         unregistered_dsa_name: !isDsaRegistered ? unregisteredDsaName : null,
         customer_name: customerName,
         customer_email: customerEmail || null,
@@ -270,7 +289,20 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
                 {isDsaRegistered ? (
                   <div className="relative">
                     <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
-                    <input type="text" readOnly value={user?.full_name || ''} className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-surface-200 bg-surface-50 text-surface-500 text-sm" />
+                    {(role === 'admin' || role === 'super_admin') ? (
+                      <select 
+                        value={selectedDsaId} 
+                        onChange={(e) => setSelectedDsaId(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-surface-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none text-sm transition-all bg-white appearance-none"
+                      >
+                        <option value="" disabled>Select a DSA...</option>
+                        {dsas.map(dsa => (
+                          <option key={dsa.id} value={dsa.id}>{dsa.full_name}</option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input type="text" readOnly value={user?.full_name || ''} className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-surface-200 bg-surface-50 text-surface-500 text-sm" />
+                    )}
                   </div>
                 ) : (
                   <input 
