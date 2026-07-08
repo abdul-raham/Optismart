@@ -25,6 +25,7 @@ export function AdminProducts() {
     stock_quantity: 0,
     min_stock_level: 5,
     source_url: '',
+    image_url: '',
   })
 
   useEffect(() => {
@@ -83,7 +84,7 @@ export function AdminProducts() {
   const closeModal = () => {
     setIsModalOpen(false)
     setEditingId(null)
-    setForm({ name: '', description: '', retail_price: 0, wholesale_price: 0, stock_quantity: 0, min_stock_level: 5, source_url: '' })
+    setForm({ name: '', description: '', retail_price: 0, wholesale_price: 0, stock_quantity: 0, min_stock_level: 5, source_url: '', image_url: '' })
   }
 
   const toggleProductStatus = async (id: string, currentStatus: boolean) => {
@@ -164,7 +165,7 @@ export function AdminProducts() {
               className="pl-9 pr-4 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none w-full sm:w-64 transition-all"
             />
           </div>
-          <button onClick={() => { setEditingId(null); setForm({ name: '', description: '', retail_price: 0, wholesale_price: 0, stock_quantity: 0, min_stock_level: 5, source_url: '' }); setIsModalOpen(true); }} className="btn-primary h-10 px-4 text-sm font-semibold flex items-center gap-2">
+          <button onClick={() => { setEditingId(null); setForm({ name: '', description: '', retail_price: 0, wholesale_price: 0, stock_quantity: 0, min_stock_level: 5, source_url: '', image_url: '' }); setIsModalOpen(true); }} className="btn-primary h-10 px-4 text-sm font-semibold flex items-center gap-2">
             <Plus className="w-4 h-4" /> Add Product
           </button>
           <button onClick={syncOptismartCatalog} disabled={syncing} className="btn-outline h-10 px-4 text-sm font-semibold flex items-center gap-2">
@@ -221,7 +222,8 @@ export function AdminProducts() {
                           wholesale_price: product.wholesale_price,
                           stock_quantity: product.stock_quantity,
                           min_stock_level: product.min_stock_level,
-                          source_url: product.source_url || ''
+                          source_url: product.source_url || '',
+                          image_url: product.image_url || ''
                         })
                         setIsModalOpen(true)
                       }}
@@ -309,6 +311,11 @@ export function AdminProducts() {
                 <div>
                   <label className="label">Website Source URL</label>
                   <input type="url" className="input" placeholder="https://optismart.com.ng/..." value={form.source_url} onChange={e => setForm({...form, source_url: e.target.value})} />
+                </div>
+
+                <div>
+                  <label className="label">Image URL</label>
+                  <input type="text" className="input" placeholder="/products/image.jpg" value={form.image_url} onChange={e => setForm({...form, image_url: e.target.value})} />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
