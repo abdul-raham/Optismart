@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { Trophy, Medal, Award, TrendingUp, Search, Calendar as CalendarIcon, Package, User } from 'lucide-react'
