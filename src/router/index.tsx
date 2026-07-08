@@ -93,6 +93,7 @@ function RedirectToRoleSection({ section }: { section: 'dashboard' | 'leads' | '
     super_admin: {
       dashboard: '/app/admin',
       orders: '/app/admin/orders',
+      leads: '/app/admin/leads',
       installers: '/app/admin/installers',
       products: '/app/admin/products',
       analytics: '/app/admin/analytics',
@@ -100,6 +101,7 @@ function RedirectToRoleSection({ section }: { section: 'dashboard' | 'leads' | '
     admin: {
       dashboard: '/app/admin',
       orders: '/app/admin/orders',
+      leads: '/app/admin/leads',
       installers: '/app/admin/installers',
       products: '/app/admin/products',
       analytics: '/app/admin/analytics',
@@ -155,6 +157,7 @@ export function AppRouter() {
           <Route element={<RequireAuth roles={['admin', 'super_admin']} />}>
             <Route path="/app/admin"            element={<AdminDashboard />} />
             <Route path="/app/admin/orders"     element={<AdminOrders />} />
+            <Route path="/app/admin/leads"      element={<DSALeads />} />
             <Route path="/app/admin/products"   element={<AdminProducts />} />
             <Route path="/app/admin/payments"   element={<AdminPayments />} />
             <Route path="/app/admin/users"      element={<AdminUsers />} />

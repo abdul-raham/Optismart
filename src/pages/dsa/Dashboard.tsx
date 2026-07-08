@@ -185,6 +185,54 @@ export function DSADashboard() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
+        {/* Quick Actions / Reminders */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5, duration: 0.4 }}
+          className="glass-card p-5"
+        >
+          <h2 className="text-lg font-bold text-surface-900 mb-4">Quick Actions</h2>
+          <div className="space-y-2 mb-8">
+            <button onClick={() => window.location.href = '/app/dsa/leads'} className="w-full flex items-center gap-3 p-3 rounded-xl bg-brand-50 text-brand-700 hover:bg-brand-100 transition-colors font-semibold text-sm">
+              <div className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center">
+                <Target className="w-4 h-4 text-brand-600" />
+              </div>
+              Add New Lead
+            </button>
+            <button onClick={() => setIsOrderModalOpen(true)} className="w-full flex items-center gap-3 p-3 rounded-xl bg-orange-50 text-orange-700 hover:bg-orange-100 transition-colors font-semibold text-sm">
+              <div className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center">
+                <ShoppingBag className="w-4 h-4 text-orange-600" />
+              </div>
+              Create Order
+            </button>
+          </div>
+
+          <div className="flex items-center justify-between mb-4 mt-6 border-t border-surface-100 pt-6">
+            <h2 className="text-sm font-bold text-surface-900 uppercase tracking-wider">Outstanding Leads</h2>
+            <button onClick={() => window.location.href = '/app/dsa/leads'} className="text-xs font-bold text-brand-600 hover:text-brand-700">View All</button>
+          </div>
+          
+          <div className="space-y-3">
+            {activeLeadsList.length === 0 ? (
+              <div className="text-center py-6 border-2 border-dashed border-surface-200 rounded-xl">
+                <Target className="w-8 h-8 text-surface-300 mx-auto mb-2" />
+                <p className="text-xs text-surface-500 font-medium">No outstanding leads</p>
+              </div>
+            ) : (
+              activeLeadsList.map(lead => (
+                <div key={lead.id} className="flex flex-col p-3 rounded-xl border border-surface-100 bg-surface-50 hover:border-brand-200 transition-colors cursor-pointer" onClick={() => window.location.href = '/app/dsa/leads'}>
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm font-bold text-surface-900">{lead.customer_name}</p>
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-brand-100 text-brand-700">{lead.temperature}</span>
+                  </div>
+                  <p className="text-xs text-surface-500">{lead.phone}</p>
+                </div>
+              ))
+            )}
+          </div>
+        </motion.div>
+
         {/* Recent Orders */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -230,54 +278,6 @@ export function DSADashboard() {
                   </div>
                 ))}
               </div>
-            )}
-          </div>
-        </motion.div>
-
-        {/* Quick Actions / Reminders */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5, duration: 0.4 }}
-          className="glass-card p-5"
-        >
-          <h2 className="text-lg font-bold text-surface-900 mb-4">Quick Actions</h2>
-          <div className="space-y-2 mb-8">
-            <button onClick={() => window.location.href = '/app/dsa/leads'} className="w-full flex items-center gap-3 p-3 rounded-xl bg-brand-50 text-brand-700 hover:bg-brand-100 transition-colors font-semibold text-sm">
-              <div className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center">
-                <Target className="w-4 h-4 text-brand-600" />
-              </div>
-              Add New Lead
-            </button>
-            <button onClick={() => setIsOrderModalOpen(true)} className="w-full flex items-center gap-3 p-3 rounded-xl bg-orange-50 text-orange-700 hover:bg-orange-100 transition-colors font-semibold text-sm">
-              <div className="w-8 h-8 rounded-lg bg-white shadow-sm flex items-center justify-center">
-                <ShoppingBag className="w-4 h-4 text-orange-600" />
-              </div>
-              Create Order
-            </button>
-          </div>
-
-          <div className="flex items-center justify-between mb-4 mt-6 border-t border-surface-100 pt-6">
-            <h2 className="text-sm font-bold text-surface-900 uppercase tracking-wider">Outstanding Leads</h2>
-            <button onClick={() => window.location.href = '/app/dsa/leads'} className="text-xs font-bold text-brand-600 hover:text-brand-700">View All</button>
-          </div>
-          
-          <div className="space-y-3">
-            {activeLeadsList.length === 0 ? (
-              <div className="text-center py-6 border-2 border-dashed border-surface-200 rounded-xl">
-                <Target className="w-8 h-8 text-surface-300 mx-auto mb-2" />
-                <p className="text-xs text-surface-500 font-medium">No outstanding leads</p>
-              </div>
-            ) : (
-              activeLeadsList.map(lead => (
-                <div key={lead.id} className="flex flex-col p-3 rounded-xl border border-surface-100 bg-surface-50 hover:border-brand-200 transition-colors cursor-pointer" onClick={() => window.location.href = '/app/dsa/leads'}>
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="text-sm font-bold text-surface-900">{lead.customer_name}</p>
-                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-brand-100 text-brand-700">{lead.temperature}</span>
-                  </div>
-                  <p className="text-xs text-surface-500">{lead.phone}</p>
-                </div>
-              ))
             )}
           </div>
         </motion.div>

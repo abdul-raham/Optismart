@@ -22,6 +22,7 @@ export const NAV_ITEMS: Record<UserRole, NavItem[]> = {
   super_admin: [
     { label: 'Dashboard',  href: '/app/admin',            icon: LayoutDashboard },
     { label: 'Orders',     href: '/app/admin/orders',     icon: ShoppingBag },
+    { label: 'Leads',      href: '/app/admin/leads',      icon: Target },
     { label: 'Products',   href: '/app/admin/products',   icon: Package },
     { label: 'Payments',   href: '/app/admin/payments',   icon: CreditCard },
     { label: 'Expenses',   href: '/app/admin/expenses',   icon: Receipt },
@@ -34,6 +35,7 @@ export const NAV_ITEMS: Record<UserRole, NavItem[]> = {
   admin: [
     { label: 'Dashboard',  href: '/app/admin',            icon: LayoutDashboard },
     { label: 'Orders',     href: '/app/admin/orders',     icon: ShoppingBag },
+    { label: 'Leads',      href: '/app/admin/leads',      icon: Target },
     { label: 'Products',   href: '/app/admin/products',   icon: Package },
     { label: 'Payments',   href: '/app/admin/payments',   icon: CreditCard },
     { label: 'Expenses',   href: '/app/admin/expenses',   icon: Receipt },

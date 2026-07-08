@@ -2,15 +2,15 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { UserPlus, Target, TrendingUp, MoreVertical, Search, Plus, X, Phone, Mail, MapPin, Calendar, Clock, Banknote, Edit2, Trash2 } from 'lucide-react'
+import { UserPlus, Target, TrendingUp, MoreVertical, Search, Plus, X, Phone, Mail, MapPin, Calendar, Clock, Banknote, Edit2, Trash2, Bell } from 'lucide-react'
 import { sendEmail } from '@/lib/email'
 import { sendWebPush } from '@/lib/push'
 import { formatDate } from '@/lib/utils'
 import type { Lead } from '@/types'
 
 export function DSALeads() {
-  const { user } = useAuthStore()
-  const [leads, setLeads] = useState<Lead[]>([])
+  const { user, role } = useAuthStore()
+  const [leads, setLeads] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -36,11 +36,18 @@ export function DSALeads() {
 
   const fetchLeads = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('leads')
-        .select('*')
-        .eq('dsa_id', user?.id)
+        .select('*, dsa:users(full_name)')
         .order('created_at', { ascending: false })
+        
+      if (role === 'dsa') {
+        query = query.eq('dsa_id', user?.id)
+      }
+      
+      const { data, error } = await query
+      
+      if (error) throw error
       
       if (data) setLeads(data)
     } catch (err) {
@@ -109,6 +116,22 @@ export function DSALeads() {
     } catch (err) {
       console.error('Error stopping reminders:', err)
       alert('Failed to stop reminders')
+    }
+  }
+
+  const handleRemindDSA = async (lead: any) => {
+    if (!lead.dsa_id) return
+    try {
+      await sendWebPush(
+        lead.dsa_id,
+        'Lead Follow-up Reminder',
+        `Admin reminded you to follow up with ${lead.customer_name}. Please check your pending leads.`,
+        '/app/dsa/leads'
+      )
+      alert(`Reminder sent to ${lead.dsa?.full_name || 'DSA'}`)
+    } catch (err) {
+      console.error('Failed to send reminder:', err)
+      alert('Failed to send reminder')
     }
   }
 
@@ -212,6 +235,11 @@ export function DSALeads() {
                     <div>
                       <div className="flex items-center gap-3">
                         <h3 className="text-lg font-black text-surface-900 group-hover:text-brand-600 transition-colors">{lead.customer_name}</h3>
+                        {role !== 'dsa' && lead.dsa?.full_name && (
+                          <span className="px-2 py-0.5 rounded text-[10px] bg-purple-50 text-purple-700 font-bold ml-2">
+                            {lead.dsa.full_name}
+                          </span>
+                        )}
                         <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border ${getTempColor(lead.temperature)}`}>
                           {getPriorityLabel(lead.temperature)}
                         </span>
@@ -238,6 +266,11 @@ export function DSALeads() {
                             <a href={`tel:${lead.phone}`} className="w-full text-left px-4 py-2 text-sm text-surface-700 hover:bg-surface-50 hover:text-brand-600 transition-colors flex items-center gap-2">
                               <Phone className="w-4 h-4" /> Call Customer
                             </a>
+                            {role !== 'dsa' && lead.dsa_id && (
+                              <button onClick={() => { handleRemindDSA(lead); setOpenDropdownId(null); }} className="w-full text-left px-4 py-2 text-sm text-orange-600 hover:bg-orange-50 transition-colors flex items-center gap-2">
+                                <Bell className="w-4 h-4" /> Remind DSA
+                              </button>
+                            )}
                             <button onClick={() => { handleDeleteLead(lead.id); setOpenDropdownId(null); }} className="w-full text-left px-4 py-2 text-sm text-danger-600 hover:bg-danger-50 transition-colors flex items-center gap-2">
                               <Trash2 className="w-4 h-4" /> Delete Lead
                             </button>
@@ -307,6 +340,7 @@ export function DSALeads() {
                 <thead className="bg-surface-50/50 text-surface-500 font-semibold border-b border-surface-100 whitespace-nowrap">
                   <tr>
                     <th className="px-6 py-4">Customer Name</th>
+                    {role !== 'dsa' && <th className="px-6 py-4">DSA / Agent</th>}
                     <th className="px-6 py-4">Contact Info</th>
                     <th className="px-6 py-4">Priority & Status</th>
                     <th className="px-6 py-4">Follow-up</th>
@@ -322,6 +356,13 @@ export function DSALeads() {
                           <Calendar className="w-3 h-3" /> Added {formatDate(lead.created_at)}
                         </div>
                       </td>
+                      {role !== 'dsa' && (
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-semibold text-purple-700 bg-purple-50 px-2 py-1 rounded inline-block">
+                            {lead.dsa?.full_name || 'Unknown'}
+                          </div>
+                        </td>
+                      )}
                       <td className="px-6 py-4 space-y-1 min-w-[200px]">
                         <div className="flex items-center gap-2 text-surface-700 whitespace-nowrap">
                           <Phone className="w-3.5 h-3.5 text-surface-400" /> {lead.phone}
@@ -369,6 +410,11 @@ export function DSALeads() {
                               {lead.follow_up_date && !lead.follow_up_stopped && (
                                 <button onClick={() => handleStopReminders(lead.id)} className="text-[10px] font-bold text-danger-600 hover:text-danger-700 bg-danger-50 px-2 py-1 rounded transition-colors" title="Stop Reminders">
                                   Stop
+                                </button>
+                              )}
+                              {role !== 'dsa' && lead.dsa_id && (
+                                <button onClick={() => handleRemindDSA(lead)} className="text-xs font-bold text-orange-600 hover:text-orange-700 transition-colors">
+                                  Remind DSA
                                 </button>
                               )}
                               <button className="text-xs font-bold text-brand-600 hover:text-brand-700 transition-colors">
