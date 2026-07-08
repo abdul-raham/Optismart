@@ -64,6 +64,8 @@ export interface Lead {
   temperature: LeadTemperature
   notes: string | null
   follow_up_date: string | null
+  follow_up_interval_days: number | null
+  follow_up_stopped: boolean
   converted_order_id: string | null
   created_at: string
   updated_at: string

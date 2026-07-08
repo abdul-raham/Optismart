@@ -23,6 +23,8 @@ export function DSALeads() {
     location: '',
     temperature: 'warm',
     notes: '',
+    follow_up_date: '',
+    follow_up_interval_days: 0,
   })
 
   useEffect(() => {
@@ -63,6 +65,8 @@ export function DSALeads() {
           location: form.location,
           temperature: form.temperature,
           notes: form.notes,
+          follow_up_date: form.follow_up_date || null,
+          follow_up_interval_days: form.follow_up_interval_days || 0,
           status: 'new'
         }])
         .select()
@@ -86,13 +90,24 @@ export function DSALeads() {
 
         setLeads([data, ...leads])
         setIsModalOpen(false)
-        setForm({ customer_name: '', phone: '', email: '', location: '', temperature: 'warm', notes: '' })
+        setForm({ customer_name: '', phone: '', email: '', location: '', temperature: 'warm', notes: '', follow_up_date: '', follow_up_interval_days: 0 })
       }
     } catch (err) {
       console.error('Error creating lead:', err)
       alert('Failed to create lead')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  const handleStopReminders = async (leadId: string) => {
+    try {
+      const { error } = await supabase.from('leads').update({ follow_up_stopped: true }).eq('id', leadId)
+      if (error) throw error
+      setLeads(leads.map(l => l.id === leadId ? { ...l, follow_up_stopped: true } : l))
+    } catch (err) {
+      console.error('Error stopping reminders:', err)
+      alert('Failed to stop reminders')
     }
   }
 
@@ -220,11 +235,29 @@ export function DSALeads() {
                     Added {formatDate(lead.created_at)}
                   </div>
                   {lead.status !== 'converted' && (
-                    <button className="text-xs font-bold text-brand-600 hover:text-brand-700 transition-colors">
-                      Convert to Order
-                    </button>
+                    <div className="flex items-center gap-3">
+                      {lead.follow_up_date && !lead.follow_up_stopped && (
+                        <button onClick={() => handleStopReminders(lead.id)} className="text-[10px] font-bold text-danger-600 hover:text-danger-700 bg-danger-50 px-2 py-1 rounded transition-colors">
+                          Stop Reminders
+                        </button>
+                      )}
+                      <button className="text-xs font-bold text-brand-600 hover:text-brand-700 transition-colors">
+                        Convert to Order
+                      </button>
+                    </div>
                   )}
                 </div>
+                {lead.follow_up_date && (
+                  <div className={`mt-3 pt-3 border-t border-surface-100 flex items-center justify-between text-xs ${lead.follow_up_stopped ? 'text-surface-400' : 'text-brand-600 font-medium'}`}>
+                    <div className="flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5" />
+                      Follow-up: {formatDate(lead.follow_up_date)}
+                    </div>
+                    {lead.follow_up_interval_days ? (
+                      <span>Every {lead.follow_up_interval_days} days</span>
+                    ) : null}
+                  </div>
+                )}
               </motion.div>
             ))}
           </AnimatePresence>
@@ -287,6 +320,24 @@ export function DSALeads() {
                         {getPriorityLabel(t)}
                       </button>
                     ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">Next Follow-up Date</label>
+                    <input type="date" className="input" value={form.follow_up_date} onChange={e => setForm({...form, follow_up_date: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="label">Reminder Interval</label>
+                    <select className="input" value={form.follow_up_interval_days} onChange={e => setForm({...form, follow_up_interval_days: parseInt(e.target.value)})}>
+                      <option value={0}>One-time (No repeat)</option>
+                      <option value={1}>Every day</option>
+                      <option value={3}>Every 3 days</option>
+                      <option value={7}>Every week</option>
+                      <option value={14}>Every 2 weeks</option>
+                      <option value={30}>Every month</option>
+                    </select>
                   </div>
                 </div>
 
