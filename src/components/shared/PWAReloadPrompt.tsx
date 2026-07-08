@@ -42,7 +42,10 @@ export function PWAReloadPrompt() {
               </p>
               <div className="flex items-center gap-3">
                 <button
-                  onClick={() => updateServiceWorker(true)}
+                  onClick={() => {
+                    updateServiceWorker(true)
+                    window.location.reload()
+                  }}
                   className="flex-1 bg-brand-600 hover:bg-brand-500 text-white font-bold py-2 px-4 rounded-xl transition-colors text-sm"
                 >
                   Reload Now

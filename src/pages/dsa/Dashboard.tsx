@@ -26,6 +26,7 @@ export function DSADashboard() {
   const [commissionStatus, setCommissionStatus] = useState({ camerasDelivered: 0, target: 30 })
   const [allOrders, setAllOrders] = useState<Order[]>([])
   const [recentOrders, setRecentOrders] = useState<Order[]>([])
+  const [activeLeadsList, setActiveLeadsList] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
   const [leaderboard, setLeaderboard] = useState<any[]>([])
@@ -79,6 +80,7 @@ export function DSADashboard() {
 
       if (leads) {
         setStats(prev => ({ ...prev, activeLeads: leads.length }))
+        setActiveLeadsList(leads.slice(0, 5))
       }
 
       if (commissions) {
@@ -255,13 +257,28 @@ export function DSADashboard() {
             </button>
           </div>
 
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-bold text-surface-900 uppercase tracking-wider">Upcoming Follow-ups</h2>
+          <div className="flex items-center justify-between mb-4 mt-6 border-t border-surface-100 pt-6">
+            <h2 className="text-sm font-bold text-surface-900 uppercase tracking-wider">Outstanding Leads</h2>
+            <button onClick={() => window.location.href = '/app/dsa/leads'} className="text-xs font-bold text-brand-600 hover:text-brand-700">View All</button>
           </div>
           
-          <div className="text-center py-6 border-2 border-dashed border-surface-200 rounded-xl">
-            <CalendarDays className="w-8 h-8 text-surface-300 mx-auto mb-2" />
-            <p className="text-xs text-surface-500 font-medium">No reminders scheduled</p>
+          <div className="space-y-3">
+            {activeLeadsList.length === 0 ? (
+              <div className="text-center py-6 border-2 border-dashed border-surface-200 rounded-xl">
+                <Target className="w-8 h-8 text-surface-300 mx-auto mb-2" />
+                <p className="text-xs text-surface-500 font-medium">No outstanding leads</p>
+              </div>
+            ) : (
+              activeLeadsList.map(lead => (
+                <div key={lead.id} className="flex flex-col p-3 rounded-xl border border-surface-100 bg-surface-50 hover:border-brand-200 transition-colors cursor-pointer" onClick={() => window.location.href = '/app/dsa/leads'}>
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="text-sm font-bold text-surface-900">{lead.customer_name}</p>
+                    <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-brand-100 text-brand-700">{lead.temperature}</span>
+                  </div>
+                  <p className="text-xs text-surface-500">{lead.phone}</p>
+                </div>
+              ))
+            )}
           </div>
         </motion.div>
 
