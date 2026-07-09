@@ -111,7 +111,7 @@ export function DSAInstallerBooking() {
 
   const filteredInstallers = installers.filter(i => 
     i.full_name.toLowerCase().includes(search.toLowerCase()) || 
-    i.installer_profiles[0].location.toLowerCase().includes(search.toLowerCase())
+    (i.installer_profiles?.[0]?.location ?? '').toLowerCase().includes(search.toLowerCase())
   )
 
   return (
@@ -202,7 +202,8 @@ export function DSAInstallerBooking() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-2">
                 <AnimatePresence>
                   {filteredInstallers.map(installer => {
-                    const profile = installer.installer_profiles[0]
+                    const profile = installer.installer_profiles?.[0]
+                    if (!profile) return null
                     return (
                       <motion.div
                         key={installer.id}
