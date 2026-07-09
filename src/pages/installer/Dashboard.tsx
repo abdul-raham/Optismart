@@ -28,6 +28,13 @@ export function InstallerDashboard() {
     if (user?.id) fetchData(user.id)
   }, [user?.id])
 
+  // Auto-prompt location share if no coords yet
+  useEffect(() => {
+    if (!loading && !profile?.lat) {
+      shareLocation()
+    }
+  }, [loading])
+
   const fetchData = async (userId: string) => {
     setLoading(true)
     try {
@@ -157,6 +164,26 @@ export function InstallerDashboard() {
 
   return (
     <div className="space-y-6">
+      {/* Mandatory location prompt banner */}
+      {!profile?.lat && !loading && (
+        <div className="rounded-2xl border-2 border-orange-300 bg-orange-50 p-5 flex flex-col sm:flex-row items-start sm:items-center gap-4">
+          <div className="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+            <MapPin className="w-5 h-5 text-orange-600" />
+          </div>
+          <div className="flex-1">
+            <p className="font-black text-orange-800">Location sharing is required</p>
+            <p className="text-sm text-orange-600 mt-0.5">You must share your location to receive job assignments. Please allow location access when prompted.</p>
+          </div>
+          <button
+            onClick={shareLocation}
+            disabled={sharingLocation}
+            className="inline-flex items-center gap-2 bg-orange-500 hover:bg-orange-600 text-white rounded-xl px-5 py-2.5 text-sm font-black transition flex-shrink-0"
+          >
+            {sharingLocation ? <Loader2 className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4" />}
+            {sharingLocation ? 'Getting location...' : 'Share My Location'}
+          </button>
+        </div>
+      )}
       <div className="glass-card overflow-hidden p-6">
         <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
           <div>
