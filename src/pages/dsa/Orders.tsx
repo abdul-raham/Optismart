@@ -36,12 +36,6 @@ export function DSAOrders() {
     notes: '',
   })
 
-  useEffect(() => {
-    if (user?.id) {
-      fetchData()
-    }
-  }, [user?.id])
-
   const fetchData = async () => {
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -64,6 +58,19 @@ export function DSAOrders() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchData()
+
+      const channel = supabase
+        .channel('dsa-orders')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => fetchData())
+        .subscribe()
+
+      return () => { supabase.removeChannel(channel) }
+    }
+  }, [user?.id])
 
   const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault()

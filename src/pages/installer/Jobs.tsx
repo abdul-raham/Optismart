@@ -35,10 +35,6 @@ export function InstallerJobs() {
     rejected: null
   }
 
-  useEffect(() => {
-    if (user?.id) fetchJobs()
-  }, [user?.id])
-
   const fetchJobs = async () => {
     try {
       const { data } = await supabase
@@ -57,6 +53,19 @@ export function InstallerJobs() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (user?.id) {
+      fetchJobs()
+
+      const channel = supabase
+        .channel('installer-jobs')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'installer_jobs', filter: `installer_id=eq.${user.id}` }, () => fetchJobs())
+        .subscribe()
+
+      return () => { supabase.removeChannel(channel) }
+    }
+  }, [user?.id])
 
   const updateJobStatus = async (jobId: string, newStatus: string) => {
     setUpdating(jobId)

@@ -15,7 +15,7 @@ interface AssignInstallerModalProps {
 export function AssignInstallerModal({ isOpen, onClose, onSuccess, order }: AssignInstallerModalProps) {
   const [installers, setInstallers] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
-  const [fetching, setFetching] = useState(true)
+  const [fetching, setFetching] = useState(false)
   const [selectedInstallerId, setSelectedInstallerId] = useState('')
   const [scheduledDate, setScheduledDate] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -68,7 +68,7 @@ export function AssignInstallerModal({ isOpen, onClose, onSuccess, order }: Assi
         const p = profileMap.get(u.id)
         const lat = p?.lat ?? null
         const lng = p?.lng ?? null
-        const dist = (lat && lng && customerLat && customerLng)
+        const dist = (lat != null && lng != null && customerLat != null && customerLng != null)
           ? haversine(customerLat, customerLng, lat, lng)
           : null
         return { ...u, lat, lng, location: (p?.location && p.location !== 'Not set') ? p.location : null, is_available: p?.is_available ?? false, dist }
@@ -103,7 +103,7 @@ export function AssignInstallerModal({ isOpen, onClose, onSuccess, order }: Assi
       const { error: insertError } = await supabase.from('installer_jobs').insert({
         installer_id: selectedInstallerId,
         order_id: order?.id,
-        scheduled_date: new Date(scheduledDate).toISOString(),
+        scheduled_date: new Date(`${scheduledDate}T00:00:00`).toISOString(),
         status: 'assigned'
       })
 
@@ -170,7 +170,7 @@ export function AssignInstallerModal({ isOpen, onClose, onSuccess, order }: Assi
 
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-bold text-surface-700 mb-1.5 flex items-center gap-1.5">
+                <label className="flex items-center gap-1.5 text-sm font-bold text-surface-700 mb-1.5">
                   <Wrench className="w-4 h-4" /> Select Installer
                   {order?.customer_address && <span className="text-xs font-normal text-surface-400 ml-1">— sorted by distance to customer</span>}
                 </label>

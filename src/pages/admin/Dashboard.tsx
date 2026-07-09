@@ -20,10 +20,6 @@ export function AdminDashboard() {
 
   const [allOrders, setAllOrders] = useState<Order[]>([])
 
-  useEffect(() => {
-    fetchDashboardData()
-  }, [])
-
   const fetchDashboardData = async () => {
     setLoading(true)
     try {
@@ -54,6 +50,17 @@ export function AdminDashboard() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchDashboardData()
+
+    const channel = supabase
+      .channel('admin-dashboard')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => fetchDashboardData())
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [])
 
   const downloadCSV = () => {
     const escape = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`

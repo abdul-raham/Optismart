@@ -52,10 +52,6 @@ export function AdminOrders() {
     cancelled: []
   }
 
-  useEffect(() => {
-    fetchData()
-  }, [])
-
   const fetchData = async () => {
     try {
       const [ordersRes, productsRes, dsasRes, jobsRes] = await Promise.all([
@@ -75,6 +71,18 @@ export function AdminOrders() {
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchData()
+
+    const channel = supabase
+      .channel('admin-orders')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'installer_jobs' }, () => fetchData())
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [])
 
   const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault()
