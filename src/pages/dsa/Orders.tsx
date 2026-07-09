@@ -43,8 +43,13 @@ export function DSAOrders() {
 
   const fetchData = async () => {
     try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const authId = session?.user?.id
+
       const [ordersRes, productsRes, dsasRes] = await Promise.all([
-        supabase.from('orders').select('*').eq('dsa_id', user?.id).order('created_at', { ascending: false }),
+        supabase.from('orders').select('*')
+          .or(`dsa_id.eq.${user?.id},created_by_auth_id.eq.${authId}`)
+          .order('created_at', { ascending: false }),
         supabase.from('products').select('*').eq('is_active', true),
         supabase.from('users').select('id, full_name, email').eq('role', 'dsa')
       ])
@@ -72,12 +77,16 @@ export function DSAOrders() {
       const productTotal = form.amount > 0 ? form.amount : Number(product.retail_price) * form.quantity
       const totalAmount = productTotal + (form.installation_needed ? form.installation_price : 0)
 
+      const { data: { session } } = await supabase.auth.getSession()
+      const authId = session?.user?.id
+
       const { data, error } = await supabase
         .from('orders')
         .insert([{
           order_number: orderNumber,
           dsa_id: form.is_dsa_registered ? (form.dsa_id || user.id) : null,
           unregistered_dsa_name: !form.is_dsa_registered ? form.unregistered_dsa_name : null,
+          created_by_auth_id: authId,
           customer_name: form.customer_name,
           customer_email: form.customer_email || null,
           customer_phone: form.customer_phone,
