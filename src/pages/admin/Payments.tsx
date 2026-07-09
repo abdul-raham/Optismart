@@ -65,6 +65,14 @@ export function AdminPayments() {
         .eq('id', payment.id)
 
       if (error) throw error
+
+      // Auto-advance the order status to 'confirmed'
+      await supabase
+        .from('orders')
+        .update({ status: 'confirmed', updated_at: new Date().toISOString() })
+        .eq('id', payment.order_id)
+        .eq('status', 'pending') // only move if still pending
+
       await fetchPayments()
     } catch (err) {
       console.error('Error confirming payment:', err)

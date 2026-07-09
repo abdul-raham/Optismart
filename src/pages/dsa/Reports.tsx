@@ -27,7 +27,10 @@ export function DSAReports() {
   const fetchData = async (userId: string) => {
     setLoading(true)
     try {
-      const { data: orders } = await supabase.from('orders').select('*').eq('dsa_id', userId)
+      const { data: { session } } = await supabase.auth.getSession()
+      const authId = session?.user?.id
+      const { data: orders } = await supabase.from('orders').select('*')
+        .or(`dsa_id.eq.${userId},created_by_auth_id.eq.${authId}`)
       const { data: commissions } = await supabase.from('commissions').select('amount, status, created_at').eq('dsa_id', userId)
 
       if (orders) {

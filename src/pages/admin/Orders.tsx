@@ -424,7 +424,7 @@ export function AdminOrders() {
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
                       <select required className="input pl-10" value={form.dsa_id} onChange={e => setForm({...form, dsa_id: e.target.value})}>
-                        <option value="">Select a DSA</option>
+                        <option value="" disabled>Select a DSA</option>
                         {dsas.map(dsa => (
                           <option key={dsa.id} value={dsa.id}>{dsa.full_name} ({dsa.email})</option>
                         ))}

@@ -33,6 +33,9 @@ export function DSAInstallerBooking() {
 
   const fetchData = async () => {
     try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const authId = session?.user?.id
+
       // 1. Fetch available installers
       const { data: installerData } = await supabase
         .from('users')
@@ -47,8 +50,8 @@ export function DSAInstallerBooking() {
       const { data: orderData } = await supabase
         .from('orders')
         .select('*')
-        .eq('dsa_id', user?.id)
-        .eq('status', 'pending') // Only pending orders can be assigned initially
+        .or(`dsa_id.eq.${user?.id},created_by_auth_id.eq.${authId}`)
+        .eq('status', 'pending')
 
       if (installerData) {
         // Filter out installers with no profile or who are unavailable

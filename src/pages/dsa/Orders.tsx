@@ -304,7 +304,7 @@ export function DSAOrders() {
                   {form.is_dsa_registered ? (
                     <div className="relative">
                       <select required className="input" value={form.dsa_id} onChange={e => setForm({...form, dsa_id: e.target.value})}>
-                        <option value="">Select a DSA</option>
+                        <option value="" disabled>Select a DSA</option>
                         {dsas.map(dsa => (
                           <option key={dsa.id} value={dsa.id}>{dsa.full_name} ({dsa.email})</option>
                         ))}
