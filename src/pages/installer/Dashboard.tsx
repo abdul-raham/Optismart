@@ -95,7 +95,11 @@ export function InstallerDashboard() {
               { headers: { 'Accept-Language': 'en' } }
             )
             const geo = await res.json()
-            locationName = geo.address?.city || geo.address?.town || geo.address?.village || geo.address?.county || geo.display_name?.split(',')[0] || locationName
+            const a = geo.address || {}
+            const street = [a.house_number, a.road || a.street].filter(Boolean).join(' ')
+            const area = a.suburb || a.neighbourhood || a.village || a.town || a.city_district || a.city
+            const city = a.city || a.town || a.county
+            locationName = [street, area && city && area !== city ? `${area}, ${city}` : area || city].filter(Boolean).join(', ') || geo.display_name?.split(',').slice(0, 3).join(',').trim() || locationName
           } catch { /* keep coords as fallback */ }
 
           const { error } = await supabase

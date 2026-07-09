@@ -111,7 +111,33 @@ export function AdminInstallers() {
         }
       })
 
-      setInstallers(mapped)
+      // Reverse geocode installers that have coords but no real location name
+      const needsGeocode = mapped.filter(i => i.lat && i.lng && !i.location)
+      if (needsGeocode.length > 0) {
+        const resolved = await Promise.all(
+          needsGeocode.map(async i => {
+            try {
+              const res = await fetch(
+                `https://nominatim.openstreetmap.org/reverse?lat=${i.lat}&lon=${i.lng}&format=json`,
+                { headers: { 'Accept-Language': 'en' } }
+              )
+              const geo = await res.json()
+              const a = geo.address || {}
+              const street = [a.house_number, a.road || a.street].filter(Boolean).join(' ')
+              const area = a.suburb || a.neighbourhood || a.village || a.town || a.city_district || a.city
+              const city = a.city || a.town || a.county
+              const name = [street, area && city && area !== city ? `${area}, ${city}` : area || city].filter(Boolean).join(', ') || geo.display_name?.split(',').slice(0, 3).join(',').trim() || null
+              return { id: i.id, location: name }
+            } catch {
+              return { id: i.id, location: null }
+            }
+          })
+        )
+        const locationMap = new Map(resolved.map(r => [r.id, r.location]))
+        setInstallers(mapped.map(i => locationMap.has(i.id) ? { ...i, location: locationMap.get(i.id) ?? null } : i))
+      } else {
+        setInstallers(mapped)
+      }
     } catch (err) {
       console.error('Error fetching installers:', err)
     } finally {
