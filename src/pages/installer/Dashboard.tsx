@@ -28,13 +28,6 @@ export function InstallerDashboard() {
     if (user?.id) fetchData(user.id)
   }, [user?.id])
 
-  // Auto-prompt location share if no coords yet
-  useEffect(() => {
-    if (!loading && !profile?.lat) {
-      shareLocation()
-    }
-  }, [loading])
-
   const fetchData = async (userId: string) => {
     setLoading(true)
     try {
@@ -47,8 +40,14 @@ export function InstallerDashboard() {
           .order('scheduled_date', { ascending: true }),
       ])
 
-      setProfile((profileRes.data as InstallerProfile) ?? null)
+      const profileData = (profileRes.data as InstallerProfile) ?? null
+      setProfile(profileData)
       setJobs((jobsRes.data ?? []) as JobRow[])
+
+      // Auto-trigger location prompt if no coords saved yet
+      if (!profileData?.lat) {
+        setTimeout(() => shareLocationForUser(userId, profileData), 500)
+      }
     } catch (err) {
       console.error('Error fetching installer dashboard:', err)
     } finally {
@@ -81,20 +80,16 @@ export function InstallerDashboard() {
     }
   }
 
-  const shareLocation = () => {
-    if (!user?.id) return
+  const shareLocationForUser = (userId: string, currentProfile: InstallerProfile | null) => {
     if (!navigator.geolocation) {
       alert("Geolocation is not supported by your browser")
       return
     }
-
     setSharingLocation(true)
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
           const { latitude: lat, longitude: lng } = position.coords
-
-          // Reverse geocode to get a human-readable location name
           let locationName = `${lat.toFixed(4)}, ${lng.toFixed(4)}`
           try {
             const res = await fetch(
@@ -111,16 +106,15 @@ export function InstallerDashboard() {
 
           const { error } = await supabase
             .from('installer_profiles')
-            .upsert({ 
-              user_id: user.id,
-              lat,
-              lng,
+            .upsert({
+              user_id: userId,
+              lat, lng,
               location: locationName,
-              is_available: profile?.is_available ?? false,
+              is_available: currentProfile?.is_available ?? false,
             }, { onConflict: 'user_id' })
 
           if (error) throw error
-          setProfile(prev => prev ? { ...prev, lat, lng, location: locationName } : prev)
+          setProfile(prev => prev ? { ...prev, lat, lng, location: locationName } : { user_id: userId, lat, lng, location: locationName, is_available: false } as any)
           alert(`Location shared! ${locationName}`)
         } catch (err) {
           console.error('Error sharing location:', err)
@@ -129,13 +123,18 @@ export function InstallerDashboard() {
           setSharingLocation(false)
         }
       },
-      (error) => {
-        console.error("Geolocation error:", error)
-        alert("Unable to retrieve your location. Please check your browser permissions.")
+      (err) => {
+        console.error('Geolocation error:', err)
+        alert('Unable to retrieve your location. Please check your browser permissions.')
         setSharingLocation(false)
       },
       { enableHighAccuracy: true, maximumAge: 0 }
     )
+  }
+
+  const shareLocation = () => {
+    if (!user?.id) return
+    shareLocationForUser(user.id, profile)
   }
 
   const handleUpdateJobStatus = async (jobId: string, newStatus: string) => {
