@@ -11,7 +11,7 @@ export default defineConfig({
       srcDir: 'src',
       filename: 'sw.js',
       registerType: 'prompt',
-      selfDestroying: true,
+      selfDestroying: false,
       devOptions: {
         enabled: false
       },
