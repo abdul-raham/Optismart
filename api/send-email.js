@@ -183,6 +183,27 @@ const templates = {
       ${button(`${appUrl}/login`, 'Login Now')}
     `),
   }),
+
+  new_order: ({ recipientEmail, orderNumber, customerName, totalAmount }) => ({
+    to: recipientEmail,
+    subject: `New Order Created: ${orderNumber}`,
+    html: layout('Order Confirmation', `
+      <h2>Hello,</h2>
+      <p>A new order has been successfully created.</p>
+      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin: 24px 0;">
+        <p style="margin: 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 700; letter-spacing: 1px;">Order Reference</p>
+        <p style="margin: 4px 0 0 0; font-size: 20px; font-weight: 800; color: #0f172a;">${escapeHtml(orderNumber)}</p>
+        <div style="margin-top: 16px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
+          <p style="margin: 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 700; letter-spacing: 1px;">Customer</p>
+          <p style="margin: 4px 0 0 0; font-size: 16px; font-weight: 600; color: #334155;">${escapeHtml(customerName)}</p>
+          <p style="margin: 8px 0 0 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 700; letter-spacing: 1px;">Total Amount</p>
+          <p style="margin: 4px 0 0 0; font-size: 16px; font-weight: 600; color: #334155;">₦${Number(totalAmount).toLocaleString()}</p>
+        </div>
+      </div>
+      <p>Log in to your portal to view more details.</p>
+      ${button(`${appUrl}/login`, 'View Order')}
+    `),
+  }),
 }
 
 function setCors(req, res) {
