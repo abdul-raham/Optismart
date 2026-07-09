@@ -157,7 +157,7 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
         orderNumber: orderNumber,
         customerName: customerName,
         totalAmount: totalAmount
-      }, { onError: (e) => console.warn('DSA Email failed:', e) })
+      }, { onError: (e) => console.warn('DSA Email failed:', e) }).catch(console.warn)
 
       setCreatedOrderNumber(orderNumber)
       setCreatedOrderAmount(totalAmount)
