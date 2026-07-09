@@ -209,7 +209,9 @@ export function DSAOrders() {
                       </td>
                       <td className="py-4 px-6 text-right">
                         {order.status === 'pending' && (
-                          <button className="text-xs font-bold text-brand-600 hover:text-brand-700 bg-brand-50 px-3 py-1.5 rounded-lg transition-colors">
+                          <button
+                            onClick={() => window.location.href = '/app/dsa/installer-booking'}
+                            className="text-xs font-bold text-brand-600 hover:text-brand-700 bg-brand-50 px-3 py-1.5 rounded-lg transition-colors">
                             Book Installer
                           </button>
                         )}
@@ -252,7 +254,9 @@ export function DSAOrders() {
 
                   {order.status === 'pending' && (
                     <div className="flex justify-end pt-2">
-                      <button className="text-xs font-bold text-brand-600 hover:text-brand-700 bg-brand-50 px-3 py-1.5 rounded-lg transition-colors">
+                      <button
+                        onClick={() => window.location.href = '/app/dsa/installer-booking'}
+                        className="text-xs font-bold text-brand-600 hover:text-brand-700 bg-brand-50 px-3 py-1.5 rounded-lg transition-colors">
                         Book Installer
                       </button>
                     </div>
