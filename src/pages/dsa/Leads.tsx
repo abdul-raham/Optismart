@@ -198,11 +198,9 @@ export function DSALeads() {
               className="pl-9 pr-4 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none w-full sm:w-64 transition-all"
             />
           </div>
-          {role === 'dsa' && (
-            <button onClick={() => setIsModalOpen(true)} className="btn-primary h-10 px-4 text-sm font-semibold flex items-center gap-2">
-              <Plus className="w-4 h-4" /> New Lead
-            </button>
-          )}
+          <button onClick={() => setIsModalOpen(true)} className="btn-primary h-10 px-4 text-sm font-semibold flex items-center gap-2">
+            <Plus className="w-4 h-4" /> New Lead
+          </button>
         </div>
       </div>
 
@@ -217,9 +215,7 @@ export function DSALeads() {
           </div>
           <h3 className="text-lg font-bold text-surface-900 mb-2">No leads found</h3>
           <p className="text-surface-500 max-w-md">You haven't added any prospects yet. Start building your pipeline by adding a new lead.</p>
-          {role === 'dsa' && (
-            <button onClick={() => setIsModalOpen(true)} className="btn-primary mt-6">Add Your First Lead</button>
-          )}
+          <button onClick={() => setIsModalOpen(true)} className="btn-primary mt-6">Add Your First Lead</button>
         </div>
       ) : (
         <>

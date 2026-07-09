@@ -120,7 +120,7 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
       
       const { error: insertError } = await supabase.from('orders').insert({
         order_number: orderNumber,
-        dsa_id: isReseller ? null : (isDsaRegistered ? (selectedDsaId || user.id) : null),
+        dsa_id: isReseller ? null : (role === 'dsa' ? user.id : (isDsaRegistered ? (selectedDsaId || user.id) : null)),
         reseller_id: isReseller ? user.id : null,
         unregistered_dsa_name: !isDsaRegistered ? unregisteredDsaName : null,
         customer_name: customerName,
