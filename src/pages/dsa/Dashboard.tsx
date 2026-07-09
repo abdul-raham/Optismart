@@ -49,11 +49,12 @@ export function DSADashboard() {
       const { data: commissions } = await supabase.from('commissions').select('amount, status').eq('dsa_id', userId)
 
       if (orders) {
-        const deliveredOrders = orders.filter(o => o.status === 'delivered')
+        const activeOrders = orders.filter(o => o.status !== 'cancelled')
+        const deliveredOrders = activeOrders.filter(o => o.status === 'delivered')
         const sales = deliveredOrders.reduce((sum, o) => sum + Number(o.total_amount), 0)
         
         const now = new Date()
-        const currentMonthOrders = orders.filter(o => {
+        const currentMonthOrders = activeOrders.filter(o => {
           const d = new Date(o.created_at)
           return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
         })
@@ -63,7 +64,7 @@ export function DSADashboard() {
         setCommissionStatus({ camerasDelivered: camerasDeliveredMonth, target: 30 })
         
         const totalDelivered = deliveredOrders.length
-        const totalOrders = orders.length
+        const totalOrders = activeOrders.length
         const percentDelivered = totalOrders > 0 ? Math.round((totalDelivered / totalOrders) * 100) : 0
 
         setStats(prev => ({ 
@@ -76,9 +77,9 @@ export function DSADashboard() {
           percentDelivered: percentDelivered
         }))
         
-        setAllOrders(orders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()))
-        const recent = [...orders].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 4)
-        setRecentOrders(recent)
+        const sorted = activeOrders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        setAllOrders(sorted)
+        setRecentOrders(sorted.slice(0, 4))
       }
 
       if (leads) {

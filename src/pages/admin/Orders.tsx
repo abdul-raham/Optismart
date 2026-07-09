@@ -187,6 +187,18 @@ export function AdminOrders() {
     }
   }
 
+  const handleDeleteOrder = async (orderId: string) => {
+    if (!window.confirm('Permanently delete this cancelled order?')) return
+    try {
+      const { error } = await supabase.from('orders').delete().eq('id', orderId)
+      if (error) throw error
+      setOrders(orders.filter(o => o.id !== orderId))
+    } catch (err) {
+      console.error('Failed to delete order:', err)
+      alert('Failed to delete order')
+    }
+  }
+
   const filteredOrders = orders.filter(o => 
     o.customer_name.toLowerCase().includes(search.toLowerCase()) || 
     o.order_number.toLowerCase().includes(search.toLowerCase())
@@ -303,6 +315,14 @@ export function AdminOrders() {
                               Assign
                             </button>
                           )}
+                          {order.status === 'cancelled' && !updating && (
+                            <button
+                              onClick={() => handleDeleteOrder(order.id)}
+                              className="text-xs font-bold px-3 py-1.5 rounded-lg border bg-danger-50 border-danger-200 text-danger-600 hover:bg-danger-100 transition-colors flex items-center gap-1"
+                            >
+                              <X className="w-3 h-3" /> Delete
+                            </button>
+                          )}
                         </div>
                       </td>
                     </motion.tr>
@@ -368,6 +388,14 @@ export function AdminOrders() {
                         className="text-xs font-bold px-3 py-1.5 rounded-lg border bg-surface-50 border-surface-200 text-surface-700 hover:bg-surface-100 transition-colors flex items-center gap-1"
                       >
                         Assign
+                      </button>
+                    )}
+                    {order.status === 'cancelled' && !updating && (
+                      <button
+                        onClick={() => handleDeleteOrder(order.id)}
+                        className="text-xs font-bold px-3 py-1.5 rounded-lg border bg-danger-50 border-danger-200 text-danger-600 hover:bg-danger-100 transition-colors flex items-center gap-1"
+                      >
+                        <X className="w-3 h-3" /> Delete
                       </button>
                     )}
                   </div>
