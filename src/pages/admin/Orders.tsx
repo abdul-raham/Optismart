@@ -102,7 +102,8 @@ export function AdminOrders() {
           installation_price: form.installation_needed ? form.installation_price : 0,
           expected_delivery_date: form.expected_delivery_date || null,
           status: 'pending',
-          notes: form.notes
+          notes: form.notes,
+          created_by_auth_id: (await supabase.auth.getSession()).data.session?.user?.id
         }])
         .select('*, dsa:users!orders_dsa_id_fkey(email, full_name)')
         .single()

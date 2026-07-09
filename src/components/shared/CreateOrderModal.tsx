@@ -117,6 +117,8 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
       const orderNumber = `ORD-${Date.now().toString().slice(-6)}`
 
       const isReseller = role === 'reseller'
+      const { data: { session } } = await supabase.auth.getSession()
+      const authId = session?.user?.id
       
       const { error: insertError } = await supabase.from('orders').insert({
         order_number: orderNumber,
@@ -135,7 +137,8 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
         installation_price: installationNeeded ? installationPrice : 0,
         expected_delivery_date: expectedDeliveryDate || null,
         notes: notes,
-        status: 'pending'
+        status: 'pending',
+        created_by_auth_id: authId
       })
 
       if (insertError) throw insertError
