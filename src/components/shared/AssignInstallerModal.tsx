@@ -69,6 +69,9 @@ export function AssignInstallerModal({ isOpen, onClose, onSuccess, order }: Assi
 
       if (insertError) throw insertError
 
+      // Update order status to processing so the Assign button disappears
+      await supabase.from('orders').update({ status: 'processing' }).eq('id', order?.id)
+
       const assignedInstaller = installers.find(i => i.id === selectedInstallerId)
       if (assignedInstaller && order) {
         if (assignedInstaller.email) {

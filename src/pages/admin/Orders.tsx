@@ -11,6 +11,7 @@ import type { Order, OrderStatus, Product, User as AppUser } from '@/types'
 
 export function AdminOrders() {
   const [orders, setOrders] = useState<Order[]>([])
+  const [assignedOrderIds, setAssignedOrderIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [updating, setUpdating] = useState<string | null>(null)
@@ -57,15 +58,17 @@ export function AdminOrders() {
 
   const fetchData = async () => {
     try {
-      const [ordersRes, productsRes, dsasRes] = await Promise.all([
+      const [ordersRes, productsRes, dsasRes, jobsRes] = await Promise.all([
         supabase.from('orders').select('*, dsa:users!orders_dsa_id_fkey(email, full_name)').order('created_at', { ascending: false }),
         supabase.from('products').select('*').eq('is_active', true),
-        supabase.from('users').select('*').eq('role', 'dsa')
+        supabase.from('users').select('*').eq('role', 'dsa'),
+        supabase.from('installer_jobs').select('order_id')
       ])
       
       if (ordersRes.data) setOrders(ordersRes.data)
       if (productsRes.data) setProducts(productsRes.data)
       if (dsasRes.data) setDsas(dsasRes.data)
+      if (jobsRes.data) setAssignedOrderIds(new Set(jobsRes.data.map(j => j.order_id)))
     } catch (err) {
       console.error('Error fetching admin orders:', err)
     } finally {
@@ -312,7 +315,7 @@ export function AdminOrders() {
                               </button>
                             ))
                           )}
-                          {order.installation_needed && !updating && (
+                          {order.installation_needed && !assignedOrderIds.has(order.id) && !updating && (
                             <button
                               onClick={() => setAssigningOrderId(order.id)}
                               className="text-xs font-bold px-3 py-1.5 rounded-lg border bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100 transition-colors flex items-center gap-1"
@@ -387,7 +390,7 @@ export function AdminOrders() {
                         </button>
                       ))
                     )}
-                    {order.installation_needed && !updating && (
+                    {order.installation_needed && !assignedOrderIds.has(order.id) && !updating && (
                       <button
                         onClick={() => setAssigningOrderId(order.id)}
                         className="text-xs font-bold px-3 py-1.5 rounded-lg border bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100 transition-colors flex items-center gap-1"
@@ -414,7 +417,10 @@ export function AdminOrders() {
         <AssignInstallerModal 
           isOpen={!!assigningOrderId} 
           onClose={() => setAssigningOrderId(null)} 
-          onSuccess={fetchData}
+          onSuccess={() => {
+            if (assigningOrderId) setAssignedOrderIds(prev => new Set([...prev, assigningOrderId]))
+            fetchData()
+          }}
           order={orders.find(o => o.id === assigningOrderId) || null}
         />
 
