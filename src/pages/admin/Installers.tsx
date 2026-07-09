@@ -193,6 +193,12 @@ export function AdminInstallers() {
                         </div>
                         <div>
                           <div className="font-semibold text-surface-900">{installer.full_name || 'Unknown User'}</div>
+                          <div className="text-xs mt-0.5">
+                            {installer.lat && installer.lng
+                              ? <span className="text-success-600 font-medium flex items-center gap-1"><MapPin className="w-3 h-3" /> {installer.lat.toFixed(4)}, {installer.lng.toFixed(4)}</span>
+                              : <span className="text-surface-400">No location shared</span>
+                            }
+                          </div>
                         </div>
                       </div>
                     </td>
