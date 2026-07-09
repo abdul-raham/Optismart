@@ -405,7 +405,8 @@ export function AdminOrders() {
                 </button>
               </div>
 
-              <form onSubmit={handleCreateOrder} className="p-6 space-y-4 overflow-y-auto flex-1">
+              <form onSubmit={handleCreateOrder} className="flex flex-col flex-1 min-h-0">
+              <div className="p-6 space-y-4 overflow-y-auto flex-1">
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="label mb-0">DSA In Charge *</label>
@@ -530,12 +531,13 @@ export function AdminOrders() {
                   <textarea rows={2} className="input resize-none" placeholder="Special instructions?" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
                 </div>
 
-                <div className="pt-4 flex items-center justify-end gap-3 border-t border-surface-100">
-                  <button type="button" onClick={() => setIsModalOpen(false)} disabled={submitting} className="btn-outline">Cancel</button>
-                  <button type="submit" disabled={submitting} className="btn-primary w-36 flex items-center justify-center">
-                    {submitting ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Confirm Order'}
-                  </button>
-                </div>
+              </div>
+              <div className="px-6 py-4 flex items-center justify-end gap-3 border-t border-surface-100 bg-white shrink-0">
+                <button type="button" onClick={() => setIsModalOpen(false)} disabled={submitting} className="btn-outline">Cancel</button>
+                <button type="submit" disabled={submitting} className="btn-primary w-36 flex items-center justify-center">
+                  {submitting ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Confirm Order'}
+                </button>
+              </div>
               </form>
             </motion.div>
           </div>
