@@ -38,14 +38,16 @@ export function AdminOrders() {
   })
   
   // A simple mapping for the allowed status transitions in the lifecycle
-  const allowedTransitions: Record<OrderStatus, OrderStatus[]> = {
+  const allowedTransitions: Record<string, OrderStatus[]> = {
     pending: ['approved', 'cancelled'],
+    paid: ['approved', 'cancelled'],
     approved: ['processing'],
     confirmed: ['processing'],
     processing: ['dispatched'],
     dispatched: ['delivered', 'rescheduled'],
     rescheduled: ['delivered', 'cancelled'],
     delivered: [],
+    completed: [],
     cancelled: []
   }
 

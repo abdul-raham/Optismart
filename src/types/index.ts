@@ -74,11 +74,13 @@ export interface Lead {
 // --- ORDERS ---
 export type OrderStatus =
   | 'pending'
+  | 'paid'
   | 'approved'
   | 'confirmed'
   | 'processing'
   | 'dispatched'
   | 'delivered'
+  | 'completed'
   | 'rescheduled'
   | 'cancelled'
 
