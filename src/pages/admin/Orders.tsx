@@ -273,6 +273,11 @@ export function AdminOrders() {
                         <p className="text-xs text-surface-400 flex items-center gap-1 mt-1">
                           <Calendar className="w-3 h-3" /> {formatDate(order.created_at)}
                         </p>
+                        {order.installation_needed && (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full mt-1">
+                            🔧 Needs Installer
+                          </span>
+                        )}
                       </td>
                       <td className="py-4 px-6">
                         <p className="text-sm font-medium text-surface-900">{order.customer_name}</p>
@@ -307,12 +312,12 @@ export function AdminOrders() {
                               </button>
                             ))
                           )}
-                          {(order.status === 'confirmed' || order.status === 'processing') && !updating && (
+                          {order.installation_needed && !updating && (
                             <button
                               onClick={() => setAssigningOrderId(order.id)}
-                              className="text-xs font-bold px-3 py-1.5 rounded-lg border bg-surface-50 border-surface-200 text-surface-700 hover:bg-surface-100 transition-colors flex items-center gap-1"
+                              className="text-xs font-bold px-3 py-1.5 rounded-lg border bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100 transition-colors flex items-center gap-1"
                             >
-                              Assign
+                              🔧 Assign Installer
                             </button>
                           )}
                           {order.status === 'cancelled' && !updating && (
@@ -382,12 +387,12 @@ export function AdminOrders() {
                         </button>
                       ))
                     )}
-                    {(order.status === 'confirmed' || order.status === 'approved' || order.status === 'processing') && !updating && (
+                    {order.installation_needed && !updating && (
                       <button
                         onClick={() => setAssigningOrderId(order.id)}
-                        className="text-xs font-bold px-3 py-1.5 rounded-lg border bg-surface-50 border-surface-200 text-surface-700 hover:bg-surface-100 transition-colors flex items-center gap-1"
+                        className="text-xs font-bold px-3 py-1.5 rounded-lg border bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100 transition-colors flex items-center gap-1"
                       >
-                        Assign
+                        🔧 Assign Installer
                       </button>
                     )}
                     {order.status === 'cancelled' && !updating && (

@@ -6,6 +6,7 @@ import { ShoppingBag, Plus, Search, Calendar, MapPin, X, Package } from 'lucide-
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { OrderStatusBadge } from '@/components/shared/Badges'
 import { sendEmail } from '@/lib/email'
+import { sendWebPush } from '@/lib/push'
 import type { Order, Product } from '@/types'
 
 export function DSAOrders() {
@@ -112,7 +113,20 @@ export function DSAOrders() {
             orderNumber: data.order_number,
             customerName: data.customer_name,
             totalAmount: data.total_amount
-          }).catch(console.error);
+          }).catch(console.error)
+        }
+
+        // Notify admins if installer is needed
+        if (form.installation_needed) {
+          const { data: admins } = await supabase.from('users').select('id').eq('role', 'admin')
+          admins?.forEach(admin => {
+            sendWebPush(
+              admin.id,
+              'Installer Assignment Needed',
+              `Order ${data.order_number} for ${data.customer_name} requires an installer.`,
+              '/app/admin/orders'
+            ).catch(console.error)
+          })
         }
 
         setOrders([data, ...orders])
@@ -208,12 +222,10 @@ export function DSAOrders() {
                         <OrderStatusBadge status={order.status} />
                       </td>
                       <td className="py-4 px-6 text-right">
-                        {order.status === 'pending' && (
-                          <button
-                            onClick={() => window.location.href = '/app/dsa/installer-booking'}
-                            className="text-xs font-bold text-brand-600 hover:text-brand-700 bg-brand-50 px-3 py-1.5 rounded-lg transition-colors">
-                            Book Installer
-                          </button>
+                        {order.installation_needed && (
+                          <span className="inline-flex items-center gap-1 text-xs font-bold text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full">
+                            🔧 Installer Needed
+                          </span>
                         )}
                       </td>
                     </motion.tr>
@@ -252,13 +264,11 @@ export function DSAOrders() {
                     </span>
                   </div>
 
-                  {order.status === 'pending' && (
+                  {order.installation_needed && (
                     <div className="flex justify-end pt-2">
-                      <button
-                        onClick={() => window.location.href = '/app/dsa/installer-booking'}
-                        className="text-xs font-bold text-brand-600 hover:text-brand-700 bg-brand-50 px-3 py-1.5 rounded-lg transition-colors">
-                        Book Installer
-                      </button>
+                      <span className="inline-flex items-center gap-1 text-xs font-bold text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full">
+                        🔧 Installer Needed
+                      </span>
                     </div>
                   )}
                 </motion.div>

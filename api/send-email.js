@@ -51,11 +51,11 @@ function layout(title, content) {
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width,initial-scale=1">
     <style>
-      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; margin: 0; padding: 0; -webkit-font-smoothing: antialiased; background-color: #f8fafc; }
+      body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; padding: 0; background-color: #f8fafc; }
       table { border-collapse: collapse; }
-      .container { max-width: 600px; margin: 0 auto; background: #ffffff; border-radius: 24px; overflow: hidden; box-shadow: 0 10px 40px -10px rgba(0,0,0,0.08); margin-top: 40px; margin-bottom: 40px; }
+      .container { max-width: 600px; margin: 40px auto; background: #ffffff; border-radius: 24px; overflow: hidden; box-shadow: 0 10px 40px -10px rgba(0,0,0,0.08); }
       .header { background: linear-gradient(135deg, #0A74FF 0%, #00d2ff 100%); padding: 48px 32px; text-align: center; }
-      .header-title { color: #ffffff; font-size: 28px; font-weight: 900; letter-spacing: -0.5px; margin: 0; text-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+      .header-title { color: #ffffff; font-size: 28px; font-weight: 900; letter-spacing: -0.5px; margin: 0; }
       .header-subtitle { color: rgba(255,255,255,0.8); font-size: 14px; text-transform: uppercase; letter-spacing: 2px; margin-top: 8px; font-weight: 700; }
       .content { padding: 48px 40px; color: #334155; line-height: 1.7; font-size: 16px; }
       .content h2 { color: #0f172a; font-size: 22px; font-weight: 800; margin-top: 0; margin-bottom: 24px; }
@@ -76,8 +76,7 @@ function layout(title, content) {
               ${content}
             </div>
             <div class="footer">
-              Questions? We're here to help. <br/>
-              Contact us at <a href="mailto:${escapeHtml(supportEmail)}">${escapeHtml(supportEmail)}</a><br><br>
+              Questions? Contact us at <a href="mailto:${escapeHtml(supportEmail)}">${escapeHtml(supportEmail)}</a><br><br>
               &copy; ${new Date().getFullYear()} ${escapeHtml(fromName)}. All rights reserved.
             </div>
           </div>
@@ -94,8 +93,7 @@ const templates = {
     subject: `Welcome to ${fromName}`,
     html: layout('Welcome Aboard', `
       <h2>Hello ${escapeHtml(recipientName)},</h2>
-      <p>Your portal account has been successfully created and is ready to use. We are thrilled to have you join the <strong>${escapeHtml(fromName)}</strong> ecosystem.</p>
-      <p>Click the button below to access your dashboard, manage operations, and grow your security business.</p>
+      <p>Your portal account has been successfully created. We are thrilled to have you join <strong>${escapeHtml(fromName)}</strong>.</p>
       ${button(`${appUrl}/login`, 'Open Your Portal')}
     `),
   }),
@@ -105,27 +103,28 @@ const templates = {
     subject: `New Lead Captured: ${customerName}`,
     html: layout('New Pipeline Activity', `
       <h2>Great job, ${escapeHtml(dsaName)}! 🎉</h2>
-      <p>You have successfully added a new lead to your pipeline: <strong>${escapeHtml(customerName)}</strong>.</p>
-      <p>Consistent follow-ups are the key to high conversion rates. Log in now to schedule a reminder or update the lead status.</p>
+      <p>You have successfully added a new lead: <strong>${escapeHtml(customerName)}</strong>.</p>
       ${button(`${appUrl}/app/leads`, 'Manage Pipeline')}
     `),
   }),
 
-  new_order: ({ recipientEmail, orderNumber, customerName }) => ({
+  new_order: ({ recipientEmail, orderNumber, customerName, totalAmount }) => ({
     to: recipientEmail,
     subject: `Order Confirmation - ${orderNumber}`,
     html: layout('Order Confirmed', `
       <h2>Order Successfully Placed</h2>
-      <p>A new order has been generated and is now in processing.</p>
       <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin: 24px 0;">
         <p style="margin: 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 700; letter-spacing: 1px;">Order Reference</p>
         <p style="margin: 4px 0 0 0; font-size: 20px; font-weight: 800; color: #0f172a;">${escapeHtml(orderNumber)}</p>
         <div style="margin-top: 16px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
           <p style="margin: 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 700; letter-spacing: 1px;">Customer</p>
           <p style="margin: 4px 0 0 0; font-size: 16px; font-weight: 600; color: #334155;">${escapeHtml(customerName)}</p>
+          ${totalAmount ? `
+          <p style="margin: 8px 0 0 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 700; letter-spacing: 1px;">Total Amount</p>
+          <p style="margin: 4px 0 0 0; font-size: 16px; font-weight: 600; color: #334155;">&#8358;${Number(totalAmount).toLocaleString()}</p>
+          ` : ''}
         </div>
       </div>
-      <p>You can track the fulfillment status and assign an installer directly from the portal.</p>
       ${button(`${appUrl}/app/orders`, 'Track Order')}
     `),
   }),
@@ -135,8 +134,7 @@ const templates = {
     subject: `Order Status Updated: ${status.toUpperCase()} - ${orderNumber}`,
     html: layout('Order Status Update', `
       <h2>Order Status Changed</h2>
-      <p>The status of order <strong>${escapeHtml(orderNumber)}</strong> for <strong>${escapeHtml(customerName)}</strong> has been updated to <strong style="text-transform: uppercase; color: #0A74FF;">${escapeHtml(status)}</strong>.</p>
-      <p>Log in to view the full details of this order.</p>
+      <p>Order <strong>${escapeHtml(orderNumber)}</strong> for <strong>${escapeHtml(customerName)}</strong> is now <strong style="text-transform: uppercase; color: #0A74FF;">${escapeHtml(status)}</strong>.</p>
       ${button(`${appUrl}/app/orders`, 'View Order')}
     `),
   }),
@@ -146,8 +144,7 @@ const templates = {
     subject: `Commission Paid! 💰`,
     html: layout('Commission Paid', `
       <h2>Hello ${escapeHtml(dsaName)},</h2>
-      <p>Great news! Your commission of <strong>${escapeHtml(amount)}</strong> for order <strong>${escapeHtml(orderNumber)}</strong> has been marked as PAID.</p>
-      <p>Keep up the great work and check your dashboard for the latest pipeline updates.</p>
+      <p>Your commission of <strong>${escapeHtml(amount)}</strong> for order <strong>${escapeHtml(orderNumber)}</strong> has been marked as PAID.</p>
       ${button(`${appUrl}/app/dsa/commission`, 'View Commissions')}
     `),
   }),
@@ -168,40 +165,18 @@ const templates = {
           <p style="margin: 4px 0 0 0; font-size: 16px; font-weight: 600; color: #334155;">${escapeHtml(location)}</p>
         </div>
       </div>
-      <p>Please log in to your portal to review the job details and contact the customer to arrange a time.</p>
-      ${button(`${appUrl}/app/installer/dashboard`, 'View Job Details')}
+      <p>Log in to review the job details and contact the customer.</p>
+      ${button(`${appUrl}/app/installer/jobs`, 'View Job Details')}
     `),
   }),
 
   account_approved: ({ recipientEmail, recipientName, role }) => ({
     to: recipientEmail,
-    subject: `Your ${escapeHtml(role).toUpperCase()} Account is Approved!`,
+    subject: `Your ${role.toUpperCase()} Account is Approved!`,
     html: layout('Account Approved', `
       <h2>Welcome, ${escapeHtml(recipientName)}!</h2>
-      <p>Your <strong>${escapeHtml(role)}</strong> account has been reviewed and approved by the admin team.</p>
-      <p>You can now log in to the OptiSmart portal and access all your tools.</p>
+      <p>Your <strong>${escapeHtml(role)}</strong> account has been approved. You can now log in.</p>
       ${button(`${appUrl}/login`, 'Login Now')}
-    `),
-  }),
-
-  new_order: ({ recipientEmail, orderNumber, customerName, totalAmount }) => ({
-    to: recipientEmail,
-    subject: `New Order Created: ${orderNumber}`,
-    html: layout('Order Confirmation', `
-      <h2>Hello,</h2>
-      <p>A new order has been successfully created.</p>
-      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin: 24px 0;">
-        <p style="margin: 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 700; letter-spacing: 1px;">Order Reference</p>
-        <p style="margin: 4px 0 0 0; font-size: 20px; font-weight: 800; color: #0f172a;">${escapeHtml(orderNumber)}</p>
-        <div style="margin-top: 16px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
-          <p style="margin: 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 700; letter-spacing: 1px;">Customer</p>
-          <p style="margin: 4px 0 0 0; font-size: 16px; font-weight: 600; color: #334155;">${escapeHtml(customerName)}</p>
-          <p style="margin: 8px 0 0 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 700; letter-spacing: 1px;">Total Amount</p>
-          <p style="margin: 4px 0 0 0; font-size: 16px; font-weight: 600; color: #334155;">₦${Number(totalAmount).toLocaleString()}</p>
-        </div>
-      </div>
-      <p>Log in to your portal to view more details.</p>
-      ${button(`${appUrl}/login`, 'View Order')}
     `),
   }),
 }
@@ -228,13 +203,13 @@ export default async function handler(req, res) {
   try {
     const { type, data } = req.body || {}
     const createEmail = templates[type]
-    if (!createEmail) return res.status(400).json({ error: \`Unknown email type: \${type}\` })
+    if (!createEmail) return res.status(400).json({ error: `Unknown email type: ${type}` })
 
     const email = createEmail(data || {})
     if (!email.to) return res.status(400).json({ error: 'Recipient email is required' })
 
     await transporter.sendMail({
-      from: \`"\${String(fromName).replace(/["\\r\\n]/g, '')}" <\${gmailUser}>\`,
+      from: `"${String(fromName).replace(/["\\r\\n]/g, '')}" <${gmailUser}>`,
       ...email,
     })
 

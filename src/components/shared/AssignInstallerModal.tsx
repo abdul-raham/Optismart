@@ -85,7 +85,7 @@ export function AssignInstallerModal({ isOpen, onClose, onSuccess, order }: Assi
           selectedInstallerId,
           'New Installation Job',
           `You have been assigned to order ${order.order_number} for ${order.customer_name}.`,
-          '/app/installer/dashboard'
+          '/app/installer/jobs'
         ).catch(console.error)
       }
 
