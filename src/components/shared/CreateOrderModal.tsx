@@ -59,10 +59,7 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
   const fetchDsas = async () => {
     try {
       const { data } = await supabase.from('users').select('id, full_name').eq('role', 'dsa')
-      if (data) {
-        setDsas(data)
-        if (data.length > 0 && !selectedDsaId) setSelectedDsaId(data[0].id)
-      }
+      if (data) setDsas(data)
     } catch (err) {
       console.error('Error fetching DSAs:', err)
     }
@@ -182,6 +179,12 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
     setCustomerAddress('')
   }
 
+  const handleClose = () => {
+    if (showPayment) onSuccess() // order was already created, refresh even if they skip payment screen
+    onClose()
+    setShowPayment(false)
+  }
+
   const handleCopy = (text: string) => {
     navigator.clipboard.writeText(text)
     setCopied(true)
@@ -195,7 +198,7 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
   return (
     <AnimatePresence>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm" onClick={onClose} />
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm" onClick={handleClose} />
         
         <motion.div 
           initial={{ opacity: 0, scale: 0.95, y: 20 }} 
@@ -207,7 +210,7 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
             <h2 className="text-xl font-bold text-surface-900">
               {showPayment ? 'Complete Payment' : 'Create New Order'}
             </h2>
-            <button onClick={onClose} className="p-2 text-surface-400 hover:text-surface-600 hover:bg-surface-200 rounded-full transition-colors">
+            <button onClick={handleClose} className="p-2 text-surface-400 hover:text-surface-600 hover:bg-surface-200 rounded-full transition-colors">
               <X className="w-5 h-5" />
             </button>
           </div>
@@ -419,7 +422,7 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
               </div>
               
               <div className="p-6 pt-4 border-t border-surface-100 flex gap-3 shrink-0 bg-surface-50 mt-auto">
-                <button type="button" onClick={onClose} className="flex-1 px-4 py-2.5 rounded-xl border border-surface-200 text-sm font-bold text-surface-700 hover:bg-surface-200 transition-colors bg-white">
+                <button type="button" onClick={handleClose} className="flex-1 px-4 py-2.5 rounded-xl border border-surface-200 text-sm font-bold text-surface-700 hover:bg-surface-200 transition-colors bg-white">
                   Cancel
                 </button>
                 <button type="submit" disabled={loading} className="flex-1 px-4 py-2.5 rounded-xl bg-brand-600 hover:bg-brand-700 text-white text-sm font-bold shadow-brand flex items-center justify-center gap-2 transition-colors">
