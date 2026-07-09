@@ -106,7 +106,7 @@ export function AdminInstallers() {
           is_available: p?.is_available ?? false,
           lat: p?.lat ?? null,
           lng: p?.lng ?? null,
-          location: p?.location ?? null,
+          location: (p?.location && p.location !== 'Not set') ? p.location : null,
           color: MARKER_COLORS[idx % MARKER_COLORS.length],
         }
       })
