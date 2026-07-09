@@ -85,19 +85,32 @@ export function InstallerDashboard() {
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         try {
+          const { latitude: lat, longitude: lng } = position.coords
+
+          // Reverse geocode to get a human-readable location name
+          let locationName = `${lat.toFixed(4)}, ${lng.toFixed(4)}`
+          try {
+            const res = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json`,
+              { headers: { 'Accept-Language': 'en' } }
+            )
+            const geo = await res.json()
+            locationName = geo.address?.city || geo.address?.town || geo.address?.village || geo.address?.county || geo.display_name?.split(',')[0] || locationName
+          } catch { /* keep coords as fallback */ }
+
           const { error } = await supabase
             .from('installer_profiles')
             .upsert({ 
               user_id: user.id,
-              lat: position.coords.latitude, 
-              lng: position.coords.longitude,
-              location: profile?.location ?? 'Not set',
+              lat,
+              lng,
+              location: locationName,
               is_available: profile?.is_available ?? false,
             }, { onConflict: 'user_id' })
 
           if (error) throw error
-          setProfile(prev => prev ? { ...prev, lat: position.coords.latitude, lng: position.coords.longitude } : prev)
-          alert(`Location shared! (${position.coords.latitude.toFixed(4)}, ${position.coords.longitude.toFixed(4)})`)
+          setProfile(prev => prev ? { ...prev, lat, lng, location: locationName } : prev)
+          alert(`Location shared! ${locationName}`)
         } catch (err) {
           console.error('Error sharing location:', err)
           alert('Failed to share location.')

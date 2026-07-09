@@ -140,7 +140,7 @@ export function AdminDashboard() {
       >
         <div className="p-5 border-b border-surface-100 flex items-center justify-between">
           <h2 className="text-lg font-bold text-surface-900">Recent Transactions</h2>
-          <button className="text-sm font-semibold text-brand-600 hover:text-brand-700 flex items-center gap-1">
+          <button onClick={() => window.location.href = '/app/admin/orders'} className="text-sm font-semibold text-brand-600 hover:text-brand-700 flex items-center gap-1">
             View All <ArrowUpRight className="w-4 h-4" />
           </button>
         </div>
