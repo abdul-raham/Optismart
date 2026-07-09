@@ -333,99 +333,71 @@ export function DSALeads() {
             </AnimatePresence>
           </div>
 
-          {/* Desktop Table View */}
           <div className="hidden lg:block glass-card overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-surface-50/50 text-surface-500 font-semibold border-b border-surface-100 whitespace-nowrap">
+              <table className="w-full text-sm text-left min-w-[800px]">
+                <thead className="bg-surface-50/50 text-surface-500 font-semibold border-b border-surface-100">
                   <tr>
-                    <th className="px-6 py-4">Customer Name</th>
-                    {role !== 'dsa' && <th className="px-6 py-4">DSA / Agent</th>}
-                    <th className="px-6 py-4">Contact Info</th>
-                    <th className="px-6 py-4">Priority & Status</th>
-                    <th className="px-6 py-4">Follow-up</th>
-                    <th className="px-6 py-4 text-right">Actions</th>
+                    <th className="px-4 py-4">Customer</th>
+                    {role !== 'dsa' && <th className="px-4 py-4">DSA</th>}
+                    <th className="px-4 py-4">Contact</th>
+                    <th className="px-4 py-4">Priority</th>
+                    <th className="px-4 py-4">Follow-up</th>
+                    <th className="px-4 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-surface-100">
                   {filteredLeads.map((lead) => (
                     <tr key={lead.id} className="hover:bg-surface-50/50 transition-colors group">
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 py-4">
                         <div className="font-bold text-surface-900">{lead.customer_name}</div>
-                        <div className="text-xs text-surface-400 mt-0.5 flex items-center gap-1">
-                          <Calendar className="w-3 h-3" /> Added {formatDate(lead.created_at)}
-                        </div>
+                        <div className="text-xs text-surface-400 mt-0.5">{formatDate(lead.created_at)}</div>
                       </td>
                       {role !== 'dsa' && (
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-semibold text-purple-700 bg-purple-50 px-2 py-1 rounded inline-block">
+                        <td className="px-4 py-4">
+                          <span className="text-sm font-semibold text-purple-700 bg-purple-50 px-2 py-1 rounded">
                             {lead.dsa?.full_name || 'Unknown'}
-                          </div>
+                          </span>
                         </td>
                       )}
-                      <td className="px-6 py-4 space-y-1 min-w-[200px]">
-                        <div className="flex items-center gap-2 text-surface-700 whitespace-nowrap">
-                          <Phone className="w-3.5 h-3.5 text-surface-400" /> {lead.phone}
+                      <td className="px-4 py-4">
+                        <div className="flex items-center gap-1.5 text-surface-700 text-sm">
+                          <Phone className="w-3.5 h-3.5 text-surface-400 flex-shrink-0" /> {lead.phone}
                         </div>
                         {lead.email && (
-                          <div className="flex items-center gap-2 text-surface-500 text-xs whitespace-nowrap">
-                            <Mail className="w-3.5 h-3.5 text-surface-400" /> {lead.email}
-                          </div>
-                        )}
-                        {lead.location && (
-                          <div className="flex items-center gap-2 text-surface-500 text-xs truncate max-w-[200px]" title={lead.location}>
-                            <MapPin className="w-3.5 h-3.5 text-surface-400 flex-shrink-0" /> <span className="truncate">{lead.location}</span>
+                          <div className="flex items-center gap-1.5 text-surface-500 text-xs mt-1 max-w-[180px] truncate">
+                            <Mail className="w-3.5 h-3.5 text-surface-400 flex-shrink-0" /> {lead.email}
                           </div>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex flex-col gap-2 items-start">
-                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border inline-block ${getTempColor(lead.temperature)}`}>
-                            {getPriorityLabel(lead.temperature)}
-                          </span>
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider inline-block ${getStatusColor(lead.status)}`}>
-                            {lead.status}
-                          </span>
+                      <td className="px-4 py-4">
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase border ${getTempColor(lead.temperature)}`}>
+                          {getPriorityLabel(lead.temperature)}
+                        </span>
+                        <div className={`mt-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase inline-block ${getStatusColor(lead.status)}`}>
+                          {lead.status}
                         </div>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
+                      <td className="px-4 py-4">
                         {lead.follow_up_date ? (
                           <div className={lead.follow_up_stopped ? 'text-surface-400' : 'text-brand-600 font-medium'}>
                             <div className="flex items-center gap-1.5 text-sm">
-                              <Clock className="w-3.5 h-3.5" />
-                              {formatDate(lead.follow_up_date)}
+                              <Clock className="w-3.5 h-3.5" /> {formatDate(lead.follow_up_date)}
                             </div>
-                            {lead.follow_up_interval_days ? (
-                              <div className="text-xs mt-1">Every {lead.follow_up_interval_days} days</div>
-                            ) : null}
                           </div>
                         ) : (
-                          <span className="text-surface-400 text-xs italic">No follow-up set</span>
+                          <span className="text-surface-400 text-xs italic">None set</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-3 opacity-40 group-hover:opacity-100 transition-opacity">
-                          {lead.status !== 'converted' && (
-                            <>
-                              {lead.follow_up_date && !lead.follow_up_stopped && (
-                                <button onClick={() => handleStopReminders(lead.id)} className="text-[10px] font-bold text-danger-600 hover:text-danger-700 bg-danger-50 px-2 py-1 rounded transition-colors" title="Stop Reminders">
-                                  Stop
-                                </button>
-                              )}
-                              {role !== 'dsa' && lead.dsa_id && (
-                                <button onClick={() => handleRemindDSA(lead)} className="text-xs font-bold text-orange-600 hover:text-orange-700 transition-colors">
-                                  Remind DSA
-                                </button>
-                              )}
-                              <button className="text-xs font-bold text-brand-600 hover:text-brand-700 transition-colors">
-                                Convert
-                              </button>
-                            </>
+                      <td className="px-4 py-4 text-right">
+                        <div className="flex items-center justify-end gap-2 opacity-40 group-hover:opacity-100 transition-opacity">
+                          {lead.status !== 'converted' && role !== 'dsa' && lead.dsa_id && (
+                            <button onClick={() => handleRemindDSA(lead)} className="text-xs font-bold text-orange-600 hover:text-orange-700 transition-colors">Remind</button>
                           )}
-                          <a href={`tel:${lead.phone}`} className="p-1.5 text-surface-400 hover:text-brand-600 hover:bg-brand-50 rounded-md transition-colors" title="Call Customer">
+                          <a href={`tel:${lead.phone}`} className="p-1.5 text-surface-400 hover:text-brand-600 hover:bg-brand-50 rounded-md transition-colors">
                             <Phone className="w-4 h-4" />
                           </a>
-                          <button onClick={() => handleDeleteLead(lead.id)} className="p-1.5 text-surface-400 hover:text-danger-600 hover:bg-danger-50 rounded-md transition-colors" title="Delete Lead">
+                          <button onClick={() => handleDeleteLead(lead.id)} className="p-1.5 text-surface-400 hover:text-danger-600 hover:bg-danger-50 rounded-md transition-colors">
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
