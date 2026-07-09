@@ -276,7 +276,7 @@ export function AdminOrders() {
                           {updating === order.id ? (
                             <div className="w-5 h-5 border-2 border-brand-500/30 border-t-brand-500 rounded-full animate-spin" />
                           ) : (
-                            allowedTransitions[order.status].map(nextStatus => (
+                            (allowedTransitions[order.status] ?? []).map(nextStatus => (
                               <button
                                 key={nextStatus}
                                 onClick={() => handleUpdateStatus(order.id, nextStatus)}
@@ -343,7 +343,7 @@ export function AdminOrders() {
                     {updating === order.id ? (
                       <div className="w-5 h-5 border-2 border-brand-500/30 border-t-brand-500 rounded-full animate-spin" />
                     ) : (
-                      allowedTransitions[order.status].map(nextStatus => (
+                      (allowedTransitions[order.status] ?? []).map(nextStatus => (
                         <button
                           key={nextStatus}
                           onClick={() => handleUpdateStatus(order.id, nextStatus)}
