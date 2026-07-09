@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { Search, MapPin, Phone, Mail, Wrench, List, Map as MapIcon } from 'lucide-react'
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet'
+import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 
@@ -25,6 +25,17 @@ interface Installer {
   created_at: string
   lat?: number
   lng?: number
+}
+
+function FitBounds({ installers }: { installers: Installer[] }) {
+  const map = useMap()
+  useEffect(() => {
+    const withCoords = installers.filter(i => i.lat && i.lng)
+    if (withCoords.length === 0) return
+    const bounds = L.latLngBounds(withCoords.map(i => [i.lat!, i.lng!]))
+    map.fitBounds(bounds, { padding: [40, 40] })
+  }, [installers, map])
+  return null
 }
 
 export function AdminInstallers() {
@@ -120,11 +131,18 @@ export function AdminInstallers() {
 
         {viewMode === 'map' ? (
           <div className="h-[600px] w-full bg-surface-50 relative z-0">
+            {filteredInstallers.filter(i => i.lat && i.lng).length === 0 && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center z-10 pointer-events-none">
+                <MapPin className="w-10 h-10 text-surface-300 mb-3" />
+                <p className="text-sm font-bold text-surface-500">No installers have shared their location yet.</p>
+              </div>
+            )}
             <MapContainer center={[6.5244, 3.3792]} zoom={11} scrollWheelZoom={false} className="h-full w-full">
               <TileLayer
                 attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
                 url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
               />
+              <FitBounds installers={filteredInstallers} />
               {filteredInstallers.map(installer => installer.lat && installer.lng && (
                 <Marker key={installer.id} position={[installer.lat, installer.lng]}>
                   <Popup>

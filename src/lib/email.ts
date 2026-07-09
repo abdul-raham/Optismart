@@ -24,6 +24,8 @@ export async function sendEmail(
     const result = await response.json().catch(() => ({}))
 
     if (!response.ok) {
+      // Silently ignore on localhost where API routes don't exist
+      if (window.location.hostname === 'localhost') return { success: false }
       throw new Error(result.error || `Email request failed (${response.status})`)
     }
 

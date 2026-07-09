@@ -293,6 +293,7 @@
   .shadow-brand-lg { box-shadow: var(--shadow-brand-lg); }
   .shadow-card     { box-shadow: var(--shadow-sm); }
   .shadow-card-lg  { box-shadow: var(--shadow-lg); }
+  .shadow-card-xl  { box-shadow: 0 25px 60px -12px rgb(0 0 0 / 0.18); }
 
   /* Animations */
   @keyframes blob-pulse {

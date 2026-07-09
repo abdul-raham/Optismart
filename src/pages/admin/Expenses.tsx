@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { motion, AnimatePresence } from 'framer-motion'
+import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { Plus, Search, Banknote, Wallet, TrendingDown, Calendar, FileText, X } from 'lucide-react'
@@ -62,9 +62,9 @@ export function AdminExpenses() {
       setIsModalOpen(false)
       setForm({ description: '', category: 'logistics', amount: '', expense_date: new Date().toISOString().split('T')[0] })
       await fetchExpenses()
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error creating expense:', err)
-      alert('Failed to save expense')
+      alert(`Failed to save expense: ${err?.message || err}`)
     } finally {
       setSubmitting(false)
     }
@@ -197,68 +197,64 @@ export function AdminExpenses() {
       </div>
 
       {/* ADD EXPENSE MODAL */}
-      <AnimatePresence>
-        {isModalOpen && createPortal(
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm"
-              onClick={() => !submitting && setIsModalOpen(false)}
-            />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white rounded-2xl shadow-card-xl w-full max-w-md relative z-10 overflow-hidden"
-            >
-              <div className="px-6 py-4 border-b border-surface-100 flex items-center justify-between bg-surface-50/50">
-                <h2 className="text-lg font-bold text-surface-900">Log New Expense</h2>
-                <button onClick={() => !submitting && setIsModalOpen(false)} className="text-surface-400 hover:text-surface-900 transition-colors p-1 rounded-md hover:bg-surface-100">
-                  <X className="w-5 h-5" />
-                </button>
+      {isModalOpen && createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+          <div
+            className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm"
+            onClick={() => !submitting && setIsModalOpen(false)}
+          />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            className="bg-white rounded-2xl shadow-xl w-full max-w-md relative z-10 overflow-hidden"
+          >
+            <div className="px-6 py-4 border-b border-surface-100 flex items-center justify-between bg-surface-50/50">
+              <h2 className="text-lg font-bold text-surface-900">Log New Expense</h2>
+              <button onClick={() => !submitting && setIsModalOpen(false)} className="text-surface-400 hover:text-surface-900 transition-colors p-1 rounded-md hover:bg-surface-100">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveExpense} className="p-6 space-y-4">
+              <div>
+                <label className="label">Description *</label>
+                <input required type="text" className="input" placeholder="e.g. Facebook Ads" value={form.description} onChange={e => setForm({...form, description: e.target.value})} />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Category *</label>
+                  <select required className="input" value={form.category} onChange={e => setForm({...form, category: e.target.value as any})}>
+                    <option value="logistics">Logistics</option>
+                    <option value="marketing">Marketing</option>
+                    <option value="salaries">Salaries</option>
+                    <option value="utilities">Utilities</option>
+                    <option value="equipment">Equipment</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Date *</label>
+                  <input required type="date" className="input" value={form.expense_date} onChange={e => setForm({...form, expense_date: e.target.value})} />
+                </div>
               </div>
 
-              <form onSubmit={handleSaveExpense} className="p-6 space-y-4">
-                <div>
-                  <label className="label">Description *</label>
-                  <input required type="text" className="input" placeholder="e.g. Facebook Ads" value={form.description} onChange={e => setForm({...form, description: e.target.value})} />
-                </div>
-                
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="label">Category *</label>
-                    <select required className="input" value={form.category} onChange={e => setForm({...form, category: e.target.value as any})}>
-                      <option value="logistics">Logistics</option>
-                      <option value="marketing">Marketing</option>
-                      <option value="salaries">Salaries</option>
-                      <option value="utilities">Utilities</option>
-                      <option value="equipment">Equipment</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="label">Date *</label>
-                    <input required type="date" className="input" value={form.expense_date} onChange={e => setForm({...form, expense_date: e.target.value})} />
-                  </div>
-                </div>
+              <div>
+                <label className="label">Amount (₦) *</label>
+                <input required type="number" min={1} className="input font-bold text-lg text-brand-700" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} />
+              </div>
 
-                <div>
-                  <label className="label">Amount (₦) *</label>
-                  <input required type="number" min={1} className="input font-bold text-lg text-brand-700" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} />
-                </div>
-
-                <div className="pt-4 flex items-center justify-end gap-3 border-t border-surface-100 mt-6">
-                  <button type="button" onClick={() => setIsModalOpen(false)} disabled={submitting} className="btn-outline">Cancel</button>
-                  <button type="submit" disabled={submitting} className="btn-primary w-32 flex items-center justify-center">
-                    {submitting ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Save'}
-                  </button>
-                </div>
-              </form>
-            </motion.div>
-          </div>,
-          document.body
-        )}
-      </AnimatePresence>
+              <div className="pt-4 flex items-center justify-end gap-3 border-t border-surface-100 mt-6">
+                <button type="button" onClick={() => setIsModalOpen(false)} disabled={submitting} className="btn-outline">Cancel</button>
+                <button type="submit" disabled={submitting} className="btn-primary w-32 flex items-center justify-center">
+                  {submitting ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Save'}
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>,
+        document.body
+      )}
     </div>
   )
 }

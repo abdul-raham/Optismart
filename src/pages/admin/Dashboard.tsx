@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { StatCard } from '@/components/shared/StatCard'
 import { OrderStatusBadge } from '@/components/shared/Badges'
-import { ShoppingBag, Users, Banknote, Wrench, ArrowUpRight } from 'lucide-react'
+import { ShoppingBag, Users, Banknote, Wrench, ArrowUpRight, Download } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { MobileDashboardNav } from '@/components/layout/MobileDashboardNav'
 import type { Order } from '@/types'
@@ -18,6 +18,8 @@ export function AdminDashboard() {
   const [recentOrders, setRecentOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
 
+  const [allOrders, setAllOrders] = useState<Order[]>([])
+
   useEffect(() => {
     fetchDashboardData()
   }, [])
@@ -26,16 +28,16 @@ export function AdminDashboard() {
     setLoading(true)
     try {
       // Fetch Orders for revenue and count
-      const { data: orders } = await supabase.from('orders').select('*')
+      const { data: orders } = await supabase.from('orders').select('*, dsa:users!orders_dsa_id_fkey(full_name)')
       
       // Fetch Users for counts
       const { data: users } = await supabase.from('users').select('role, status')
 
       if (orders) {
-        const revenue = orders.reduce((sum, o) => sum + Number(o.total_amount), 0)
-        setStats(prev => ({ ...prev, totalRevenue: revenue, totalOrders: orders.length }))
-        
-        // Sort and get 5 most recent
+        const activeOrders = orders.filter(o => o.status !== 'cancelled')
+        const revenue = activeOrders.reduce((sum, o) => sum + Number(o.total_amount), 0)
+        setStats(prev => ({ ...prev, totalRevenue: revenue, totalOrders: activeOrders.length }))
+        setAllOrders(orders)
         const recent = [...orders].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 5)
         setRecentOrders(recent)
       }
@@ -53,6 +55,27 @@ export function AdminDashboard() {
     }
   }
 
+  const downloadCSV = () => {
+    const escape = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`
+    const headers = ['Order Number', 'Date', 'Customer Name', 'Phone', 'Address', 'DSA', 'Status', 'Qty', 'Amount (₦)', 'Notes']
+    const rows = allOrders
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .map(o => [
+        o.order_number, formatDate(o.created_at), o.customer_name,
+        o.customer_phone ?? '', o.customer_address ?? '',
+        (o as any).dsa?.full_name ?? o.unregistered_dsa_name ?? 'System',
+        o.status, o.quantity, o.total_amount, o.notes ?? ''
+      ])
+    const csv = [headers, ...rows].map(r => r.map(escape).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `optismart-orders-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -61,7 +84,9 @@ export function AdminDashboard() {
           <p className="text-sm text-surface-500 mt-1">Real-time metrics and operations control.</p>
         </div>
         <div className="flex items-center gap-3">
-          <button onClick={() => window.print()} className="btn-outline h-10 px-4 text-sm font-semibold">Generate Report</button>
+          <button onClick={downloadCSV} className="btn-outline h-10 px-4 text-sm font-semibold flex items-center gap-2">
+            <Download className="w-4 h-4" /> Generate Report
+          </button>
         </div>
       </div>
 

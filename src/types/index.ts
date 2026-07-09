@@ -28,6 +28,8 @@ export interface InstallerProfile {
   is_available: boolean
   rating: number
   total_jobs: number
+  lat?: number | null
+  lng?: number | null
   created_at: string
 }
 
@@ -107,6 +109,7 @@ export interface Order {
   notes: string | null
   payment_confirmed_at: string | null
   delivered_at?: string | null
+  created_by_auth_id?: string | null
   created_at: string
   updated_at: string
   installer_job?: InstallerJob

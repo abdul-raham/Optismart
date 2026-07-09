@@ -87,14 +87,17 @@ export function InstallerDashboard() {
         try {
           const { error } = await supabase
             .from('installer_profiles')
-            .update({ 
+            .upsert({ 
+              user_id: user.id,
               lat: position.coords.latitude, 
-              lng: position.coords.longitude 
-            })
-            .eq('user_id', user.id)
+              lng: position.coords.longitude,
+              location: profile?.location ?? 'Not set',
+              is_available: profile?.is_available ?? false,
+            }, { onConflict: 'user_id' })
 
           if (error) throw error
-          alert("Location shared successfully! Admins can now see your live location on the map.")
+          setProfile(prev => prev ? { ...prev, lat: position.coords.latitude, lng: position.coords.longitude } : prev)
+          alert(`Location shared! (${position.coords.latitude.toFixed(4)}, ${position.coords.longitude.toFixed(4)})`)
         } catch (err) {
           console.error('Error sharing location:', err)
           alert('Failed to share location.')
