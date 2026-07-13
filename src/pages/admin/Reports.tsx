@@ -26,6 +26,8 @@ interface MonthlyBreakdown {
   orders: number
   revenue: number
   commissions: number
+  active_dsas: number
+  top_dsa: string
 }
 
 interface RemittanceRow {
@@ -67,6 +69,18 @@ export function AdminReports() {
   const [totalRevenue, setTotalRevenue] = useState(0)
   const [totalCommissions, setTotalCommissions] = useState(0)
   const [remittanceData, setRemittanceData] = useState<RemittanceRow[]>([])
+  const [deliveryOrders, setDeliveryOrders] = useState<any[]>([])
+  const [monthlyView, setMonthlyView] = useState<'monthly' | 'alltime'>('monthly')
+  const [deliveryPage, setDeliveryPage] = useState(1)
+  const [totalDeliveryOrders, setTotalDeliveryOrders] = useState(0)
+  
+  // Frontend Pagination States
+  const [dsaPage, setDsaPage] = useState(1)
+  const [monthlyPage, setMonthlyPage] = useState(1)
+  const [remittancePage, setRemittancePage] = useState(1)
+  
+  const DELIVERY_PAGE_SIZE = 20
+  const FRONTEND_PAGE_SIZE = 10
 
   // Filters
   const [selectedMonth, setSelectedMonth] = useState('')
@@ -75,12 +89,16 @@ export function AdminReports() {
 
   useEffect(() => {
     fetchAll()
-  }, [selectedMonth, selectedDsa])
+  }, [selectedMonth, selectedDsa, monthlyView])
+
+  useEffect(() => {
+    fetchOrdersByDelivery()
+  }, [deliveryPage])
 
   const fetchAll = async () => {
     setLoading(true)
     try {
-      await Promise.all([fetchDsaSummaries(), fetchMonthlyBreakdown(), fetchDsaList(), fetchRemittance()])
+      await Promise.all([fetchDsaSummaries(), fetchMonthlyBreakdown(), fetchDsaList(), fetchRemittance(), fetchOrdersByDelivery()])
     } finally {
       setLoading(false)
     }
@@ -97,7 +115,7 @@ export function AdminReports() {
       .from('orders')
       .select(`
         id, quantity, total_amount, status, created_at, delivered_at,
-        dsa:dsa_id ( id, full_name, email )
+        dsa:users!orders_dsa_id_fkey ( id, full_name, email )
       `)
 
     if (selectedDsa) query = query.eq('dsa_id', selectedDsa)
@@ -170,12 +188,20 @@ export function AdminReports() {
     if (!orders) return
 
     const monthMap: Record<string, MonthlyBreakdown> = {}
+    const dsaMonthSales: Record<string, Record<string, number>> = {}
+
     orders.forEach((o: any) => {
       const month = o.created_at?.slice(0, 7) || ''
-      if (!monthMap[month]) monthMap[month] = { month, cameras: 0, orders: 0, revenue: 0, commissions: 0 }
+      if (!monthMap[month]) monthMap[month] = { month, cameras: 0, orders: 0, revenue: 0, commissions: 0, active_dsas: 0, top_dsa: '' }
+      
       monthMap[month].cameras += o.quantity || 0
       monthMap[month].orders += 1
       monthMap[month].revenue += o.total_amount || 0
+
+      const dsaName = o.dsa?.full_name || 'Unregistered'
+      if (!dsaMonthSales[month]) dsaMonthSales[month] = {}
+      if (!dsaMonthSales[month][dsaName]) dsaMonthSales[month][dsaName] = 0
+      dsaMonthSales[month][dsaName] += o.quantity || 0
     });
 
     (comms || []).forEach((c: any) => {
@@ -183,24 +209,38 @@ export function AdminReports() {
       if (monthMap[month]) monthMap[month].commissions += c.amount || 0
     })
 
+    Object.keys(monthMap).forEach(month => {
+      const dsasInMonth = dsaMonthSales[month] || {}
+      monthMap[month].active_dsas = Object.keys(dsasInMonth).length
+      
+      let topDsa = ''
+      let maxCam = 0
+      for (const [name, cams] of Object.entries(dsasInMonth)) {
+         if (cams > maxCam) {
+            maxCam = cams
+            topDsa = name
+         }
+      }
+      monthMap[month].top_dsa = topDsa ? `${topDsa} (${maxCam})` : '—'
+    })
+
     const result = Object.values(monthMap)
       .sort((a, b) => a.month.localeCompare(b.month))
-      .slice(-12) // last 12 months
 
-    setMonthlyData(result)
+    setMonthlyData(monthlyView === 'alltime' ? result : result.slice(-12))
   }
 
   const fetchRemittance = async () => {
     // DSA collected from customers = sum of confirmed payments on orders belonging to each DSA
     const { data: payments } = await supabase
       .from('payments')
-      .select('amount, order_id, status, orders!inner(dsa_id, dsa:dsa_id(id, full_name, email))')
+      .select('amount, order_id, status, orders!inner(dsa_id, dsa:users!orders_dsa_id_fkey(id, full_name, email))')
       .eq('status', 'confirmed')
 
     // Commission HQ owes DSAs = pending commissions
     const { data: pendingComms } = await supabase
       .from('commissions')
-      .select('dsa_id, amount, status, dsa:dsa_id(id, full_name, email)')
+      .select('dsa_id, amount, status, dsa:users!commissions_dsa_id_fkey(id, full_name, email)')
       .eq('status', 'pending')
 
     const map: Record<string, RemittanceRow> = {}
@@ -226,6 +266,55 @@ export function AdminReports() {
     Object.values(map).forEach(r => { r.net = r.collected_from_customers - r.commission_owed_to_dsa })
 
     setRemittanceData(Object.values(map))
+  }
+
+  const fetchOrdersByDelivery = async () => {
+    const from = (deliveryPage - 1) * DELIVERY_PAGE_SIZE
+    const to = from + DELIVERY_PAGE_SIZE - 1
+
+    const { data, count } = await supabase
+      .from('orders')
+      .select(`
+        id, order_number, customer_name, status, quantity, total_amount,
+        expected_delivery_date, delivered_at, created_at,
+        dsa:users!orders_dsa_id_fkey ( full_name, email ),
+        product:products!orders_product_id_fkey ( name )
+      `, { count: 'exact' })
+      .not('expected_delivery_date', 'is', null)
+      .order('expected_delivery_date', { ascending: true })
+      .range(from, to)
+
+    if (data) setDeliveryOrders(data)
+    if (count !== null) setTotalDeliveryOrders(count)
+  }
+
+  const renderPagination = (page: number, setPage: (p: number | ((prev: number) => number)) => void, totalItems: number, pageSize: number) => {
+    if (totalItems <= pageSize) return null
+    return (
+      <div className="p-4 border-t border-surface-100 flex items-center justify-between bg-surface-50">
+        <p className="text-xs text-surface-500 font-medium">
+          Showing <span className="font-bold text-surface-900">{(page - 1) * pageSize + 1}</span> to{' '}
+          <span className="font-bold text-surface-900">{Math.min(page * pageSize, totalItems)}</span> of{' '}
+          <span className="font-bold text-surface-900">{totalItems}</span> entries
+        </p>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="px-3 py-1.5 rounded-lg border border-surface-200 text-sm font-bold text-surface-600 disabled:opacity-50 hover:bg-white transition-colors"
+          >
+            Previous
+          </button>
+          <button
+            onClick={() => setPage(p => p + 1)}
+            disabled={page * pageSize >= totalItems}
+            className="px-3 py-1.5 rounded-lg border border-surface-200 text-sm font-bold text-surface-600 disabled:opacity-50 hover:bg-white transition-colors"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    )
   }
 
   const statCards = [
@@ -335,7 +424,7 @@ export function AdminReports() {
               ) : dsaSummaries.length === 0 ? (
                 <tr><td colSpan={8} className="px-4 py-12 text-center text-surface-400 font-medium">No data found</td></tr>
               ) : (
-                dsaSummaries.map(d => (
+                dsaSummaries.slice((dsaPage - 1) * FRONTEND_PAGE_SIZE, dsaPage * FRONTEND_PAGE_SIZE).map(d => (
                   <tr key={d.dsa_id} className="hover:bg-surface-50/50 transition-colors">
                     <td className="px-4 py-3 font-semibold text-surface-900">{d.dsa_name}</td>
                     <td className="px-4 py-3 text-surface-500 text-xs">{d.dsa_email}</td>
@@ -361,6 +450,7 @@ export function AdminReports() {
             </tbody>
           </table>
         </div>
+        {renderPagination(dsaPage, setDsaPage, dsaSummaries.length, FRONTEND_PAGE_SIZE)}
       </div>
 
       {/* Monthly Breakdown Table */}
@@ -368,25 +458,42 @@ export function AdminReports() {
         <div className="p-5 border-b border-surface-100 flex items-center justify-between">
           <div>
             <h2 className="font-bold text-surface-900 flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-brand-500" /> Monthly Breakdown (Last 12 Months)
+              <Calendar className="w-5 h-5 text-brand-500" /> Monthly Breakdown {monthlyView === 'monthly' ? '(Last 12 Months)' : '(All Time)'}
             </h2>
             <p className="text-xs text-surface-400 mt-0.5">Camera sales, orders, revenue and commissions per month</p>
           </div>
-          <button
-            onClick={() => exportCSV(monthlyData.map(m => ({
-              Month: m.month, 'Cameras': m.cameras, 'Orders': m.orders,
-              'Revenue (₦)': m.revenue, 'Commissions (₦)': m.commissions,
-            })), 'monthly-breakdown')}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-bold hover:bg-brand-700 transition-colors"
-          >
-            <Download className="w-4 h-4" /> Download CSV
-          </button>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center bg-surface-100 rounded-lg p-1">
+              <button
+                onClick={() => setMonthlyView('monthly')}
+                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${monthlyView === 'monthly' ? 'bg-white text-surface-900 shadow-sm' : 'text-surface-500 hover:text-surface-700'}`}
+              >
+                12 Months
+              </button>
+              <button
+                onClick={() => setMonthlyView('alltime')}
+                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${monthlyView === 'alltime' ? 'bg-white text-surface-900 shadow-sm' : 'text-surface-500 hover:text-surface-700'}`}
+              >
+                All Time
+              </button>
+            </div>
+            <button
+              onClick={() => exportCSV(monthlyData.map(m => ({
+                Month: m.month, 'Cameras': m.cameras, 'Orders': m.orders,
+                'Active DSAs': m.active_dsas, 'Top DSA': m.top_dsa,
+                'Revenue (₦)': m.revenue, 'Commissions (₦)': m.commissions,
+              })), 'monthly-breakdown')}
+              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-bold hover:bg-brand-700 transition-colors"
+            >
+              <Download className="w-4 h-4" /> Download CSV
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-surface-50 text-left">
-                {['Month', 'Cameras Sold', 'Orders', 'Revenue', 'Commissions'].map(h => (
+                {['Month', 'Cameras Sold', 'Orders', 'Active DSAs', 'Top DSA', 'Revenue', 'Commissions'].map(h => (
                   <th key={h} className="px-4 py-3 text-xs font-bold text-surface-500 uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
@@ -394,16 +501,18 @@ export function AdminReports() {
             <tbody className="divide-y divide-surface-50">
               {loading ? (
                 [...Array(6)].map((_, i) => (
-                  <tr key={i}><td colSpan={5} className="px-4 py-3"><div className="h-4 bg-surface-100 rounded animate-pulse" /></td></tr>
+                  <tr key={i}><td colSpan={7} className="px-4 py-3"><div className="h-4 bg-surface-100 rounded animate-pulse" /></td></tr>
                 ))
               ) : monthlyData.length === 0 ? (
-                <tr><td colSpan={5} className="px-4 py-12 text-center text-surface-400 font-medium">No data</td></tr>
+                <tr><td colSpan={7} className="px-4 py-12 text-center text-surface-400 font-medium">No data</td></tr>
               ) : (
-                monthlyData.map(m => (
+                monthlyData.slice((monthlyPage - 1) * FRONTEND_PAGE_SIZE, monthlyPage * FRONTEND_PAGE_SIZE).map(m => (
                   <tr key={m.month} className="hover:bg-surface-50/50 transition-colors">
                     <td className="px-4 py-3 font-bold text-surface-900">{new Date(m.month + '-01').toLocaleString('default', { month: 'long', year: 'numeric' })}</td>
                     <td className="px-4 py-3 font-semibold text-brand-700">{m.cameras}</td>
                     <td className="px-4 py-3 font-semibold">{m.orders}</td>
+                    <td className="px-4 py-3 text-surface-600">{m.active_dsas}</td>
+                    <td className="px-4 py-3 text-sm text-surface-600 truncate max-w-[150px]">{m.top_dsa}</td>
                     <td className="px-4 py-3 font-semibold">₦{m.revenue.toLocaleString()}</td>
                     <td className="px-4 py-3 font-semibold text-emerald-700">₦{m.commissions.toLocaleString()}</td>
                   </tr>
@@ -412,6 +521,7 @@ export function AdminReports() {
             </tbody>
           </table>
         </div>
+        {renderPagination(monthlyPage, setMonthlyPage, monthlyData.length, FRONTEND_PAGE_SIZE)}
       </div>
 
       {/* Remittance Table */}
@@ -456,7 +566,7 @@ export function AdminReports() {
               ) : remittanceData.length === 0 ? (
                 <tr><td colSpan={6} className="px-4 py-12 text-center text-surface-400 font-medium">No remittance data found</td></tr>
               ) : (
-                remittanceData.map(r => (
+                remittanceData.slice((remittancePage - 1) * FRONTEND_PAGE_SIZE, remittancePage * FRONTEND_PAGE_SIZE).map(r => (
                   <tr key={r.dsa_id} className="hover:bg-surface-50/50 transition-colors">
                     <td className="px-4 py-3 font-semibold text-surface-900">{r.dsa_name}</td>
                     <td className="px-4 py-3 text-surface-500 text-xs">{r.dsa_email}</td>
@@ -486,6 +596,103 @@ export function AdminReports() {
             </tbody>
           </table>
         </div>
+        {renderPagination(remittancePage, setRemittancePage, remittanceData.length, FRONTEND_PAGE_SIZE)}
+      </div>
+
+      {/* Orders by Delivery Date Table */}
+      <div className="glass-card overflow-hidden flex flex-col">
+        <div className="p-5 border-b border-surface-100 flex items-center justify-between">
+          <div>
+            <h2 className="font-bold text-surface-900 flex items-center gap-2">
+              <Clock className="w-5 h-5 text-brand-500" /> Orders by Delivery Date
+            </h2>
+            <p className="text-xs text-surface-400 mt-0.5">Upcoming and recent deliveries (Total: {totalDeliveryOrders})</p>
+          </div>
+          <button
+            onClick={() => exportCSV(deliveryOrders.map(o => ({
+              'Order #': o.order_number,
+              'Customer Name': o.customer_name || '—',
+              'Product': o.product?.name || 'Unknown',
+              'Quantity': o.quantity,
+              'Total Amount (₦)': o.total_amount,
+              'Status': o.status,
+              'Expected Delivery': o.expected_delivery_date || '',
+              'DSA Name': o.dsa?.full_name || 'Unregistered'
+            })), 'delivery-orders')}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-bold hover:bg-brand-700 transition-colors"
+          >
+            <Download className="w-4 h-4" /> Download CSV
+          </button>
+        </div>
+        <div className="overflow-x-auto flex-1">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="bg-surface-50 text-left">
+                {['Order #', 'Customer', 'Product', 'Qty', 'Amount', 'Expected Delivery', 'DSA', 'Status'].map(h => (
+                  <th key={h} className="px-4 py-3 text-xs font-bold text-surface-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-surface-50">
+              {loading ? (
+                [...Array(5)].map((_, i) => (
+                  <tr key={i}><td colSpan={8} className="px-4 py-3"><div className="h-4 bg-surface-100 rounded animate-pulse" /></td></tr>
+                ))
+              ) : deliveryOrders.length === 0 ? (
+                <tr><td colSpan={8} className="px-4 py-12 text-center text-surface-400 font-medium">No deliveries found</td></tr>
+              ) : (
+                deliveryOrders.map(o => (
+                  <tr key={o.id} className="hover:bg-surface-50/50 transition-colors">
+                    <td className="px-4 py-3 font-bold text-surface-900">{o.order_number}</td>
+                    <td className="px-4 py-3 text-surface-700">{o.customer_name || '—'}</td>
+                    <td className="px-4 py-3 font-semibold text-surface-700">{o.product?.name || 'Unknown'}</td>
+                    <td className="px-4 py-3 font-semibold text-brand-700">{o.quantity}</td>
+                    <td className="px-4 py-3 font-semibold">₦{o.total_amount?.toLocaleString() || 0}</td>
+                    <td className="px-4 py-3 font-medium text-surface-700">
+                      {o.expected_delivery_date ? new Date(o.expected_delivery_date).toLocaleDateString() : 'Not set'}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-surface-500">{o.dsa?.full_name || 'Unregistered'}</td>
+                    <td className="px-4 py-3">
+                      <span className={`text-[10px] font-bold px-2 py-1 rounded-full uppercase ${
+                        o.status === 'delivered' ? 'bg-success-100 text-success-700' :
+                        o.status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                        'bg-surface-100 text-surface-600'
+                      }`}>
+                        {o.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+        {/* Pagination Controls */}
+        {totalDeliveryOrders > DELIVERY_PAGE_SIZE && (
+          <div className="p-4 border-t border-surface-100 flex items-center justify-between bg-surface-50">
+            <p className="text-xs text-surface-500 font-medium">
+              Showing <span className="font-bold text-surface-900">{(deliveryPage - 1) * DELIVERY_PAGE_SIZE + 1}</span> to{' '}
+              <span className="font-bold text-surface-900">{Math.min(deliveryPage * DELIVERY_PAGE_SIZE, totalDeliveryOrders)}</span> of{' '}
+              <span className="font-bold text-surface-900">{totalDeliveryOrders}</span> entries
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setDeliveryPage(p => Math.max(1, p - 1))}
+                disabled={deliveryPage === 1}
+                className="px-3 py-1.5 rounded-lg border border-surface-200 text-sm font-bold text-surface-600 disabled:opacity-50 hover:bg-white transition-colors"
+              >
+                Previous
+              </button>
+              <button
+                onClick={() => setDeliveryPage(p => p + 1)}
+                disabled={deliveryPage * DELIVERY_PAGE_SIZE >= totalDeliveryOrders}
+                className="px-3 py-1.5 rounded-lg border border-surface-200 text-sm font-bold text-surface-600 disabled:opacity-50 hover:bg-white transition-colors"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
