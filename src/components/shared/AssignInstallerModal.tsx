@@ -18,6 +18,7 @@ export function AssignInstallerModal({ isOpen, onClose, onSuccess, order }: Assi
   const [fetching, setFetching] = useState(false)
   const [selectedInstallerId, setSelectedInstallerId] = useState('')
   const [scheduledDate, setScheduledDate] = useState('')
+  const [commissionPct, setCommissionPct] = useState(60)
   const [error, setError] = useState<string | null>(null)
 
   // Haversine distance in km
@@ -100,11 +101,17 @@ export function AssignInstallerModal({ isOpen, onClose, onSuccess, order }: Assi
       if (!selectedInstallerId) throw new Error('Please select an installer')
       if (!scheduledDate) throw new Error('Please select a date')
 
+      const installationPrice = order?.installation_price ?? 0
+      const computedCommission = installationPrice > 0
+        ? Math.round(installationPrice * commissionPct / 100)
+        : 0
+
       const { error: insertError } = await supabase.from('installer_jobs').insert({
         installer_id: selectedInstallerId,
         order_id: order?.id,
         scheduled_date: new Date(`${scheduledDate}T00:00:00`).toISOString(),
-        status: 'assigned'
+        status: 'assigned',
+        commission_amount: computedCommission > 0 ? computedCommission : null
       })
 
       if (insertError) throw insertError
@@ -230,6 +237,30 @@ export function AssignInstallerModal({ isOpen, onClose, onSuccess, order }: Assi
                 <label className="block text-sm font-bold text-surface-700 mb-1.5">Scheduled Date</label>
                 <input required type="date" value={scheduledDate} onChange={e => setScheduledDate(e.target.value)} className="w-full px-4 py-2.5 rounded-xl border border-surface-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none text-sm transition-all" />
               </div>
+
+              {/* Commission % — only show if installation is needed */}
+              {order?.installation_needed && (
+                <div>
+                  <label className="block text-sm font-bold text-surface-700 mb-1">
+                    Installer Commission Cut <span className="font-normal text-surface-400">(% of installation price)</span>
+                  </label>
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="number" min={0} max={100} step={1}
+                      value={commissionPct}
+                      onChange={e => setCommissionPct(Math.min(100, Math.max(0, Number(e.target.value))))}
+                      className="w-24 px-4 py-2.5 rounded-xl border border-surface-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none text-sm text-center font-bold"
+                    />
+                    <span className="text-sm text-surface-500">%</span>
+                    {order?.installation_price > 0 && (
+                      <span className="text-xs bg-success-50 text-success-700 font-bold px-3 py-1.5 rounded-lg ml-auto">
+                        Installer gets: ₦{Math.round(order.installation_price * commissionPct / 100).toLocaleString()}
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-surface-400 mt-1">Full installation price: ₦{(order?.installation_price ?? 0).toLocaleString()}</p>
+                </div>
+              )}
             </div>
 
             <div className="pt-4 flex gap-3">

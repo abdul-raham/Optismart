@@ -282,7 +282,7 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
               )}
 
             <div className="space-y-4">
-              {role !== 'reseller' && (
+              {role !== 'reseller' && role !== 'dsa' && (
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="block text-sm font-bold text-surface-700 mb-0">DSA In Charge *</label>
@@ -299,20 +299,16 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
                   {isDsaRegistered ? (
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
-                      {(role === 'admin' || role === 'super_admin') ? (
-                        <select 
-                          value={selectedDsaId} 
-                          onChange={(e) => setSelectedDsaId(e.target.value)}
-                          className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-surface-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none text-sm transition-all bg-white appearance-none"
-                        >
-                          <option value="" disabled>Select a DSA...</option>
-                          {dsas.map(dsa => (
-                            <option key={dsa.id} value={dsa.id}>{dsa.full_name}</option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input type="text" readOnly value={user?.full_name || ''} className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-surface-200 bg-surface-50 text-surface-500 text-sm" />
-                      )}
+                      <select 
+                        value={selectedDsaId} 
+                        onChange={(e) => setSelectedDsaId(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-surface-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none text-sm transition-all bg-white appearance-none"
+                      >
+                        <option value="" disabled>Select a DSA...</option>
+                        {dsas.map(dsa => (
+                          <option key={dsa.id} value={dsa.id}>{dsa.full_name}</option>
+                        ))}
+                      </select>
                     </div>
                   ) : (
                     <input 
@@ -393,6 +389,7 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
               {installationNeeded && (
                 <div className="mb-4">
                   <label className="block text-sm font-bold text-surface-700 mb-1.5">Installation Price (₦) *</label>
+                  <p className="text-xs text-surface-400 mb-2">The installer's commission % is set by admin when assigning the installer.</p>
                   <input required type="number" min={0} value={installationPrice} onChange={e => setInstallationPrice(Number(e.target.value))} className="w-full px-4 py-2.5 rounded-xl border border-surface-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none text-sm transition-all" />
                 </div>
               )}

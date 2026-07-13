@@ -25,6 +25,7 @@ import { AdminExpenses } from '@/pages/admin/Expenses'
 import { AdminInstallers } from '@/pages/admin/Installers'
 import { AdminAnalytics } from '@/pages/admin/Analytics'
 import { AdminTraining } from '@/pages/admin/Training'
+import { AdminReports } from '@/pages/admin/Reports'
 
 // DSA pages
 import { DSADashboard } from '@/pages/dsa/Dashboard'
@@ -165,6 +166,7 @@ export function AppRouter() {
             <Route path="/app/admin/installers" element={<AdminInstallers />} />
             <Route path="/app/admin/analytics"  element={<AdminAnalytics />} />
             <Route path="/app/admin/training"   element={<AdminTraining />} />
+            <Route path="/app/admin/reports"    element={<AdminReports />} />
           </Route>
 
           {/* DSA */}

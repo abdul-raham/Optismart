@@ -162,7 +162,10 @@ export function InstallerJobs() {
                     <span className="text-brand-700">Scheduled: {formatDate(job.scheduled_date)}</span>
                   </div>
                   <div className="flex items-center gap-2 text-sm text-surface-600 font-medium border-t border-surface-100 pt-3">
-                    <span className="bg-success-50 text-success-700 px-2 py-1 rounded-lg">Fee: {formatCurrency(job.commission_amount)}</span>
+                    <span className="bg-success-50 text-success-700 px-3 py-1.5 rounded-lg font-bold">
+                      Your Commission: {formatCurrency(job.commission_amount)}
+                    </span>
+                    <span className="text-xs text-surface-400 ml-auto">(your cut)</span>
                   </div>
                 </div>
 
