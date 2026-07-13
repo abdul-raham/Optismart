@@ -30,10 +30,14 @@ export function DSAReports() {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const authId = session?.user?.id
-      const { data: orders } = await supabase.from('orders').select('*')
+      const { data: orders, error: ordersError } = await supabase.from('orders').select('*')
         .or(`dsa_id.eq.${userId},created_by_auth_id.eq.${authId}`)
-      const { data: commissions } = await supabase.from('commissions').select('amount, status, created_at').eq('dsa_id', userId)
-      const { data: leads } = await supabase.from('leads').select('*').eq('dsa_id', userId)
+      const { data: commissions, error: commissionsError } = await supabase.from('commissions').select('amount, status, triggered_at').eq('dsa_id', userId)
+      const { data: leads, error: leadsError } = await supabase.from('leads').select('*').eq('dsa_id', userId)
+
+      if (ordersError) throw ordersError
+      if (commissionsError) throw commissionsError
+      if (leadsError) throw leadsError
 
       if (orders) setAllOrders(orders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()))
       if (commissions) setAllCommissions(commissions)
@@ -66,7 +70,7 @@ export function DSAReports() {
 
     return {
       filteredOrders: allOrders.filter(o => filterByDate(o.created_at)),
-      filteredCommissions: allCommissions.filter(c => filterByDate(c.created_at))
+      filteredCommissions: allCommissions.filter(c => filterByDate(c.triggered_at))
     }
   }, [allOrders, allCommissions, timeFilter])
 

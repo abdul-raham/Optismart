@@ -73,6 +73,7 @@ export function AdminReports() {
   const [monthlyView, setMonthlyView] = useState<'monthly' | 'alltime'>('monthly')
   const [deliveryPage, setDeliveryPage] = useState(1)
   const [totalDeliveryOrders, setTotalDeliveryOrders] = useState(0)
+  const [error, setError] = useState('')
   
   // Frontend Pagination States
   const [dsaPage, setDsaPage] = useState(1)
@@ -89,23 +90,40 @@ export function AdminReports() {
 
   useEffect(() => {
     fetchAll()
-  }, [selectedMonth, selectedDsa, monthlyView])
+  }, [selectedMonth, selectedDsa, monthlyView, deliveryPage])
 
   useEffect(() => {
-    fetchOrdersByDelivery()
-  }, [deliveryPage])
+    setDsaPage(1)
+    setMonthlyPage(1)
+    setRemittancePage(1)
+    setDeliveryPage(1)
+  }, [selectedMonth, selectedDsa])
 
   const fetchAll = async () => {
     setLoading(true)
+    setError('')
     try {
       await Promise.all([fetchDsaSummaries(), fetchMonthlyBreakdown(), fetchDsaList(), fetchRemittance(), fetchOrdersByDelivery()])
+    } catch (err: any) {
+      console.error('Error fetching admin reports:', err)
+      setError(err?.message || 'Unable to load report data. Please refresh and try again.')
     } finally {
       setLoading(false)
     }
   }
 
+  const monthRange = () => {
+    if (!selectedMonth) return null
+    const [year, month] = selectedMonth.split('-').map(Number)
+    return {
+      start: new Date(Date.UTC(year, month - 1, 1)).toISOString(),
+      end: new Date(Date.UTC(year, month, 1)).toISOString(),
+    }
+  }
+
   const fetchDsaList = async () => {
-    const { data } = await supabase.from('users').select('id, full_name').eq('role', 'dsa').eq('status', 'active')
+    const { data, error } = await supabase.from('users').select('id, full_name').eq('role', 'dsa').eq('status', 'active')
+    if (error) throw error
     if (data) setDsaList(data)
   }
 
@@ -114,23 +132,25 @@ export function AdminReports() {
     let query = supabase
       .from('orders')
       .select(`
-        id, quantity, total_amount, status, created_at, delivered_at,
+        id, dsa_id, quantity, total_amount, status, created_at, delivered_at,
         dsa:users!orders_dsa_id_fkey ( id, full_name, email )
       `)
 
     if (selectedDsa) query = query.eq('dsa_id', selectedDsa)
-    if (selectedMonth) {
-      const start = `${selectedMonth}-01`
-      const end = new Date(new Date(start).getFullYear(), new Date(start).getMonth() + 1, 1).toISOString()
-      query = query.gte('created_at', start).lt('created_at', end)
+    const range = monthRange()
+    if (range) {
+      query = query.gte('created_at', range.start).lt('created_at', range.end)
     }
 
-    const { data: orders } = await query
+    const { data: orders, error: ordersError } = await query
+    if (ordersError) throw ordersError
 
     // Fetch commissions
-    let commQuery = supabase.from('commissions').select('dsa_id, amount, status')
+    let commQuery = supabase.from('commissions').select('dsa_id, amount, status, triggered_at')
     if (selectedDsa) commQuery = commQuery.eq('dsa_id', selectedDsa)
-    const { data: comms } = await commQuery
+    if (range) commQuery = commQuery.gte('triggered_at', range.start).lt('triggered_at', range.end)
+    const { data: comms, error: commsError } = await commQuery
+    if (commsError) throw commsError
 
     if (!orders) return
 
@@ -176,14 +196,29 @@ export function AdminReports() {
   }
 
   const fetchMonthlyBreakdown = async () => {
-    const { data: orders } = await supabase
+    let ordersQuery = supabase
       .from('orders')
-      .select('quantity, total_amount, status, created_at')
+      .select('dsa_id, quantity, total_amount, status, created_at, dsa:users!orders_dsa_id_fkey(full_name)')
       .order('created_at', { ascending: true })
 
-    const { data: comms } = await supabase
+    let commsQuery = supabase
       .from('commissions')
-      .select('amount, triggered_at')
+      .select('dsa_id, amount, triggered_at')
+
+    if (selectedDsa) {
+      ordersQuery = ordersQuery.eq('dsa_id', selectedDsa)
+      commsQuery = commsQuery.eq('dsa_id', selectedDsa)
+    }
+    const range = monthRange()
+    if (range) {
+      ordersQuery = ordersQuery.gte('created_at', range.start).lt('created_at', range.end)
+      commsQuery = commsQuery.gte('triggered_at', range.start).lt('triggered_at', range.end)
+    }
+
+    const { data: orders, error: ordersError } = await ordersQuery
+    const { data: comms, error: commsError } = await commsQuery
+    if (ordersError) throw ordersError
+    if (commsError) throw commsError
 
     if (!orders) return
 
@@ -232,16 +267,31 @@ export function AdminReports() {
 
   const fetchRemittance = async () => {
     // DSA collected from customers = sum of confirmed payments on orders belonging to each DSA
-    const { data: payments } = await supabase
+    let paymentsQuery = supabase
       .from('payments')
-      .select('amount, order_id, status, orders!inner(dsa_id, dsa:users!orders_dsa_id_fkey(id, full_name, email))')
+      .select('amount, order_id, status, created_at, orders!inner(dsa_id, dsa:users!orders_dsa_id_fkey(id, full_name, email))')
       .eq('status', 'confirmed')
 
     // Commission HQ owes DSAs = pending commissions
-    const { data: pendingComms } = await supabase
+    let pendingCommsQuery = supabase
       .from('commissions')
-      .select('dsa_id, amount, status, dsa:users!commissions_dsa_id_fkey(id, full_name, email)')
+      .select('dsa_id, amount, status, triggered_at, dsa:users!commissions_dsa_id_fkey(id, full_name, email)')
       .eq('status', 'pending')
+
+    if (selectedDsa) {
+      paymentsQuery = paymentsQuery.eq('orders.dsa_id', selectedDsa)
+      pendingCommsQuery = pendingCommsQuery.eq('dsa_id', selectedDsa)
+    }
+    const range = monthRange()
+    if (range) {
+      paymentsQuery = paymentsQuery.gte('created_at', range.start).lt('created_at', range.end)
+      pendingCommsQuery = pendingCommsQuery.gte('triggered_at', range.start).lt('triggered_at', range.end)
+    }
+
+    const { data: payments, error: paymentsError } = await paymentsQuery
+    const { data: pendingComms, error: commsError } = await pendingCommsQuery
+    if (paymentsError) throw paymentsError
+    if (commsError) throw commsError
 
     const map: Record<string, RemittanceRow> = {}
 
@@ -272,7 +322,7 @@ export function AdminReports() {
     const from = (deliveryPage - 1) * DELIVERY_PAGE_SIZE
     const to = from + DELIVERY_PAGE_SIZE - 1
 
-    const { data, count } = await supabase
+    let query = supabase
       .from('orders')
       .select(`
         id, order_number, customer_name, status, quantity, total_amount,
@@ -282,7 +332,13 @@ export function AdminReports() {
       `, { count: 'exact' })
       .not('expected_delivery_date', 'is', null)
       .order('expected_delivery_date', { ascending: true })
-      .range(from, to)
+
+    if (selectedDsa) query = query.eq('dsa_id', selectedDsa)
+    const range = monthRange()
+    if (range) query = query.gte('created_at', range.start).lt('created_at', range.end)
+
+    const { data, count, error } = await query.range(from, to)
+    if (error) throw error
 
     if (data) setDeliveryOrders(data)
     if (count !== null) setTotalDeliveryOrders(count)
@@ -370,6 +426,12 @@ export function AdminReports() {
           >Clear filters</button>
         )}
       </div>
+
+      {error && (
+        <div className="rounded-xl border border-danger-200 bg-danger-50 px-4 py-3 text-sm font-semibold text-danger-700">
+          Report data could not be loaded accurately: {error}
+        </div>
+      )}
 
       {/* Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
