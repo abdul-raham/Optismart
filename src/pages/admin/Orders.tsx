@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
-import { ShoppingBag, Search, Calendar, Check, X, ArrowRightLeft, Plus, MapPin, Package, User } from 'lucide-react'
+import { ShoppingBag, Search, Calendar, Check, X, ArrowRightLeft, Plus, MapPin, Package, User, Edit2 } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { OrderStatusBadge } from '@/components/shared/Badges'
 import { AssignInstallerModal } from '@/components/shared/AssignInstallerModal'
@@ -19,7 +19,23 @@ export function AdminOrders() {
   const [products, setProducts] = useState<Product[]>([])
   const [dsas, setDsas] = useState<AppUser[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false)
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null)
   const [submitting, setSubmitting] = useState(false)
+
+  const [editForm, setEditForm] = useState({
+    customer_name: '',
+    customer_email: '',
+    customer_phone: '',
+    customer_address: '',
+    product_id: '',
+    quantity: 1,
+    total_amount: 0,
+    installation_needed: false,
+    installation_price: 0,
+    expected_delivery_date: '',
+    notes: '',
+  })
 
   const [form, setForm] = useState({
     is_dsa_registered: true,
@@ -198,6 +214,63 @@ export function AdminOrders() {
     }
   }
 
+  const openEditModal = (order: Order) => {
+    setEditingOrder(order)
+    setEditForm({
+      customer_name: order.customer_name,
+      customer_email: order.customer_email || '',
+      customer_phone: order.customer_phone,
+      customer_address: order.customer_address,
+      product_id: order.product_id,
+      quantity: order.quantity,
+      total_amount: order.total_amount,
+      installation_needed: order.installation_needed,
+      installation_price: order.installation_price,
+      expected_delivery_date: order.expected_delivery_date || '',
+      notes: order.notes || '',
+    })
+    setIsEditModalOpen(true)
+  }
+
+  const handleSaveEditOrder = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingOrder) return
+    setSubmitting(true)
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .update({
+          customer_name: editForm.customer_name,
+          customer_email: editForm.customer_email || null,
+          customer_phone: editForm.customer_phone,
+          customer_address: editForm.customer_address,
+          product_id: editForm.product_id,
+          quantity: editForm.quantity,
+          total_amount: editForm.total_amount,
+          installation_needed: editForm.installation_needed,
+          installation_price: editForm.installation_needed ? editForm.installation_price : 0,
+          expected_delivery_date: editForm.expected_delivery_date || null,
+          notes: editForm.notes,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', editingOrder.id)
+        .select('*, dsa:users!orders_dsa_id_fkey(email, full_name)')
+        .single()
+
+      if (error) throw error
+      if (data) {
+        setOrders(orders.map(o => o.id === editingOrder.id ? data : o))
+        setIsEditModalOpen(false)
+        setEditingOrder(null)
+      }
+    } catch (err) {
+      console.error('Failed to edit order:', err)
+      alert('Failed to save order changes.')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
   const handleDeleteOrder = async (orderId: string) => {
     if (!window.confirm('Permanently delete this cancelled order?')) return
     try {
@@ -306,22 +379,33 @@ export function AdminOrders() {
                           {updating === order.id ? (
                             <div className="w-5 h-5 border-2 border-brand-500/30 border-t-brand-500 rounded-full animate-spin" />
                           ) : (
-                            (allowedTransitions[order.status] ?? []).map(nextStatus => (
-                              <button
-                                key={nextStatus}
-                                onClick={() => handleUpdateStatus(order.id, nextStatus)}
-                                className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-colors flex items-center gap-1 ${
-                                  nextStatus === 'cancelled' 
-                                    ? 'bg-white border-surface-200 text-danger-600 hover:border-danger-200 hover:bg-danger-50'
-                                    : nextStatus === 'delivered'
-                                      ? 'bg-success-50 border-success-200 text-success-700 hover:bg-success-100'
-                                      : 'bg-white border-surface-200 text-brand-600 hover:border-brand-200 hover:bg-brand-50'
-                                }`}
-                              >
-                                {nextStatus === 'cancelled' ? <X className="w-3 h-3" /> : <Check className="w-3 h-3" />}
-                                Mark {nextStatus}
-                              </button>
-                            ))
+                            <>
+                              {order.status === 'pending' && (
+                                <button
+                                  onClick={() => openEditModal(order)}
+                                  className="text-xs font-bold px-3 py-1.5 rounded-lg border bg-surface-50 border-surface-200 text-surface-700 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700 transition-colors flex items-center gap-1"
+                                  title="Edit this pending order"
+                                >
+                                  <Edit2 className="w-3 h-3" /> Edit
+                                </button>
+                              )}
+                              {(allowedTransitions[order.status] ?? []).map(nextStatus => (
+                                <button
+                                  key={nextStatus}
+                                  onClick={() => handleUpdateStatus(order.id, nextStatus)}
+                                  className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-colors flex items-center gap-1 ${
+                                    nextStatus === 'cancelled' 
+                                      ? 'bg-white border-surface-200 text-danger-600 hover:border-danger-200 hover:bg-danger-50'
+                                      : nextStatus === 'delivered'
+                                        ? 'bg-success-50 border-success-200 text-success-700 hover:bg-success-100'
+                                        : 'bg-white border-surface-200 text-brand-600 hover:border-brand-200 hover:bg-brand-50'
+                                  }`}
+                                >
+                                  {nextStatus === 'cancelled' ? <X className="w-3 h-3" /> : <Check className="w-3 h-3" />}
+                                  Mark {nextStatus}
+                                </button>
+                              ))}
+                            </>
                           )}
                           {order.installation_needed && !assignedOrderIds.has(order.id) && !updating && (
                             <button
@@ -381,22 +465,32 @@ export function AdminOrders() {
                     {updating === order.id ? (
                       <div className="w-5 h-5 border-2 border-brand-500/30 border-t-brand-500 rounded-full animate-spin" />
                     ) : (
-                      (allowedTransitions[order.status] ?? []).map(nextStatus => (
-                        <button
-                          key={nextStatus}
-                          onClick={() => handleUpdateStatus(order.id, nextStatus)}
-                          className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-colors flex items-center gap-1 ${
-                            nextStatus === 'cancelled' 
-                              ? 'bg-white border-surface-200 text-danger-600 hover:border-danger-200 hover:bg-danger-50'
-                              : nextStatus === 'delivered'
-                                ? 'bg-success-50 border-success-200 text-success-700 hover:bg-success-100'
-                                : 'bg-white border-surface-200 text-brand-600 hover:border-brand-200 hover:bg-brand-50'
-                          }`}
-                        >
-                          {nextStatus === 'cancelled' ? <X className="w-3 h-3" /> : <Check className="w-3 h-3" />}
-                          Mark {nextStatus}
-                        </button>
-                      ))
+                      <>
+                        {order.status === 'pending' && (
+                          <button
+                            onClick={() => openEditModal(order)}
+                            className="text-xs font-bold px-3 py-1.5 rounded-lg border bg-surface-50 border-surface-200 text-surface-700 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700 transition-colors flex items-center gap-1"
+                          >
+                            <Edit2 className="w-3 h-3" /> Edit
+                          </button>
+                        )}
+                        {(allowedTransitions[order.status] ?? []).map(nextStatus => (
+                          <button
+                            key={nextStatus}
+                            onClick={() => handleUpdateStatus(order.id, nextStatus)}
+                            className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-colors flex items-center gap-1 ${
+                              nextStatus === 'cancelled' 
+                                ? 'bg-white border-surface-200 text-danger-600 hover:border-danger-200 hover:bg-danger-50'
+                                : nextStatus === 'delivered'
+                                  ? 'bg-success-50 border-success-200 text-success-700 hover:bg-success-100'
+                                  : 'bg-white border-surface-200 text-brand-600 hover:border-brand-200 hover:bg-brand-50'
+                            }`}
+                          >
+                            {nextStatus === 'cancelled' ? <X className="w-3 h-3" /> : <Check className="w-3 h-3" />}
+                            Mark {nextStatus}
+                          </button>
+                        ))}
+                      </>
                     )}
                     {order.installation_needed && !assignedOrderIds.has(order.id) && !updating && (
                       <button
@@ -431,6 +525,131 @@ export function AdminOrders() {
           }}
           order={orders.find(o => o.id === assigningOrderId) || null}
         />
+
+      {/* EDIT ORDER MODAL */}
+      <AnimatePresence>
+        {isEditModalOpen && editingOrder && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+            <motion.div 
+              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm"
+              onClick={() => !submitting && setIsEditModalOpen(false)}
+            />
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="bg-white rounded-2xl shadow-card-xl w-full max-w-lg relative z-10 overflow-hidden max-h-[90vh] flex flex-col"
+            >
+              <div className="px-6 py-4 border-b border-surface-100 flex items-center justify-between bg-surface-50/50">
+                <div>
+                  <h2 className="text-lg font-bold text-surface-900">Edit Order</h2>
+                  <p className="text-xs text-surface-500 mt-0.5">{editingOrder.order_number}</p>
+                </div>
+                <button onClick={() => !submitting && setIsEditModalOpen(false)} className="text-surface-400 hover:text-surface-900 transition-colors p-1 rounded-md hover:bg-surface-100">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveEditOrder} className="flex flex-col flex-1 min-h-0">
+                <div className="p-6 space-y-4 overflow-y-auto flex-1">
+
+                  <div>
+                    <label className="label">Customer Name *</label>
+                    <input required type="text" className="input" value={editForm.customer_name} onChange={e => setEditForm({...editForm, customer_name: e.target.value})} />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="label">Customer Phone *</label>
+                      <input required type="tel" className="input" value={editForm.customer_phone} onChange={e => setEditForm({...editForm, customer_phone: e.target.value.replace(/[^\d+]/g, '')})} />
+                    </div>
+                    <div>
+                      <label className="label">Customer Email</label>
+                      <input type="email" className="input" value={editForm.customer_email} onChange={e => setEditForm({...editForm, customer_email: e.target.value})} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="label">Delivery Address *</label>
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-3 w-5 h-5 text-surface-400" />
+                      <textarea required rows={2} className="input pl-10" value={editForm.customer_address} onChange={e => setEditForm({...editForm, customer_address: e.target.value})} />
+                    </div>
+                  </div>
+
+                  <div className="border-t border-surface-100 pt-4">
+                    <label className="label">Product *</label>
+                    <div className="relative">
+                      <Package className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
+                      <select required className="input pl-10" value={editForm.product_id} onChange={e => {
+                        const p = products.find(prod => prod.id === e.target.value)
+                        setEditForm({...editForm, product_id: e.target.value, total_amount: p ? p.retail_price * editForm.quantity : editForm.total_amount})
+                      }}>
+                        <option value="">Select a product</option>
+                        {products.map(p => (
+                          <option key={p.id} value={p.id}>{p.name} — {formatCurrency(p.retail_price)}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="label">Quantity *</label>
+                      <input required type="number" min={1} className="input" value={editForm.quantity} onChange={e => {
+                        const qty = parseInt(e.target.value) || 1
+                        const p = products.find(prod => prod.id === editForm.product_id)
+                        setEditForm({...editForm, quantity: qty, total_amount: p ? p.retail_price * qty : editForm.total_amount})
+                      }} />
+                    </div>
+                    <div>
+                      <label className="label">Total Amount (₦) *</label>
+                      <input required type="number" min={0} className="input" value={editForm.total_amount} onChange={e => setEditForm({...editForm, total_amount: Number(e.target.value)})} />
+                    </div>
+                  </div>
+
+                  <div className="border-t border-surface-100 pt-4">
+                    <div className="flex items-center gap-3 mb-3">
+                      <input 
+                        type="checkbox" 
+                        id="edit_install_needed"
+                        checked={editForm.installation_needed} 
+                        onChange={e => setEditForm({...editForm, installation_needed: e.target.checked})} 
+                        className="w-5 h-5 rounded border-surface-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
+                      />
+                      <label htmlFor="edit_install_needed" className="label mb-0 cursor-pointer">Installation Needed</label>
+                    </div>
+                    {editForm.installation_needed && (
+                      <div>
+                        <label className="label">Installation Price (₦)</label>
+                        <input type="number" min={0} className="input" value={editForm.installation_price} onChange={e => setEditForm({...editForm, installation_price: Number(e.target.value)})} />
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="label">Expected Delivery Date</label>
+                    <input type="date" className="input" value={editForm.expected_delivery_date} onChange={e => setEditForm({...editForm, expected_delivery_date: e.target.value})} />
+                  </div>
+
+                  <div>
+                    <label className="label">Notes</label>
+                    <textarea rows={2} className="input resize-none" value={editForm.notes} onChange={e => setEditForm({...editForm, notes: e.target.value})} />
+                  </div>
+
+                </div>
+                <div className="px-6 py-4 flex items-center justify-end gap-3 border-t border-surface-100 bg-white shrink-0">
+                  <button type="button" onClick={() => setIsEditModalOpen(false)} disabled={submitting} className="btn-outline">Cancel</button>
+                  <button type="submit" disabled={submitting} className="btn-primary w-36 flex items-center justify-center">
+                    {submitting ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Save Changes'}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* CREATE ORDER MODAL */}
       <AnimatePresence>
