@@ -275,83 +275,88 @@ export function AdminProducts() {
         </div>
       )}
 
-      {/* ADD MODAL */}
-      <AnimatePresence>
-        {isModalOpen && createPortal(
-          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-            <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm"
-              onClick={() => !submitting && closeModal()}
-            />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white rounded-2xl shadow-card-xl w-full max-w-lg relative z-10 overflow-hidden"
-            >
-              <div className="px-6 py-4 border-b border-surface-100 flex items-center justify-between bg-surface-50/50">
-                <h2 className="text-lg font-bold text-surface-900">{editingId ? 'Edit Product' : 'Add Product'}</h2>
-                <button onClick={() => !submitting && closeModal()} className="text-surface-400 hover:text-surface-900 transition-colors p-1 rounded-md hover:bg-surface-100">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
 
-              <form onSubmit={handleSaveProduct} className="p-6 space-y-4">
-                <div>
-                  <label className="label">Product Name *</label>
-                  <input required type="text" className="input" placeholder="e.g. 4-Channel CCTV Kit" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
-                </div>
-                
-                <div>
-                  <label className="label">Description</label>
-                  <textarea rows={2} className="input resize-none" placeholder="Features, contents, specs..." value={form.description} onChange={e => setForm({...form, description: e.target.value})} />
-                </div>
-
-                <div>
-                  <label className="label">Website Source URL</label>
-                  <input type="url" className="input" placeholder="https://optismart.com.ng/..." value={form.source_url} onChange={e => setForm({...form, source_url: e.target.value})} />
-                </div>
-
-                <div>
-                  <label className="label">Image URL</label>
-                  <input type="text" className="input" placeholder="/products/image.jpg" value={form.image_url} onChange={e => setForm({...form, image_url: e.target.value})} />
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="label">Retail Price (₦) *</label>
-                    <input required type="number" min={0} className="input" value={form.retail_price} onChange={e => setForm({...form, retail_price: Number(e.target.value)})} />
-                  </div>
-                  <div>
-                    <label className="label">Wholesale Price (₦) *</label>
-                    <input required type="number" min={0} className="input" value={form.wholesale_price} onChange={e => setForm({...form, wholesale_price: Number(e.target.value)})} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="label">Initial Stock *</label>
-                    <input required type="number" min={0} className="input" value={form.stock_quantity} onChange={e => setForm({...form, stock_quantity: Number(e.target.value)})} />
-                  </div>
-                  <div>
-                    <label className="label">Low Stock Alert *</label>
-                    <input required type="number" min={0} className="input" value={form.min_stock_level} onChange={e => setForm({...form, min_stock_level: Number(e.target.value)})} />
-                  </div>
-                </div>
-
-                <div className="pt-4 flex items-center justify-end gap-3 border-t border-surface-100 mt-6">
-                  <button type="button" onClick={() => closeModal()} disabled={submitting} className="btn-outline">Cancel</button>
-                  <button type="submit" disabled={submitting} className="btn-primary w-32 flex items-center justify-center">
-                    {submitting ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : (editingId ? 'Save Changes' : 'Save Product')}
+      {/* PRODUCT MODAL — always-mounted portal, AnimatePresence inside */}
+      {createPortal(
+        <AnimatePresence>
+          {isModalOpen && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+              <motion.div
+                key="backdrop"
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm"
+                onClick={() => !submitting && closeModal()}
+              />
+              <motion.div
+                key="modal"
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="bg-white rounded-2xl shadow-card-xl w-full max-w-lg relative z-10 overflow-hidden"
+              >
+                <div className="px-6 py-4 border-b border-surface-100 flex items-center justify-between bg-surface-50/50">
+                  <h2 className="text-lg font-bold text-surface-900">{editingId ? 'Edit Product' : 'Add Product'}</h2>
+                  <button onClick={() => !submitting && closeModal()} className="text-surface-400 hover:text-surface-900 transition-colors p-1 rounded-md hover:bg-surface-100">
+                    <X className="w-5 h-5" />
                   </button>
                 </div>
-              </form>
-            </motion.div>
-          </div>,
-          document.getElementById('modal-root') || document.body
-        )}
-      </AnimatePresence>
+
+                <form onSubmit={handleSaveProduct} className="p-6 space-y-4">
+                  <div>
+                    <label className="label">Product Name *</label>
+                    <input required type="text" className="input" placeholder="e.g. 4-Channel CCTV Kit" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
+                  </div>
+
+                  <div>
+                    <label className="label">Description</label>
+                    <textarea rows={2} className="input resize-none" placeholder="Features, contents, specs..." value={form.description} onChange={e => setForm({...form, description: e.target.value})} />
+                  </div>
+
+                  <div>
+                    <label className="label">Website Source URL</label>
+                    <input type="url" className="input" placeholder="https://optismart.com.ng/..." value={form.source_url} onChange={e => setForm({...form, source_url: e.target.value})} />
+                  </div>
+
+                  <div>
+                    <label className="label">Image URL</label>
+                    <input type="text" className="input" placeholder="/products/image.jpg" value={form.image_url} onChange={e => setForm({...form, image_url: e.target.value})} />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="label">Retail Price (₦) *</label>
+                      <input required type="number" min={0} className="input" value={form.retail_price} onChange={e => setForm({...form, retail_price: Number(e.target.value)})} />
+                    </div>
+                    <div>
+                      <label className="label">Wholesale Price (₦) *</label>
+                      <input required type="number" min={0} className="input" value={form.wholesale_price} onChange={e => setForm({...form, wholesale_price: Number(e.target.value)})} />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="label">Stock Quantity *</label>
+                      <input required type="number" min={0} className="input" value={form.stock_quantity} onChange={e => setForm({...form, stock_quantity: Number(e.target.value)})} />
+                    </div>
+                    <div>
+                      <label className="label">Low Stock Alert *</label>
+                      <input required type="number" min={0} className="input" value={form.min_stock_level} onChange={e => setForm({...form, min_stock_level: Number(e.target.value)})} />
+                    </div>
+                  </div>
+
+                  <div className="pt-4 flex items-center justify-end gap-3 border-t border-surface-100 mt-6">
+                    <button type="button" onClick={() => closeModal()} disabled={submitting} className="btn-outline">Cancel</button>
+                    <button type="submit" disabled={submitting} className="btn-primary w-32 flex items-center justify-center">
+                      {submitting ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : (editingId ? 'Save Changes' : 'Save Product')}
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.getElementById('modal-root') || document.body
+      )}
     </div>
   )
 }
