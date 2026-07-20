@@ -381,11 +381,11 @@ export function AdminOrders() {
                             <div className="w-5 h-5 border-2 border-brand-500/30 border-t-brand-500 rounded-full animate-spin" />
                           ) : (
                             <>
-                              {order.status === 'pending' && (
+                              {!['delivered', 'completed', 'cancelled'].includes(order.status) && (
                                 <button
                                   onClick={() => openEditModal(order)}
                                   className="text-xs font-bold px-3 py-1.5 rounded-lg border bg-surface-50 border-surface-200 text-surface-700 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700 transition-colors flex items-center gap-1"
-                                  title="Edit this pending order"
+                                  title="Edit this order"
                                 >
                                   <Edit2 className="w-3 h-3" /> Edit
                                 </button>
@@ -467,7 +467,7 @@ export function AdminOrders() {
                       <div className="w-5 h-5 border-2 border-brand-500/30 border-t-brand-500 rounded-full animate-spin" />
                     ) : (
                       <>
-                        {order.status === 'pending' && (
+                        {!['delivered', 'completed', 'cancelled'].includes(order.status) && (
                           <button
                             onClick={() => openEditModal(order)}
                             className="text-xs font-bold px-3 py-1.5 rounded-lg border bg-surface-50 border-surface-200 text-surface-700 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700 transition-colors flex items-center gap-1"
