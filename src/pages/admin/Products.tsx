@@ -349,7 +349,7 @@ export function AdminProducts() {
               </form>
             </motion.div>
           </div>,
-          document.body
+          document.getElementById('modal-root') || document.body
         )}
       </AnimatePresence>
     </div>
