@@ -2,11 +2,12 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
-import { Package, Plus, Search, Edit2, Trash2, X, RefreshCw, ExternalLink } from 'lucide-react'
+import { Package, Plus, Search, Edit2, Trash2, X, RefreshCw, ExternalLink, Upload, Loader2 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import type { Product } from '@/types'
 import { optismartCatalogProducts } from '@/data/optismartProducts'
 import { getProductImage } from '@/lib/productImages'
+import { optimizeImage, uploadProductImage } from '@/utils/imageUpload'
 
 export function AdminProducts() {
   const [products, setProducts] = useState<Product[]>([])
@@ -16,6 +17,7 @@ export function AdminProducts() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [syncing, setSyncing] = useState(false)
+  const [isUploading, setIsUploading] = useState(false)
 
   const [form, setForm] = useState({
     name: '',
@@ -40,6 +42,26 @@ export function AdminProducts() {
       console.error('Error fetching products:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setIsUploading(true)
+    try {
+      // Optimize image before upload
+      const optimized = await optimizeImage(file)
+      // Upload and get URL
+      const url = await uploadProductImage(optimized)
+      
+      setForm(prev => ({ ...prev, image_url: url }))
+    } catch (err) {
+      console.error('Image upload failed:', err)
+      alert('Failed to upload image. Make sure the storage bucket is set up.')
+    } finally {
+      setIsUploading(false)
     }
   }
 
@@ -321,8 +343,29 @@ export function AdminProducts() {
                     </div>
 
                     <div>
-                      <label className="label">Image URL</label>
-                      <input type="text" className="input" placeholder="/products/image.jpg" value={form.image_url} onChange={e => setForm({...form, image_url: e.target.value})} />
+                      <label className="label">Product Image</label>
+                      <div className="flex gap-2 items-center">
+                        <input type="text" className="input flex-1" placeholder="URL or upload an image..." value={form.image_url} onChange={e => setForm({...form, image_url: e.target.value})} />
+                        
+                        <div className="relative shrink-0">
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            onChange={handleImageUpload} 
+                            disabled={isUploading}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer disabled:cursor-not-allowed" 
+                          />
+                          <button type="button" disabled={isUploading} className="btn-outline px-4 flex items-center gap-2 h-[42px]">
+                            {isUploading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                            <span className="hidden sm:inline">{isUploading ? 'Uploading...' : 'Upload'}</span>
+                          </button>
+                        </div>
+                      </div>
+                      {form.image_url && (
+                        <div className="mt-3 relative w-24 h-24 rounded-lg overflow-hidden border border-surface-200 bg-surface-50">
+                          <img src={form.image_url} alt="Preview" className="w-full h-full object-cover" />
+                        </div>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
