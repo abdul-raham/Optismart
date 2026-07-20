@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { ShoppingBag, Search, Calendar, Check, X, ArrowRightLeft, Plus, MapPin, Package, User, Edit2 } from 'lucide-react'
@@ -528,8 +529,8 @@ export function AdminOrders() {
 
       {/* EDIT ORDER MODAL */}
       <AnimatePresence>
-        {isEditModalOpen && editingOrder && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+        {isEditModalOpen && editingOrder && createPortal(
+          <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm"
@@ -647,7 +648,8 @@ export function AdminOrders() {
                 </div>
               </form>
             </motion.div>
-          </div>
+          </div>,
+          document.body
         )}
       </AnimatePresence>
 
