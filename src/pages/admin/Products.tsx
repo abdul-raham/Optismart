@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { Package, Plus, Search, Edit2, Trash2, X, RefreshCw, ExternalLink, Upload, Loader2 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import type { Product } from '@/types'
+import { CardGridSkeleton } from '@/components/shared/Skeletons'
 import { optismartCatalogProducts } from '@/data/optismartProducts'
 import { getProductImage } from '@/lib/productImages'
 import { optimizeImage, uploadProductImage } from '@/utils/imageUpload'
@@ -197,7 +198,7 @@ export function AdminProducts() {
       </div>
 
       {loading ? (
-        <div className="glass-card h-64 animate-pulse bg-surface-100/50" />
+        <CardGridSkeleton count={6} />
       ) : filteredProducts.length === 0 ? (
         <div className="glass-card p-12 flex flex-col items-center justify-center text-center">
           <div className="w-16 h-16 rounded-2xl bg-surface-100 flex items-center justify-center mb-4">

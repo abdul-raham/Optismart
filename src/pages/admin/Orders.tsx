@@ -6,6 +6,7 @@ import { ShoppingBag, Search, Calendar, Check, X, ArrowRightLeft, Plus, MapPin, 
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { OrderStatusBadge } from '@/components/shared/Badges'
 import { AssignInstallerModal } from '@/components/shared/AssignInstallerModal'
+import { TableSkeleton } from '@/components/shared/Skeletons'
 import { sendEmail } from '@/lib/email'
 import { sendWebPush } from '@/lib/push'
 import type { Order, OrderStatus, Product, User as AppUser } from '@/types'
@@ -320,7 +321,7 @@ export function AdminOrders() {
       </div>
 
       {loading ? (
-        <div className="glass-card h-64 animate-pulse bg-surface-100/50" />
+        <TableSkeleton rows={6} cols={5} />
       ) : filteredOrders.length === 0 ? (
         <div className="glass-card p-12 flex flex-col items-center justify-center text-center">
           <div className="w-16 h-16 rounded-2xl bg-surface-100 flex items-center justify-center mb-4">

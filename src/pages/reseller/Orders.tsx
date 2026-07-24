@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { Package, Search, Calendar, ChevronRight } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { OrderStatusBadge } from '@/components/shared/Badges'
+import { TableSkeleton } from '@/components/shared/Skeletons'
 import { useAuthStore } from '@/stores/authStore'
 import type { Order } from '@/types'
 
@@ -56,22 +57,19 @@ export function ResellerOrders() {
         </div>
       </div>
 
-      <div className="glass-card overflow-hidden">
-        {loading ? (
-          <div className="h-64 flex items-center justify-center animate-pulse bg-surface-50/50">
-            <div className="text-surface-400 text-sm font-semibold">Loading orders...</div>
+      {loading ? (
+        <TableSkeleton rows={5} cols={5} />
+      ) : filteredOrders.length === 0 ? (
+        <div className="glass-card p-12 flex flex-col items-center justify-center text-center">
+          <div className="w-16 h-16 rounded-2xl bg-surface-100 flex items-center justify-center mb-4">
+            <Package className="w-8 h-8 text-surface-400" />
           </div>
-        ) : filteredOrders.length === 0 ? (
-          <div className="p-12 flex flex-col items-center justify-center text-center">
-            <div className="w-16 h-16 rounded-2xl bg-surface-100 flex items-center justify-center mb-4">
-              <Package className="w-8 h-8 text-surface-400" />
-            </div>
-            <h3 className="text-lg font-bold text-surface-900 mb-2">No orders found</h3>
-            <p className="text-surface-500 max-w-md">You haven't placed any bulk orders yet.</p>
-          </div>
-        ) : (
-          <>
-            {/* Desktop Table */}
+          <h3 className="text-lg font-bold text-surface-900 mb-2">No orders found</h3>
+          <p className="text-surface-500 max-w-md">You haven't placed any bulk orders yet.</p>
+        </div>
+      ) : (
+        <div className="glass-card overflow-hidden">
+          {/* Desktop Table */}
             <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left border-collapse">
               <thead>
@@ -137,9 +135,8 @@ export function ResellerOrders() {
                 </div>
               ))}
             </div>
-          </>
+          </div>
         )}
       </div>
-    </div>
-  )
+    )
 }

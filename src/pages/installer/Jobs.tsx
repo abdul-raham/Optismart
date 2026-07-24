@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { Wrench, MapPin, Calendar, Clock, CheckCircle2, ChevronRight, Search, Phone } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
+import { CardGridSkeleton } from '@/components/shared/Skeletons'
 
 interface InstallerJob {
   id: string
@@ -116,9 +117,7 @@ export function InstallerJobs() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1,2,3].map(i => <div key={i} className="glass-card h-48 animate-pulse bg-surface-100/50" />)}
-        </div>
+        <CardGridSkeleton count={3} />
       ) : jobs.length === 0 ? (
         <div className="glass-card p-12 flex flex-col items-center justify-center text-center">
           <div className="w-16 h-16 rounded-2xl bg-brand-50 flex items-center justify-center mb-4">

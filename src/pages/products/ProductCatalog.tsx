@@ -3,6 +3,7 @@ import { ExternalLink, Package, Search } from 'lucide-react'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
+import { CardGridSkeleton } from '@/components/shared/Skeletons'
 import type { Product } from '@/types'
 import { getProductImage } from '@/lib/productImages'
 
@@ -50,9 +51,7 @@ export function ProductCatalog() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-3 xl:grid-cols-4">
-          {[1, 2, 3, 4, 5, 6].map((item) => <div key={item} className="glass-card h-72 animate-pulse bg-surface-100/60" />)}
-        </div>
+        <CardGridSkeleton count={6} />
       ) : filteredProducts.length === 0 ? (
         <div className="glass-card p-12 text-center">
           <Package className="mx-auto h-10 w-10 text-surface-300" />

@@ -6,6 +6,7 @@ import {
   Camera, Banknote, Clock, TrendingUp, Filter, RefreshCw, Tag
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
+import { StatCardSkeleton, TableSkeleton } from '@/components/shared/Skeletons'
 
 function formatCompactAmount(amount: number): string {
   if (amount >= 1_000_000) {
@@ -485,20 +486,27 @@ export function AdminReports() {
         </div>
       )}
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
-        {statCards.map((s, i) => (
-          <motion.div key={s.label} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
-            className="glass-card p-4 flex flex-col gap-2"
-          >
-            <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center`}>
-              <s.icon className="w-5 h-5 text-white" />
-            </div>
-            <p className="text-xs text-surface-500 font-medium">{s.label}</p>
-            <p className="text-xl font-black text-surface-900">{loading ? '—' : s.value}</p>
-          </motion.div>
-        ))}
-      </div>
+      {loading ? (
+        <div className="space-y-6">
+          <StatCardSkeleton count={5} />
+          <TableSkeleton rows={6} cols={5} />
+        </div>
+      ) : (
+        <>
+          {/* Stat Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+            {statCards.map((s, i) => (
+              <motion.div key={s.label} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}
+                className="glass-card p-4 flex flex-col gap-2"
+              >
+                <div className={`w-10 h-10 rounded-xl bg-gradient-to-br ${s.color} flex items-center justify-center`}>
+                  <s.icon className="w-5 h-5 text-white" />
+                </div>
+                <p className="text-xs text-surface-500 font-medium">{s.label}</p>
+                <p className="text-xl font-black text-surface-900">{loading ? '—' : s.value}</p>
+              </motion.div>
+            ))}
+          </div>
 
       {/* DSA Performance Table */}
       <div className="glass-card overflow-hidden">
@@ -808,6 +816,8 @@ export function AdminReports() {
           </div>
         )}
       </div>
-    </div>
+    </>
+  )}
+</div>
   )
 }

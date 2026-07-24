@@ -6,6 +6,7 @@ import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { formatDate } from '@/lib/utils'
+import { TableSkeleton } from '@/components/shared/Skeletons'
 
 delete (L.Icon.Default.prototype as any)._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -211,7 +212,9 @@ export function AdminInstallers() {
           </div>
         </div>
 
-        {viewMode === 'map' ? (
+        {loading ? (
+          <TableSkeleton rows={5} cols={6} />
+        ) : viewMode === 'map' ? (
           <div className="flex h-[500px] sm:h-[600px] relative">
             {/* Side panel */}
             <div className={`${
@@ -326,16 +329,7 @@ export function AdminInstallers() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-surface-100">
-                {loading ? (
-                  <tr>
-                    <td colSpan={6} className="py-12 text-center text-surface-400 text-sm">
-                      <div className="flex flex-col items-center gap-2">
-                        <div className="w-6 h-6 border-2 border-brand-500 border-t-transparent rounded-full animate-spin" />
-                        Loading installers...
-                      </div>
-                    </td>
-                  </tr>
-                ) : filtered.length === 0 ? (
+                {filtered.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="py-12 text-center text-surface-400 text-sm">
                       <Wrench className="w-8 h-8 text-surface-300 mx-auto mb-3" />

@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { Package, ShoppingCart, Search, TrendingUp, Banknote } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
+import { CardGridSkeleton } from '@/components/shared/Skeletons'
 import { MobileDashboardNav } from '@/components/layout/MobileDashboardNav'
 import type { Product } from '@/types'
 
@@ -83,9 +84,7 @@ export function ResellerDashboard() {
       </h2>
 
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {[1,2,3,4].map(i => <div key={i} className="glass-card h-64 animate-pulse bg-surface-100/50" />)}
-        </div>
+        <CardGridSkeleton count={4} />
       ) : filteredProducts.length === 0 ? (
         <div className="glass-card p-12 flex flex-col items-center justify-center text-center">
           <div className="w-16 h-16 rounded-2xl bg-surface-100 flex items-center justify-center mb-4">

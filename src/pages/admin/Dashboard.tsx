@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { StatCard } from '@/components/shared/StatCard'
 import { OrderStatusBadge } from '@/components/shared/Badges'
+import { StatCardSkeleton, TableSkeleton } from '@/components/shared/Skeletons'
 import { ShoppingBag, Users, Banknote, Wrench, ArrowUpRight, Download } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { MobileDashboardNav } from '@/components/layout/MobileDashboardNav'
@@ -98,11 +99,7 @@ export function AdminDashboard() {
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map(i => (
-            <div key={i} className="glass-card h-[140px] animate-pulse bg-surface-100/50" />
-          ))}
-        </div>
+        <StatCardSkeleton count={4} />
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard

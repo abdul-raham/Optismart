@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { ShoppingBag, Plus, Search, Calendar, MapPin, X, Package } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { OrderStatusBadge } from '@/components/shared/Badges'
+import { TableSkeleton } from '@/components/shared/Skeletons'
 import { sendEmail } from '@/lib/email'
 import { sendWebPush } from '@/lib/push'
 import type { Order, Product } from '@/types'
@@ -178,7 +179,7 @@ export function DSAOrders() {
       </div>
 
       {loading ? (
-        <div className="glass-card h-64 animate-pulse bg-surface-100/50" />
+        <TableSkeleton rows={5} cols={5} />
       ) : filteredOrders.length === 0 ? (
         <div className="glass-card p-12 flex flex-col items-center justify-center text-center">
           <div className="w-16 h-16 rounded-2xl bg-brand-50 flex items-center justify-center mb-4">

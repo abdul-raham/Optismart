@@ -6,6 +6,7 @@ import { formatDate } from '@/lib/utils'
 import { sendEmail } from '@/lib/email'
 import { sendWebPush } from '@/lib/push'
 import { useAuthStore } from '@/stores/authStore'
+import { TableSkeleton } from '@/components/shared/Skeletons'
 
 interface SystemUser {
   id: string
@@ -228,7 +229,7 @@ export function AdminUsers() {
       </div>
 
       {loading ? (
-        <div className="glass-card h-[400px] animate-pulse bg-surface-50/50" />
+        <TableSkeleton rows={6} cols={5} />
       ) : filteredUsers.length === 0 ? (
         <div className="glass-card p-12 flex flex-col items-center justify-center text-center">
           <div className="w-16 h-16 rounded-2xl bg-surface-100 flex items-center justify-center mb-4">

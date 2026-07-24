@@ -63,6 +63,11 @@ export const NAV_ITEMS: Record<UserRole, NavItem[]> = {
     { label: 'Earnings',  href: '/app/installer/earnings',icon: Banknote },
     { label: 'Settings',  href: '/app/settings',          icon: Settings },
   ],
+  reseller: [
+    { label: 'Dashboard', href: '/app/reseller',        icon: LayoutDashboard },
+    { label: 'My Orders', href: '/app/reseller/orders', icon: ShoppingBag },
+    { label: 'Settings',  href: '/app/settings',        icon: Settings },
+  ],
 }
 
 const ROLE_META: Record<UserRole, { label: string; color: string }> = {
@@ -70,6 +75,7 @@ const ROLE_META: Record<UserRole, { label: string; color: string }> = {
   admin:       { label: 'Admin',       color: 'from-blue-500 to-cyan-500' },
   dsa:         { label: 'DSA Agent',   color: 'from-indigo-500 to-purple-500' },
   installer:   { label: 'Installer',   color: 'from-amber-500 to-orange-500' },
+  reseller:    { label: 'Reseller',    color: 'from-emerald-500 to-teal-500' },
 }
 
 export function Sidebar() {

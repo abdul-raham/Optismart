@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { CheckCircle2, CreditCard, ReceiptText, Search } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
+import { TableSkeleton } from '@/components/shared/Skeletons'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type { Payment } from '@/types'
 
@@ -115,7 +116,7 @@ export function AdminPayments() {
       </div>
 
       {loading ? (
-        <div className="glass-card h-72 animate-pulse bg-surface-100/60" />
+        <TableSkeleton rows={5} cols={6} />
       ) : filteredPayments.length === 0 ? (
         <div className="glass-card p-12 text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-brand-50">
