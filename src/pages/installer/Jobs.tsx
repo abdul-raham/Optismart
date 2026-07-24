@@ -77,6 +77,14 @@ export function InstallerJobs() {
 
       if (error) throw error
       
+      const targetJob = jobs.find(j => j.id === jobId)
+      if (targetJob?.order_id && ['installed', 'completed'].includes(newStatus)) {
+        await supabase
+          .from('orders')
+          .update({ status: 'delivered', delivered_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+          .eq('id', targetJob.order_id)
+      }
+
       setJobs(jobs.map(j => j.id === jobId ? { ...j, status: newStatus as any } : j))
     } catch (err) {
       console.error('Error updating status:', err)

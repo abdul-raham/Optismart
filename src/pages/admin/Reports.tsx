@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import {
   BarChart3, Download, Calendar, Users, ShoppingBag,
-  Camera, Banknote, Clock, TrendingUp, Filter, RefreshCw
+  Camera, Banknote, Clock, TrendingUp, Filter, RefreshCw, Tag
 } from 'lucide-react'
 
 
@@ -86,18 +86,19 @@ export function AdminReports() {
   // Filters
   const [selectedMonth, setSelectedMonth] = useState('')
   const [selectedDsa, setSelectedDsa] = useState('')
+  const [selectedStatus, setSelectedStatus] = useState('')
   const [dsaList, setDsaList] = useState<{ id: string; full_name: string }[]>([])
 
   useEffect(() => {
     fetchAll()
-  }, [selectedMonth, selectedDsa, monthlyView, deliveryPage])
+  }, [selectedMonth, selectedDsa, selectedStatus, monthlyView, deliveryPage])
 
   useEffect(() => {
     setDsaPage(1)
     setMonthlyPage(1)
     setRemittancePage(1)
     setDeliveryPage(1)
-  }, [selectedMonth, selectedDsa])
+  }, [selectedMonth, selectedDsa, selectedStatus])
 
   const fetchAll = async () => {
     setLoading(true)
@@ -137,6 +138,7 @@ export function AdminReports() {
       `)
 
     if (selectedDsa) query = query.eq('dsa_id', selectedDsa)
+    if (selectedStatus) query = query.eq('status', selectedStatus)
     const range = monthRange()
     if (range) {
       query = query.gte('created_at', range.start).lt('created_at', range.end)
@@ -208,6 +210,9 @@ export function AdminReports() {
     if (selectedDsa) {
       ordersQuery = ordersQuery.eq('dsa_id', selectedDsa)
       commsQuery = commsQuery.eq('dsa_id', selectedDsa)
+    }
+    if (selectedStatus) {
+      ordersQuery = ordersQuery.eq('status', selectedStatus)
     }
     const range = monthRange()
     if (range) {
@@ -334,6 +339,7 @@ export function AdminReports() {
       .order('expected_delivery_date', { ascending: true })
 
     if (selectedDsa) query = query.eq('dsa_id', selectedDsa)
+    if (selectedStatus) query = query.eq('status', selectedStatus)
     const range = monthRange()
     if (range) query = query.gte('created_at', range.start).lt('created_at', range.end)
 
@@ -420,8 +426,28 @@ export function AdminReports() {
             {dsaList.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
           </select>
         </div>
-        {(selectedMonth || selectedDsa) && (
-          <button onClick={() => { setSelectedMonth(''); setSelectedDsa('') }}
+        <div className="flex items-center gap-2">
+          <Tag className="w-4 h-4 text-surface-400" />
+          <select
+            value={selectedStatus}
+            onChange={e => setSelectedStatus(e.target.value)}
+            className="px-3 py-1.5 rounded-lg border border-surface-200 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none bg-white font-medium"
+          >
+            <option value="">All Statuses</option>
+            <option value="pending">Pending</option>
+            <option value="paid">Paid</option>
+            <option value="approved">Approved</option>
+            <option value="confirmed">Confirmed</option>
+            <option value="processing">Processing</option>
+            <option value="dispatched">Dispatched</option>
+            <option value="delivered">Delivered</option>
+            <option value="completed">Completed</option>
+            <option value="rescheduled">Rescheduled</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+        </div>
+        {(selectedMonth || selectedDsa || selectedStatus) && (
+          <button onClick={() => { setSelectedMonth(''); setSelectedDsa(''); setSelectedStatus('') }}
             className="text-xs font-bold text-brand-600 hover:text-brand-700 underline"
           >Clear filters</button>
         )}

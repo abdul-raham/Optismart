@@ -57,12 +57,12 @@ export function AdminOrders() {
   
   // A simple mapping for the allowed status transitions in the lifecycle
   const allowedTransitions: Record<string, OrderStatus[]> = {
-    pending: ['approved', 'cancelled'],
-    paid: ['approved', 'cancelled'],
-    approved: ['processing'],
-    confirmed: ['processing'],
-    processing: ['dispatched'],
-    dispatched: ['delivered', 'rescheduled'],
+    pending: ['approved', 'delivered', 'cancelled'],
+    paid: ['approved', 'delivered', 'cancelled'],
+    approved: ['processing', 'delivered', 'cancelled'],
+    confirmed: ['processing', 'delivered', 'cancelled'],
+    processing: ['dispatched', 'delivered', 'cancelled'],
+    dispatched: ['delivered', 'rescheduled', 'cancelled'],
     rescheduled: ['delivered', 'cancelled'],
     delivered: [],
     completed: [],
@@ -164,9 +164,13 @@ export function AdminOrders() {
   const handleUpdateStatus = async (orderId: string, newStatus: OrderStatus) => {
     setUpdating(orderId)
     try {
+      const updatePayload: any = { status: newStatus, updated_at: new Date().toISOString() }
+      if (newStatus === 'delivered') {
+        updatePayload.delivered_at = new Date().toISOString()
+      }
       const { error } = await supabase
         .from('orders')
-        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .update(updatePayload)
         .eq('id', orderId)
 
       if (error) throw error

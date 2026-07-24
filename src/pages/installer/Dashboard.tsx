@@ -141,6 +141,15 @@ export function InstallerDashboard() {
     try {
       const { error } = await supabase.from('installer_jobs').update({ status: newStatus }).eq('id', jobId)
       if (error) throw error
+
+      const targetJob = jobs.find(j => j.id === jobId)
+      if (targetJob?.order_id && ['installed', 'completed'].includes(newStatus)) {
+        await supabase
+          .from('orders')
+          .update({ status: 'delivered', delivered_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+          .eq('id', targetJob.order_id)
+      }
+
       if (user?.id) fetchData(user.id)
     } catch (err) {
       console.error('Error updating job status:', err)
