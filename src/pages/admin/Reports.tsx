@@ -149,6 +149,9 @@ export function AdminReports() {
 
     let comms: any[] = []
     try {
+      let commQuery = supabase.from('commissions').select('dsa_id, amount, status, triggered_at')
+      if (selectedDsa) commQuery = commQuery.eq('dsa_id', selectedDsa)
+      if (range) commQuery = commQuery.gte('triggered_at', range.start).lt('triggered_at', range.end)
       const { data } = await commQuery
       if (data) comms = data
     } catch (_) {}
