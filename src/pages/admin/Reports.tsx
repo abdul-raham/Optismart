@@ -5,6 +5,17 @@ import {
   BarChart3, Download, Calendar, Users, ShoppingBag,
   Camera, Banknote, Clock, TrendingUp, Filter, RefreshCw, Tag
 } from 'lucide-react'
+import { formatCurrency } from '@/lib/utils'
+
+function formatCompactAmount(amount: number): string {
+  if (amount >= 1_000_000) {
+    return `₦${(amount / 1_000_000).toFixed(2)}M`
+  }
+  if (amount >= 100_000) {
+    return `₦${(amount / 1_000).toFixed(0)}k`
+  }
+  return formatCurrency(amount)
+}
 
 
 // ── Types ──────────────────────────────────────────────────────
@@ -392,12 +403,14 @@ export function AdminReports() {
     )
   }
 
+
+
   const statCards = [
     { label: 'Total Cameras Sold', value: totalCameras.toLocaleString(), icon: Camera, color: 'from-blue-500 to-cyan-400' },
     { label: 'Total Orders', value: totalOrders.toLocaleString(), icon: ShoppingBag, color: 'from-brand-500 to-violet-500' },
     { label: 'Pending Orders', value: pendingOrders.toLocaleString(), icon: Clock, color: 'from-amber-500 to-orange-400' },
-    { label: 'Total Revenue', value: `₦${(totalRevenue / 1000).toFixed(0)}k`, icon: TrendingUp, color: 'from-emerald-500 to-teal-400' },
-    { label: 'Total Commissions', value: `₦${(totalCommissions / 1000).toFixed(0)}k`, icon: Banknote, color: 'from-rose-500 to-pink-400' },
+    { label: 'Total Revenue', value: formatCompactAmount(totalRevenue), icon: TrendingUp, color: 'from-emerald-500 to-teal-400' },
+    { label: 'Total Commissions', value: formatCompactAmount(totalCommissions), icon: Banknote, color: 'from-rose-500 to-pink-400' },
   ]
 
   return (
