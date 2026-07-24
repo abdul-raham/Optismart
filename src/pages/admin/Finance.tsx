@@ -44,7 +44,7 @@ export function AdminFinance() {
       const [ordersRes, expensesRes] = await Promise.all([
         supabase
           .from('orders')
-          .select('total_amount, delivered_at, created_at, status')
+          .select('total_amount, created_at, status')
           .eq('status', 'delivered')
           .gte('created_at', yearStart)
           .lte('created_at', yearEnd),

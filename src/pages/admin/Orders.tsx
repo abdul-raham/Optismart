@@ -165,9 +165,6 @@ export function AdminOrders() {
     setUpdating(orderId)
     try {
       const updatePayload: any = { status: newStatus, updated_at: new Date().toISOString() }
-      if (newStatus === 'delivered') {
-        updatePayload.delivered_at = new Date().toISOString()
-      }
       const { error } = await supabase
         .from('orders')
         .update(updatePayload)

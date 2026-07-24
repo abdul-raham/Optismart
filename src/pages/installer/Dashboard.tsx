@@ -146,7 +146,7 @@ export function InstallerDashboard() {
       if (targetJob?.order_id && ['installed', 'completed'].includes(newStatus)) {
         await supabase
           .from('orders')
-          .update({ status: 'delivered', delivered_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+          .update({ status: 'delivered', updated_at: new Date().toISOString() })
           .eq('id', targetJob.order_id)
       }
 

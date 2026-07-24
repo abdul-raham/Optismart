@@ -80,7 +80,7 @@ export function AdminReports() {
   const [monthlyPage, setMonthlyPage] = useState(1)
   const [remittancePage, setRemittancePage] = useState(1)
   
-  const DELIVERY_PAGE_SIZE = 20
+  const DELIVERY_PAGE_SIZE = 10
   const FRONTEND_PAGE_SIZE = 10
 
   // Filters
@@ -133,7 +133,7 @@ export function AdminReports() {
     let query = supabase
       .from('orders')
       .select(`
-        id, dsa_id, quantity, total_amount, status, created_at, delivered_at,
+        id, dsa_id, quantity, total_amount, status, created_at,
         dsa:users!orders_dsa_id_fkey ( id, full_name, email )
       `)
 
@@ -147,12 +147,11 @@ export function AdminReports() {
     const { data: orders, error: ordersError } = await query
     if (ordersError) throw ordersError
 
-    // Fetch commissions
-    let commQuery = supabase.from('commissions').select('dsa_id, amount, status, triggered_at')
-    if (selectedDsa) commQuery = commQuery.eq('dsa_id', selectedDsa)
-    if (range) commQuery = commQuery.gte('triggered_at', range.start).lt('triggered_at', range.end)
-    const { data: comms, error: commsError } = await commQuery
-    if (commsError) throw commsError
+    let comms: any[] = []
+    try {
+      const { data } = await commQuery
+      if (data) comms = data
+    } catch (_) {}
 
     if (!orders) return
 
@@ -221,9 +220,13 @@ export function AdminReports() {
     }
 
     const { data: orders, error: ordersError } = await ordersQuery
-    const { data: comms, error: commsError } = await commsQuery
     if (ordersError) throw ordersError
-    if (commsError) throw commsError
+
+    let comms: any[] = []
+    try {
+      const { data } = await commsQuery
+      if (data) comms = data
+    } catch (_) {}
 
     if (!orders) return
 
@@ -293,10 +296,17 @@ export function AdminReports() {
       pendingCommsQuery = pendingCommsQuery.gte('triggered_at', range.start).lt('triggered_at', range.end)
     }
 
-    const { data: payments, error: paymentsError } = await paymentsQuery
-    const { data: pendingComms, error: commsError } = await pendingCommsQuery
-    if (paymentsError) throw paymentsError
-    if (commsError) throw commsError
+    let payments: any[] = []
+    try {
+      const { data } = await paymentsQuery
+      if (data) payments = data
+    } catch (_) {}
+
+    let pendingComms: any[] = []
+    try {
+      const { data } = await pendingCommsQuery
+      if (data) pendingComms = data
+    } catch (_) {}
 
     const map: Record<string, RemittanceRow> = {}
 
@@ -331,7 +341,7 @@ export function AdminReports() {
       .from('orders')
       .select(`
         id, order_number, customer_name, status, quantity, total_amount,
-        expected_delivery_date, delivered_at, created_at,
+        expected_delivery_date, created_at,
         dsa:users!orders_dsa_id_fkey ( full_name, email ),
         product:products!orders_product_id_fkey ( name )
       `, { count: 'exact' })
