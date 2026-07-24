@@ -32,7 +32,7 @@ export function Topbar() {
   }, [user?.id, fetchNotifications, addNotification])
 
   return (
-    <header className="h-[72px] bg-white/72 backdrop-blur-xl border-b border-white/70 flex items-center justify-between px-4 md:px-8 z-20 sticky top-0">
+    <header className="h-[72px] bg-white/80 dark:bg-surface-900/90 backdrop-blur-xl border-b border-surface-200/60 dark:border-surface-800 flex items-center justify-between px-4 md:px-8 z-20 sticky top-0 transition-colors duration-300">
       
       {/* Search Bar - hidden on mobile, or replaced by a button */}
       <div className="flex-1 max-w-md hidden md:flex items-center relative">

@@ -40,65 +40,28 @@ export function SettingsPage() {
         })
       }
     } catch (err) {
-      console.error('Error fetching system settings:', err)
-    }
-  }
-
-  const handleUpdateSystemSettings = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSavingSettings(true)
-    setError('')
-    setSuccess('')
-
-    try {
-      const { error: dbError } = await supabase
-        .from('system_settings')
-        .upsert({
-          id: 'default',
-          moniepoint_account_name: systemSettings.moniepointAccountName,
-          moniepoint_account_number: systemSettings.moniepointAccountNumber,
-          updated_at: new Date().toISOString()
-        })
-      
-      if (dbError) throw dbError
-      setSuccess('System settings updated successfully!')
-      setTimeout(() => setSuccess(''), 3000)
-    } catch (err: any) {
-      console.error('Error updating system settings:', err)
-      setError(err.message || 'Failed to update system settings')
-    } finally {
-      setSavingSettings(false)
+      console.error('Failed to fetch system settings:', err)
     }
   }
 
   const handleUpdateProfile = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!user) return
     setLoading(true)
     setError('')
     setSuccess('')
 
     try {
-      // 1. Update auth metadata
-      const { error: authError } = await supabase.auth.updateUser({
-        data: { full_name: form.fullName }
-      })
-      if (authError) throw authError
+      const { error } = await supabase
+        .from('users')
+        .update({ full_name: form.fullName, updated_at: new Date().toISOString() })
+        .eq('id', user.id)
 
-      // 2. Update users table
-      if (user?.id) {
-        const { error: dbError } = await supabase
-          .from('users')
-          .update({ full_name: form.fullName })
-          .eq('id', user.id)
-        
-        if (dbError) throw dbError
-      }
+      if (error) throw error
 
       setSuccess('Profile updated successfully!')
-      setTimeout(() => setSuccess(''), 3000)
     } catch (err: any) {
-      console.error('Update profile error:', err)
-      setError(err.message || 'Failed to update profile')
+      setError(err.message || 'Failed to update profile.')
     } finally {
       setLoading(false)
     }
@@ -107,36 +70,61 @@ export function SettingsPage() {
   const handleUpdatePassword = async (e: React.FormEvent) => {
     e.preventDefault()
     if (form.newPassword !== form.confirmPassword) {
-      setError('New passwords do not match')
+      setError('New passwords do not match.')
       return
     }
-
     setLoading(true)
     setError('')
     setSuccess('')
 
     try {
-      const { error: authError } = await supabase.auth.updateUser({
+      const { error } = await supabase.auth.updateUser({
         password: form.newPassword
       })
-      if (authError) throw authError
+
+      if (error) throw error
 
       setSuccess('Password updated successfully!')
-      setForm(prev => ({ ...prev, currentPassword: '', newPassword: '', confirmPassword: '' }))
-      setTimeout(() => setSuccess(''), 3000)
+      setForm({ ...form, currentPassword: '', newPassword: '', confirmPassword: '' })
     } catch (err: any) {
-      console.error('Update password error:', err)
-      setError(err.message || 'Failed to update password')
+      setError(err.message || 'Failed to update password.')
     } finally {
       setLoading(false)
     }
   }
 
+  const handleUpdateSystemSettings = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!isAdmin) return
+    setSavingSettings(true)
+    setError('')
+    setSuccess('')
+
+    try {
+      const { error } = await supabase.from('system_settings').upsert({
+        id: 'default',
+        moniepoint_account_name: systemSettings.moniepointAccountName,
+        moniepoint_account_number: systemSettings.moniepointAccountNumber,
+        updated_at: new Date().toISOString()
+      })
+
+      if (error) throw error
+      setSuccess('Payment gateway settings updated successfully!')
+    } catch (err: any) {
+      console.error('Error saving settings:', err)
+      setError(err.message || 'Failed to save system settings.')
+    } finally {
+      setSavingSettings(false)
+    }
+  }
+
   return (
-    <div className="space-y-6 max-w-4xl mx-auto">
-      <div>
-        <h1 className="text-2xl font-bold text-surface-900 tracking-tight">Account Settings</h1>
-        <p className="text-sm text-surface-500 mt-1">Manage your personal information and security preferences.</p>
+    <div className="space-y-8">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Account Settings</h1>
+          <p className="page-subtitle">Manage your profile, security, and application preferences.</p>
+        </div>
       </div>
 
       {(error || success) && (

@@ -48,54 +48,43 @@ export const NAV_ITEMS: Record<UserRole, NavItem[]> = {
     { label: 'Settings',   href: '/app/settings',         icon: Settings },
   ],
   dsa: [
-    { label: 'Dashboard',  href: '/app/dsa',             icon: LayoutDashboard },
-    { label: 'Leads',      href: '/app/dsa/leads',       icon: Target },
-    { label: 'Orders',     href: '/app/dsa/orders',      icon: ShoppingBag },
-    { label: 'Products',   href: '/app/products',        icon: Package },
-    { label: 'Installers', href: '/app/dsa/installers',  icon: UserCheck },
-    { label: 'Commission', href: '/app/dsa/commission',  icon: Banknote },
-    { label: 'Reports',    href: '/app/dsa/reports',     icon: BarChart3 },
-    { label: 'Leaderboard',href: '/app/dsa/leaderboard', icon: Award },
-    { label: 'Reminders',  href: '/app/dsa/reminders',   icon: CalendarDays },
-    { label: 'Training',   href: '/app/training',        icon: BookOpen },
-    { label: 'Settings',   href: '/app/settings',        icon: Settings },
+    { label: 'Dashboard',   href: '/app/dsa',          icon: LayoutDashboard },
+    { label: 'New Lead',    href: '/app/dsa/new-lead', icon: Target },
+    { label: 'My Leads',    href: '/app/dsa/leads',    icon: Target },
+    { label: 'My Orders',   href: '/app/dsa/orders',   icon: ShoppingBag },
+    { label: 'Training',    href: '/app/dsa/training', icon: BookOpen },
+    { label: 'Leaderboard', href: '/app/dsa/leaderboard', icon: Award },
+    { label: 'Settings',    href: '/app/settings',     icon: Settings },
   ],
   installer: [
-    { label: 'Dashboard', href: '/app/installer',          icon: LayoutDashboard },
-    { label: 'My Jobs',   href: '/app/installer/jobs',     icon: Wrench },
-    { label: 'Products',  href: '/app/products',           icon: Package },
-    { label: 'Schedule',  href: '/app/installer/schedule', icon: CalendarDays },
-    { label: 'Training',  href: '/app/training',           icon: BookOpen },
-    { label: 'Settings',  href: '/app/settings',           icon: Settings },
-  ],
-  reseller: [
-    { label: 'Dashboard', href: '/app/reseller',        icon: LayoutDashboard },
-    { label: 'Products',  href: '/app/products',        icon: Package },
-    { label: 'Orders',    href: '/app/reseller/orders', icon: ShoppingBag },
-    { label: 'Training',  href: '/app/training',        icon: BookOpen },
-    { label: 'Settings',  href: '/app/settings',        icon: Settings },
+    { label: 'Dashboard', href: '/app/installer',         icon: LayoutDashboard },
+    { label: 'Jobs',      href: '/app/installer/jobs',    icon: Wrench },
+    { label: 'Schedule',  href: '/app/installer/schedule',icon: CalendarDays },
+    { label: 'Earnings',  href: '/app/installer/earnings',icon: Banknote },
+    { label: 'Settings',  href: '/app/settings',          icon: Settings },
   ],
 }
 
 const ROLE_META: Record<UserRole, { label: string; color: string }> = {
-  super_admin: { label: 'Super Admin',   color: 'from-purple-600 to-violet-500' },
-  admin:       { label: 'Admin',         color: 'from-blue-600 to-cyan-500' },
-  dsa:         { label: 'Sales Agent',   color: 'from-orange-500 to-amber-400' },
-  installer:   { label: 'Installer',     color: 'from-green-600 to-emerald-400' },
-  reseller:    { label: 'Reseller',      color: 'from-rose-500 to-pink-400' },
+  super_admin: { label: 'Super Admin', color: 'from-blue-600 to-indigo-600' },
+  admin:       { label: 'Admin',       color: 'from-blue-500 to-cyan-500' },
+  dsa:         { label: 'DSA Agent',   color: 'from-indigo-500 to-purple-500' },
+  installer:   { label: 'Installer',   color: 'from-amber-500 to-orange-500' },
 }
 
 export function Sidebar() {
-  const { user, role } = useAuthStore()
+  const { user } = useAuthStore()
   const { sidebarCollapsed, toggleSidebar } = useUIStore()
   const location = useLocation()
-  const navItems = role ? NAV_ITEMS[role] : []
-  const meta = role ? ROLE_META[role] : null
 
-  const W = sidebarCollapsed ? 72 : 260
+  const role = user?.role ?? 'dsa'
+  const navItems = NAV_ITEMS[role] ?? NAV_ITEMS.dsa
+  const meta = ROLE_META[role]
+
+  const W = sidebarCollapsed ? 'var(--sidebar-collapsed-w)' : 'var(--sidebar-w)'
 
   const isActive = (href: string) => {
-    if (href === '/app/admin' || href === '/app/dsa' || href === '/app/installer' || href === '/app/reseller') {
+    if (href === '/app/admin' || href === '/app/dsa' || href === '/app/installer') {
       return location.pathname === href
     }
     return location.pathname.startsWith(href)
