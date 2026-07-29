@@ -32,7 +32,15 @@ export function Topbar() {
   }, [user?.id, fetchNotifications, addNotification])
 
   return (
-    <header className="h-[72px] bg-white/80 dark:bg-surface-900/90 backdrop-blur-xl border-b border-surface-200/60 dark:border-surface-800 flex items-center justify-between px-4 md:px-8 z-20 sticky top-0 transition-colors duration-300">
+    <header 
+      className="h-[68px] mx-4 md:mx-8 mt-3 mb-2 rounded-2xl flex items-center justify-between px-4 md:px-6 z-20 sticky top-3 transition-all duration-300"
+      style={{
+        backdropFilter: 'blur(24px) saturate(180%)',
+        background: 'rgba(255, 255, 255, 0.82)',
+        border: '1px solid rgba(226, 232, 240, 0.9)',
+        boxShadow: '0 10px 30px -10px rgba(15, 23, 42, 0.08), 0 2px 8px -2px rgba(15, 23, 42, 0.04)'
+      }}
+    >
       
       {/* Search Bar - hidden on mobile, or replaced by a button */}
       <div className="flex-1 max-w-md hidden md:flex items-center relative">
@@ -40,18 +48,18 @@ export function Topbar() {
         <input 
           type="text" 
           placeholder="Search orders, leads, or products..." 
-          className="w-full bg-surface-50 border border-surface-200 rounded-full py-1.5 pl-9 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all"
+          className="w-full bg-white/70 border border-surface-200/80 rounded-full py-1.5 pl-9 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all backdrop-blur-md"
         />
         <div className="absolute right-3 flex items-center gap-1">
-          <kbd className="hidden lg:inline-block text-[10px] font-mono text-surface-400 bg-white border border-surface-200 px-1.5 py-0.5 rounded">Ctrl</kbd>
-          <kbd className="hidden lg:inline-block text-[10px] font-mono text-surface-400 bg-white border border-surface-200 px-1.5 py-0.5 rounded">K</kbd>
+          <kbd className="hidden lg:inline-block text-[10px] font-mono text-surface-400 bg-white/90 border border-surface-200 px-1.5 py-0.5 rounded shadow-xs">Ctrl</kbd>
+          <kbd className="hidden lg:inline-block text-[10px] font-mono text-surface-400 bg-white/90 border border-surface-200 px-1.5 py-0.5 rounded shadow-xs">K</kbd>
         </div>
       </div>
 
       <div className="md:hidden flex-1 flex items-center gap-2">
         <img src={optismartLogo} alt="OptiSmart" className="h-8 w-auto object-contain" />
         {user?.role && (
-          <span className="px-2 py-0.5 rounded-full bg-brand-50 text-brand-700 text-[10px] font-black uppercase tracking-wider whitespace-nowrap">
+          <span className="px-2.5 py-0.5 rounded-full bg-brand-50/80 border border-brand-200/60 text-brand-700 text-[10px] font-black uppercase tracking-wider whitespace-nowrap">
             {user.role.replace('_', ' ')}
           </span>
         )}
@@ -63,17 +71,18 @@ export function Topbar() {
         <div className="relative">
         </div>
 
-        <div className="h-6 w-px bg-surface-200 hidden md:block"></div>
+        <div className="h-6 w-px bg-surface-200/80 hidden md:block"></div>
 
         {/* User Dropdown */}
         <div className="relative">
           <button 
             onClick={() => setShowDropdown(!showDropdown)}
-            className="flex items-center gap-1.5 hover:bg-surface-50 p-1 pr-2 rounded-full transition-colors border border-transparent hover:border-surface-200"
+            className="flex items-center gap-2 hover:bg-white/80 p-1.5 pr-3 rounded-full transition-all border border-transparent hover:border-surface-200/80 hover:shadow-sm"
           >
-            <div className="w-8 h-8 rounded-full bg-brand-gradient flex items-center justify-center text-white text-xs font-bold shadow-sm">
+            <div className="w-8 h-8 rounded-full bg-brand-gradient flex items-center justify-center text-white text-xs font-bold shadow-brand">
               {getInitials(user?.full_name ?? 'U')}
             </div>
+            <span className="hidden sm:inline-block text-xs font-bold text-surface-800">{user?.full_name?.split(' ')[0]}</span>
             <ChevronDown className={`w-3.5 h-3.5 text-surface-400 transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`} />
           </button>
 
@@ -89,26 +98,31 @@ export function Topbar() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: 10, scale: 0.95 }}
                   transition={{ duration: 0.15 }}
-                  className="absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-card-lg border border-surface-100 py-2 z-40"
+                  className="absolute right-0 top-full mt-3 w-56 rounded-2xl p-2 z-40 border border-white/80 shadow-2xl"
+                  style={{
+                    backdropFilter: 'blur(24px) saturate(180%)',
+                    background: 'rgba(255, 255, 255, 0.92)',
+                    boxShadow: '0 20px 40px -15px rgba(15, 23, 42, 0.15)'
+                  }}
                 >
-                  <div className="px-4 py-2 border-b border-surface-50 mb-1">
-                    <p className="text-sm font-semibold text-surface-900 truncate">{user?.full_name}</p>
+                  <div className="px-4 py-2.5 border-b border-surface-100/80 mb-1">
+                    <p className="text-sm font-bold text-surface-900 truncate">{user?.full_name}</p>
                     <p className="text-xs text-surface-500 truncate">{user?.email}</p>
                   </div>
                   
-                  <button className="w-full flex items-center gap-2 px-4 py-2 text-sm text-surface-700 hover:bg-surface-50 hover:text-surface-900 transition-colors">
+                  <button className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-surface-700 hover:bg-surface-100/80 hover:text-surface-900 transition-colors">
                     <UserIcon className="w-4 h-4 text-surface-400" />
                     Profile Settings
                   </button>
                   
-                  <div className="h-px bg-surface-50 my-1"></div>
+                  <div className="h-px bg-surface-100/80 my-1"></div>
                   
                   <button 
                     onClick={() => {
                       setShowDropdown(false)
                       logout()
                     }}
-                    className="w-full flex items-center gap-2 px-4 py-2 text-sm text-danger-600 hover:bg-danger-50 transition-colors"
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold text-danger-600 hover:bg-danger-50 transition-colors"
                   >
                     <LogOut className="w-4 h-4" />
                     Sign Out

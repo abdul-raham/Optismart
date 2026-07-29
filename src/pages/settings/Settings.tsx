@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { User, Lock, Save, Bell, Palette, Building2 } from 'lucide-react'
+import { User, Lock, Save, Bell, Building2 } from 'lucide-react'
 
 export function SettingsPage() {
   const { user } = useAuthStore()
@@ -275,23 +275,6 @@ export function SettingsPage() {
             </div>
             <p className="text-xs text-surface-400 mt-4 leading-relaxed">
               We'll let you know about important account updates and new commissions.
-            </p>
-          </div>
-
-          <div className="glass-card p-6">
-            <h2 className="text-lg font-bold text-surface-900 mb-6 flex items-center gap-2">
-              <Palette className="w-5 h-5 text-brand-600" /> Appearance
-            </h2>
-            <div className="grid grid-cols-2 gap-3">
-              <button className="border-2 border-brand-500 bg-brand-50 text-brand-700 py-2 rounded-lg text-sm font-bold transition-all">
-                Light
-              </button>
-              <button className="border-2 border-surface-100 text-surface-400 hover:border-surface-200 py-2 rounded-lg text-sm font-bold transition-all opacity-50 cursor-not-allowed">
-                Dark
-              </button>
-            </div>
-            <p className="text-[10px] uppercase font-bold tracking-wider text-center mt-3 text-surface-400">
-              Dark mode coming soon
             </p>
           </div>
         </div>
