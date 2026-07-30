@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
-import { ShoppingBag, Search, Calendar, Check, X, ArrowRightLeft, Plus, MapPin, Package, User, Edit2, ChevronDown } from 'lucide-react'
+import { ShoppingBag, Search, Calendar, Check, X, ArrowRightLeft, Plus, MapPin, Package, User, Edit2, ChevronDown, Filter } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { OrderStatusBadge } from '@/components/shared/Badges'
 import { AssignInstallerModal } from '@/components/shared/AssignInstallerModal'
@@ -16,6 +16,7 @@ export function AdminOrders() {
   const [assignedOrderIds, setAssignedOrderIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [updating, setUpdating] = useState<string | null>(null)
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
   const [assigningOrderId, setAssigningOrderId] = useState<string | null>(null)
@@ -29,17 +30,9 @@ export function AdminOrders() {
   const fetchSequence = useRef(0)
 
   const [editForm, setEditForm] = useState({
-    customer_name: '',
-    customer_email: '',
-    customer_phone: '',
-    customer_address: '',
-    product_id: '',
-    quantity: 1,
-    total_amount: 0,
-    installation_needed: false,
-    installation_price: 0,
-    expected_delivery_date: '',
-    notes: '',
+    customer_name: '', customer_email: '', customer_phone: '', customer_address: '',
+    product_id: '', quantity: 1, total_amount: 0, installation_needed: false,
+    installation_price: 0, expected_delivery_date: '', notes: '',
   })
 
   const [form, setForm] = useState({
@@ -251,17 +244,11 @@ export function AdminOrders() {
   const openEditModal = (order: Order) => {
     setEditingOrder(order)
     setEditForm({
-      customer_name: order.customer_name,
-      customer_email: order.customer_email || '',
-      customer_phone: order.customer_phone,
-      customer_address: order.customer_address,
-      product_id: order.product_id,
-      quantity: order.quantity,
-      total_amount: order.total_amount,
-      installation_needed: order.installation_needed,
-      installation_price: order.installation_price,
-      expected_delivery_date: order.expected_delivery_date || '',
-      notes: order.notes || '',
+      customer_name: order.customer_name, customer_email: order.customer_email || '',
+      customer_phone: order.customer_phone, customer_address: order.customer_address,
+      product_id: order.product_id, quantity: order.quantity, total_amount: order.total_amount,
+      installation_needed: order.installation_needed, installation_price: order.installation_price,
+      expected_delivery_date: order.expected_delivery_date || '', notes: order.notes || '',
     })
     setIsEditModalOpen(true)
   }
@@ -271,35 +258,26 @@ export function AdminOrders() {
     if (!editingOrder) return
     setSubmitting(true)
     try {
-      const { data, error } = await supabase
-        .from('orders')
-        .update({
-          customer_name: editForm.customer_name,
-          customer_email: editForm.customer_email || null,
-          customer_phone: editForm.customer_phone,
-          customer_address: editForm.customer_address,
-          product_id: editForm.product_id,
-          quantity: editForm.quantity,
-          total_amount: editForm.total_amount,
-          installation_needed: editForm.installation_needed,
-          installation_price: editForm.installation_needed ? editForm.installation_price : 0,
-          expected_delivery_date: editForm.expected_delivery_date || null,
-          notes: editForm.notes,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', editingOrder.id)
-        .select('*, dsa:users!orders_dsa_id_fkey(email, full_name)')
-        .single()
-
+      const product = products.find(item => item.id === editForm.product_id)
+      if (!product) throw new Error('Select a valid product.')
+      const { data, error } = await supabase.from('orders').update({
+        customer_name: editForm.customer_name, customer_email: editForm.customer_email || null,
+        customer_phone: editForm.customer_phone, customer_address: editForm.customer_address,
+        product_id: editForm.product_id, quantity: editForm.quantity, unit_price: product.retail_price,
+        total_amount: editForm.total_amount, installation_needed: editForm.installation_needed,
+        installation_price: editForm.installation_needed ? editForm.installation_price : 0,
+        expected_delivery_date: editForm.expected_delivery_date || null, notes: editForm.notes,
+        updated_at: new Date().toISOString(),
+      }).eq('id', editingOrder.id).select().single()
       if (error) throw error
       if (data) {
-        setOrders(orders.map(o => o.id === editingOrder.id ? data : o))
+        setOrders(current => current.map(order => order.id === editingOrder.id ? { ...order, ...data } : order))
         setIsEditModalOpen(false)
         setEditingOrder(null)
       }
     } catch (err) {
       console.error('Failed to edit order:', err)
-      alert('Failed to save order changes.')
+      alert(err instanceof Error ? err.message : 'Failed to save order changes.')
     } finally {
       setSubmitting(false)
     }
@@ -317,10 +295,11 @@ export function AdminOrders() {
     }
   }
 
-  const filteredOrders = orders.filter(o => 
-    o.customer_name.toLowerCase().includes(search.toLowerCase()) || 
-    o.order_number.toLowerCase().includes(search.toLowerCase())
-  )
+  const filteredOrders = orders.filter(order => {
+    const term = search.toLowerCase()
+    const matchesSearch = order.customer_name.toLowerCase().includes(term) || order.order_number.toLowerCase().includes(term)
+    return matchesSearch && (statusFilter === 'all' || order.status === statusFilter)
+  })
 
   return (
     <div className="space-y-6">
@@ -329,7 +308,7 @@ export function AdminOrders() {
           <h1 className="text-2xl font-bold text-surface-900 tracking-tight">System Orders</h1>
           <p className="text-sm text-surface-500 mt-1">Manage all orders and update their lifecycle status.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
             <Search className="w-4 h-4 text-surface-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input 
@@ -339,6 +318,14 @@ export function AdminOrders() {
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 pr-4 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none w-full sm:w-64 transition-all"
             />
+          </div>
+          <div className="relative">
+            <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-400" />
+            <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} className="h-10 rounded-lg border border-surface-200 bg-white pl-9 pr-8 text-sm outline-none transition-all focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20">
+              <option value="all">All statuses</option><option value="pending">Pending</option><option value="paid">Paid</option>
+              <option value="approved">Approved</option><option value="confirmed">Confirmed</option><option value="processing">Processing</option>
+              <option value="dispatched">Dispatched</option><option value="rescheduled">Rescheduled</option><option value="delivered">Delivered</option><option value="cancelled">Cancelled</option>
+            </select>
           </div>
           <button 
             onClick={() => setIsModalOpen(true)}

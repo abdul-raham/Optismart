@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { ShoppingBag, Plus, Search, Calendar, MapPin, X, Package } from 'lucide-react'
+import { ShoppingBag, Plus, Search, Calendar, MapPin, X, Package, Edit2, Filter } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { OrderStatusBadge } from '@/components/shared/Badges'
 import { TableSkeleton } from '@/components/shared/Skeletons'
+import { OrderEditModal } from '@/components/shared/OrderEditModal'
 import { sendEmail } from '@/lib/email'
 import { sendWebPush } from '@/lib/push'
 import type { Order, Product } from '@/types'
@@ -17,7 +18,9 @@ export function DSAOrders() {
   const [dsas, setDsas] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [editingOrder, setEditingOrder] = useState<Order | null>(null)
   const [submitting, setSubmitting] = useState(false)
 
   const [form, setForm] = useState({
@@ -82,7 +85,7 @@ export function DSAOrders() {
       const product = products.find(p => p.id === form.product_id)
       if (!product) throw new Error('Product not found')
 
-      const orderNumber = `ORD-${Date.now().toString().slice(-6)}`
+      const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 4).toUpperCase()}`
       const productTotal = form.amount > 0 ? form.amount : Number(product.retail_price) * form.quantity
       const totalAmount = productTotal + (form.installation_needed ? form.installation_price : 0)
 
@@ -137,7 +140,7 @@ export function DSAOrders() {
           })
         }
 
-        setOrders([data, ...orders])
+        setOrders(current => current.some(order => order.id === data.id) ? current : [data, ...current])
         setIsModalOpen(false)
         setForm({ is_dsa_registered: true, unregistered_dsa_name: '', dsa_id: user?.id || '', customer_name: '', customer_email: '', customer_phone: '', customer_address: '', product_id: '', quantity: 1, amount: 0, installation_needed: false, installation_price: 0, expected_delivery_date: '', notes: '' })
       }
@@ -149,10 +152,12 @@ export function DSAOrders() {
     }
   }
 
-  const filteredOrders = orders.filter(o => 
-    o.customer_name.toLowerCase().includes(search.toLowerCase()) || 
-    o.order_number.toLowerCase().includes(search.toLowerCase())
-  )
+  const filteredOrders = orders.filter(order => {
+    const term = search.toLowerCase()
+    const matchesSearch = order.customer_name.toLowerCase().includes(term) || order.order_number.toLowerCase().includes(term)
+    const matchesStatus = statusFilter === 'all' || order.status === statusFilter
+    return matchesSearch && matchesStatus
+  })
 
   return (
     <div className="space-y-6 relative">
@@ -161,7 +166,7 @@ export function DSAOrders() {
           <h1 className="text-2xl font-bold text-surface-900 tracking-tight">Orders Management</h1>
           <p className="text-sm text-surface-500 mt-1">Create and track your customer orders.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
             <Search className="w-4 h-4 text-surface-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input 
@@ -171,6 +176,15 @@ export function DSAOrders() {
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 pr-4 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none w-full sm:w-64 transition-all"
             />
+          </div>
+          <div className="relative">
+            <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-400" />
+            <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} className="h-10 rounded-lg border border-surface-200 bg-white pl-9 pr-8 text-sm outline-none transition-all focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20">
+              <option value="all">All statuses</option>
+              <option value="pending">Pending</option><option value="paid">Paid</option><option value="approved">Approved</option>
+              <option value="confirmed">Confirmed</option><option value="processing">Processing</option><option value="dispatched">Dispatched</option>
+              <option value="rescheduled">Rescheduled</option><option value="delivered">Delivered</option><option value="cancelled">Cancelled</option>
+            </select>
           </div>
           <button onClick={() => setIsModalOpen(true)} className="btn-primary h-10 px-4 text-sm font-semibold flex items-center gap-2">
             <Plus className="w-4 h-4" /> New Order
@@ -230,6 +244,11 @@ export function DSAOrders() {
                         <OrderStatusBadge status={order.status} />
                       </td>
                       <td className="py-4 px-6 text-right">
+                        {order.status === 'pending' && (
+                          <button type="button" onClick={() => setEditingOrder(order)} className="mr-2 inline-flex items-center gap-1 rounded-lg border border-surface-200 bg-white px-3 py-1.5 text-xs font-bold text-surface-700 transition-colors hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700">
+                            <Edit2 className="h-3.5 w-3.5" /> Edit
+                          </button>
+                        )}
                         {order.installation_needed && (
                           <span className="inline-flex items-center gap-1 text-xs font-bold text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full">
                             🔧 Installer Needed
@@ -272,6 +291,14 @@ export function DSAOrders() {
                     </span>
                   </div>
 
+                  {order.status === 'pending' && (
+                    <div className="flex justify-end">
+                      <button type="button" onClick={() => setEditingOrder(order)} className="inline-flex items-center gap-1 rounded-lg border border-surface-200 bg-white px-3 py-1.5 text-xs font-bold text-surface-700">
+                        <Edit2 className="h-3.5 w-3.5" /> Edit Order
+                      </button>
+                    </div>
+                  )}
+
                   {order.installation_needed && (
                     <div className="flex justify-end pt-2">
                       <span className="inline-flex items-center gap-1 text-xs font-bold text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full">
@@ -285,6 +312,16 @@ export function DSAOrders() {
           </div>
         </div>
       )}
+
+      <OrderEditModal
+        order={editingOrder}
+        products={products}
+        onClose={() => setEditingOrder(null)}
+        onSaved={updatedOrder => {
+          setOrders(current => current.map(order => order.id === updatedOrder.id ? updatedOrder : order))
+          setEditingOrder(null)
+        }}
+      />
 
       {/* CREATE ORDER MODAL */}
       <AnimatePresence>
