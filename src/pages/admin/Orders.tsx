@@ -1,8 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
-import { ShoppingBag, Search, Calendar, Check, X, ArrowRightLeft, Plus, MapPin, Package, User, Edit2, ChevronDown } from 'lucide-react'
+import { ShoppingBag, Search, Calendar, Check, X, ArrowRightLeft, Plus, MapPin, Package, User, Edit2, ChevronDown, Filter } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { OrderStatusBadge } from '@/components/shared/Badges'
 import { AssignInstallerModal } from '@/components/shared/AssignInstallerModal'
@@ -16,6 +16,7 @@ export function AdminOrders() {
   const [assignedOrderIds, setAssignedOrderIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
   const [updating, setUpdating] = useState<string | null>(null)
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
   const [assigningOrderId, setAssigningOrderId] = useState<string | null>(null)
@@ -25,19 +26,13 @@ export function AdminOrders() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editingOrder, setEditingOrder] = useState<Order | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [createError, setCreateError] = useState('')
+  const fetchSequence = useRef(0)
 
   const [editForm, setEditForm] = useState({
-    customer_name: '',
-    customer_email: '',
-    customer_phone: '',
-    customer_address: '',
-    product_id: '',
-    quantity: 1,
-    total_amount: 0,
-    installation_needed: false,
-    installation_price: 0,
-    expected_delivery_date: '',
-    notes: '',
+    customer_name: '', customer_email: '', customer_phone: '', customer_address: '',
+    product_id: '', quantity: 1, total_amount: 0, installation_needed: false,
+    installation_price: 0, expected_delivery_date: '', notes: '',
   })
 
   const [form, setForm] = useState({
@@ -72,6 +67,7 @@ export function AdminOrders() {
   }
 
   const fetchData = async () => {
+    const sequence = ++fetchSequence.current
     try {
       const [ordersRes, productsRes, dsasRes, jobsRes] = await Promise.all([
         supabase.from('orders').select('*, dsa:users!orders_dsa_id_fkey(email, full_name)').order('created_at', { ascending: false }),
@@ -80,10 +76,16 @@ export function AdminOrders() {
         supabase.from('installer_jobs').select('order_id')
       ])
       
-      if (ordersRes.data) setOrders(ordersRes.data)
-      if (productsRes.data) setProducts(productsRes.data)
-      if (dsasRes.data) setDsas(dsasRes.data)
-      if (jobsRes.data) setAssignedOrderIds(new Set(jobsRes.data.map(j => j.order_id)))
+      if (ordersRes.error) throw ordersRes.error
+      if (productsRes.error) throw productsRes.error
+      if (dsasRes.error) throw dsasRes.error
+      if (jobsRes.error) throw jobsRes.error
+      if (sequence !== fetchSequence.current) return
+
+      setOrders(ordersRes.data ?? [])
+      setProducts(productsRes.data ?? [])
+      setDsas(dsasRes.data ?? [])
+      setAssignedOrderIds(new Set((jobsRes.data ?? []).map(j => j.order_id)))
     } catch (err) {
       console.error('Error fetching admin orders:', err)
     } finally {
@@ -96,7 +98,18 @@ export function AdminOrders() {
 
     const channel = supabase
       .channel('admin-orders')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => fetchData())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, payload => {
+        const newOrder = payload.new as Order
+        setOrders(current => current.some(order => order.id === newOrder.id) ? current : [newOrder, ...current])
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, payload => {
+        const updatedOrder = payload.new as Order
+        setOrders(current => current.map(order => order.id === updatedOrder.id ? { ...order, ...updatedOrder } : order))
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'orders' }, payload => {
+        const deletedOrder = payload.old as Pick<Order, 'id'>
+        setOrders(current => current.filter(order => order.id !== deletedOrder.id))
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'installer_jobs' }, () => fetchData())
       .subscribe()
 
@@ -105,14 +118,18 @@ export function AdminOrders() {
 
   const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.product_id) return
+    setCreateError('')
+    if (!form.product_id) {
+      setCreateError('Select a product before creating the order.')
+      return
+    }
     
     setSubmitting(true)
     try {
       const product = products.find(p => p.id === form.product_id)
       if (!product) throw new Error('Product not found')
 
-      const orderNumber = `ORD-${Date.now().toString().slice(-6)}`
+      const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 4).toUpperCase()}`
       const productTotal = form.amount > 0 ? form.amount : Number(product.retail_price) * form.quantity
       const totalAmount = productTotal + (form.installation_needed ? form.installation_price : 0)
 
@@ -137,7 +154,7 @@ export function AdminOrders() {
           notes: form.notes,
           created_by_auth_id: (await supabase.auth.getSession()).data.session?.user?.id
         }])
-        .select('*, dsa:users!orders_dsa_id_fkey(email, full_name)')
+        .select()
         .single()
 
       if (error) throw error
@@ -151,13 +168,19 @@ export function AdminOrders() {
           }).catch(console.error);
         }
         
-        setOrders([data, ...orders])
+        const createdOrder = {
+          ...data,
+          dsa: form.dsa_id
+            ? dsas.find(dsa => dsa.id === form.dsa_id)
+            : undefined,
+        } as Order
+        setOrders(current => [createdOrder, ...current])
         setIsModalOpen(false)
         setForm({ is_dsa_registered: true, unregistered_dsa_name: '', dsa_id: '', customer_name: '', customer_email: '', customer_phone: '', customer_address: '', product_id: '', quantity: 1, amount: 0, installation_needed: false, installation_price: 0, expected_delivery_date: '', notes: '' })
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error creating order:', err)
-      alert('Failed to create order')
+      setCreateError(err?.message || 'Failed to create order. Please try again.')
     } finally {
       setSubmitting(false)
     }
@@ -221,17 +244,11 @@ export function AdminOrders() {
   const openEditModal = (order: Order) => {
     setEditingOrder(order)
     setEditForm({
-      customer_name: order.customer_name,
-      customer_email: order.customer_email || '',
-      customer_phone: order.customer_phone,
-      customer_address: order.customer_address,
-      product_id: order.product_id,
-      quantity: order.quantity,
-      total_amount: order.total_amount,
-      installation_needed: order.installation_needed,
-      installation_price: order.installation_price,
-      expected_delivery_date: order.expected_delivery_date || '',
-      notes: order.notes || '',
+      customer_name: order.customer_name, customer_email: order.customer_email || '',
+      customer_phone: order.customer_phone, customer_address: order.customer_address,
+      product_id: order.product_id, quantity: order.quantity, total_amount: order.total_amount,
+      installation_needed: order.installation_needed, installation_price: order.installation_price,
+      expected_delivery_date: order.expected_delivery_date || '', notes: order.notes || '',
     })
     setIsEditModalOpen(true)
   }
@@ -241,35 +258,26 @@ export function AdminOrders() {
     if (!editingOrder) return
     setSubmitting(true)
     try {
-      const { data, error } = await supabase
-        .from('orders')
-        .update({
-          customer_name: editForm.customer_name,
-          customer_email: editForm.customer_email || null,
-          customer_phone: editForm.customer_phone,
-          customer_address: editForm.customer_address,
-          product_id: editForm.product_id,
-          quantity: editForm.quantity,
-          total_amount: editForm.total_amount,
-          installation_needed: editForm.installation_needed,
-          installation_price: editForm.installation_needed ? editForm.installation_price : 0,
-          expected_delivery_date: editForm.expected_delivery_date || null,
-          notes: editForm.notes,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', editingOrder.id)
-        .select('*, dsa:users!orders_dsa_id_fkey(email, full_name)')
-        .single()
-
+      const product = products.find(item => item.id === editForm.product_id)
+      if (!product) throw new Error('Select a valid product.')
+      const { data, error } = await supabase.from('orders').update({
+        customer_name: editForm.customer_name, customer_email: editForm.customer_email || null,
+        customer_phone: editForm.customer_phone, customer_address: editForm.customer_address,
+        product_id: editForm.product_id, quantity: editForm.quantity, unit_price: product.retail_price,
+        total_amount: editForm.total_amount, installation_needed: editForm.installation_needed,
+        installation_price: editForm.installation_needed ? editForm.installation_price : 0,
+        expected_delivery_date: editForm.expected_delivery_date || null, notes: editForm.notes,
+        updated_at: new Date().toISOString(),
+      }).eq('id', editingOrder.id).select().single()
       if (error) throw error
       if (data) {
-        setOrders(orders.map(o => o.id === editingOrder.id ? data : o))
+        setOrders(current => current.map(order => order.id === editingOrder.id ? { ...order, ...data } : order))
         setIsEditModalOpen(false)
         setEditingOrder(null)
       }
     } catch (err) {
       console.error('Failed to edit order:', err)
-      alert('Failed to save order changes.')
+      alert(err instanceof Error ? err.message : 'Failed to save order changes.')
     } finally {
       setSubmitting(false)
     }
@@ -287,10 +295,11 @@ export function AdminOrders() {
     }
   }
 
-  const filteredOrders = orders.filter(o => 
-    o.customer_name.toLowerCase().includes(search.toLowerCase()) || 
-    o.order_number.toLowerCase().includes(search.toLowerCase())
-  )
+  const filteredOrders = orders.filter(order => {
+    const term = search.toLowerCase()
+    const matchesSearch = order.customer_name.toLowerCase().includes(term) || order.order_number.toLowerCase().includes(term)
+    return matchesSearch && (statusFilter === 'all' || order.status === statusFilter)
+  })
 
   return (
     <div className="space-y-6">
@@ -299,7 +308,7 @@ export function AdminOrders() {
           <h1 className="text-2xl font-bold text-surface-900 tracking-tight">System Orders</h1>
           <p className="text-sm text-surface-500 mt-1">Manage all orders and update their lifecycle status.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
             <Search className="w-4 h-4 text-surface-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input 
@@ -309,6 +318,14 @@ export function AdminOrders() {
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 pr-4 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none w-full sm:w-64 transition-all"
             />
+          </div>
+          <div className="relative">
+            <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-400" />
+            <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} className="h-10 rounded-lg border border-surface-200 bg-white pl-9 pr-8 text-sm outline-none transition-all focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20">
+              <option value="all">All statuses</option><option value="pending">Pending</option><option value="paid">Paid</option>
+              <option value="approved">Approved</option><option value="confirmed">Confirmed</option><option value="processing">Processing</option>
+              <option value="dispatched">Dispatched</option><option value="rescheduled">Rescheduled</option><option value="delivered">Delivered</option><option value="cancelled">Cancelled</option>
+            </select>
           </div>
           <button 
             onClick={() => setIsModalOpen(true)}
@@ -581,15 +598,18 @@ export function AdminOrders() {
         />
 
       {/* EDIT ORDER MODAL */}
-      <AnimatePresence>
-        {isEditModalOpen && editingOrder && createPortal(
+      {createPortal(
+        <AnimatePresence>
+        {isEditModalOpen && editingOrder && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
             <motion.div 
+              key="edit-order-backdrop"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm"
               onClick={() => !submitting && setIsEditModalOpen(false)}
             />
             <motion.div 
+              key="edit-order-modal"
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -701,10 +721,11 @@ export function AdminOrders() {
                 </div>
               </form>
             </motion.div>
-          </div>,
-          document.body
+          </div>
         )}
-      </AnimatePresence>
+        </AnimatePresence>,
+        document.getElementById('modal-root') || document.body
+      )}
 
       {/* CREATE ORDER MODAL */}
       <AnimatePresence>
@@ -732,7 +753,7 @@ export function AdminOrders() {
               <div className="p-6 space-y-4 overflow-y-auto flex-1">
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <label className="label mb-0">DSA In Charge *</label>
+                    <label className="label mb-0">DSA In Charge (Optional)</label>
                     <label className="flex items-center gap-2 text-xs font-medium text-surface-600 cursor-pointer">
                       <input 
                         type="checkbox" 
@@ -747,8 +768,8 @@ export function AdminOrders() {
                   {form.is_dsa_registered ? (
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
-                      <select required className="input pl-10" value={form.dsa_id} onChange={e => setForm({...form, dsa_id: e.target.value})}>
-                        <option value="" disabled>Select a DSA</option>
+                      <select className="input pl-10" value={form.dsa_id} onChange={e => setForm({...form, dsa_id: e.target.value})}>
+                        <option value="">No DSA / System order</option>
                         {dsas.map(dsa => (
                           <option key={dsa.id} value={dsa.id}>{dsa.full_name} ({dsa.email})</option>
                         ))}
@@ -853,6 +874,12 @@ export function AdminOrders() {
                   <label className="label">Additional Notes</label>
                   <textarea rows={2} className="input resize-none" placeholder="Special instructions?" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
                 </div>
+
+                {createError && (
+                  <div role="alert" className="rounded-xl border border-danger-200 bg-danger-50 p-3 text-sm font-semibold text-danger-700">
+                    {createError}
+                  </div>
+                )}
 
               </div>
               <div className="px-6 py-4 flex items-center justify-end gap-3 border-t border-surface-100 bg-white shrink-0">

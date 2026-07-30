@@ -103,6 +103,15 @@ export function AdminReports() {
 
   useEffect(() => {
     fetchAll()
+
+    const channel = supabase
+      .channel('admin-reports-orders')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => fetchAll())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'payments' }, () => fetchAll())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'commissions' }, () => fetchAll())
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
   }, [selectedMonth, selectedDsa, selectedStatus, monthlyView, deliveryPage])
 
   useEffect(() => {
@@ -313,15 +322,23 @@ export function AdminReports() {
 
     let payments: any[] = []
     try {
-      const { data } = await paymentsQuery
+      const { data, error } = await paymentsQuery
+      if (error) throw error
       if (data) payments = data
-    } catch (_) {}
+    } catch (error) {
+      console.error('Error fetching remittance payments:', error)
+      throw error
+    }
 
     let pendingComms: any[] = []
     try {
-      const { data } = await pendingCommsQuery
+      const { data, error } = await pendingCommsQuery
+      if (error) throw error
       if (data) pendingComms = data
-    } catch (_) {}
+    } catch (error) {
+      console.error('Error fetching pending commissions:', error)
+      throw error
+    }
 
     const map: Record<string, RemittanceRow> = {}
 
