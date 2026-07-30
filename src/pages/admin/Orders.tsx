@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
@@ -25,6 +25,8 @@ export function AdminOrders() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editingOrder, setEditingOrder] = useState<Order | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [createError, setCreateError] = useState('')
+  const fetchSequence = useRef(0)
 
   const [editForm, setEditForm] = useState({
     customer_name: '',
@@ -72,6 +74,7 @@ export function AdminOrders() {
   }
 
   const fetchData = async () => {
+    const sequence = ++fetchSequence.current
     try {
       const [ordersRes, productsRes, dsasRes, jobsRes] = await Promise.all([
         supabase.from('orders').select('*, dsa:users!orders_dsa_id_fkey(email, full_name)').order('created_at', { ascending: false }),
@@ -80,10 +83,16 @@ export function AdminOrders() {
         supabase.from('installer_jobs').select('order_id')
       ])
       
-      if (ordersRes.data) setOrders(ordersRes.data)
-      if (productsRes.data) setProducts(productsRes.data)
-      if (dsasRes.data) setDsas(dsasRes.data)
-      if (jobsRes.data) setAssignedOrderIds(new Set(jobsRes.data.map(j => j.order_id)))
+      if (ordersRes.error) throw ordersRes.error
+      if (productsRes.error) throw productsRes.error
+      if (dsasRes.error) throw dsasRes.error
+      if (jobsRes.error) throw jobsRes.error
+      if (sequence !== fetchSequence.current) return
+
+      setOrders(ordersRes.data ?? [])
+      setProducts(productsRes.data ?? [])
+      setDsas(dsasRes.data ?? [])
+      setAssignedOrderIds(new Set((jobsRes.data ?? []).map(j => j.order_id)))
     } catch (err) {
       console.error('Error fetching admin orders:', err)
     } finally {
@@ -96,7 +105,18 @@ export function AdminOrders() {
 
     const channel = supabase
       .channel('admin-orders')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => fetchData())
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, payload => {
+        const newOrder = payload.new as Order
+        setOrders(current => current.some(order => order.id === newOrder.id) ? current : [newOrder, ...current])
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, payload => {
+        const updatedOrder = payload.new as Order
+        setOrders(current => current.map(order => order.id === updatedOrder.id ? { ...order, ...updatedOrder } : order))
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'orders' }, payload => {
+        const deletedOrder = payload.old as Pick<Order, 'id'>
+        setOrders(current => current.filter(order => order.id !== deletedOrder.id))
+      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'installer_jobs' }, () => fetchData())
       .subscribe()
 
@@ -105,14 +125,18 @@ export function AdminOrders() {
 
   const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.product_id) return
+    setCreateError('')
+    if (!form.product_id) {
+      setCreateError('Select a product before creating the order.')
+      return
+    }
     
     setSubmitting(true)
     try {
       const product = products.find(p => p.id === form.product_id)
       if (!product) throw new Error('Product not found')
 
-      const orderNumber = `ORD-${Date.now().toString().slice(-6)}`
+      const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 4).toUpperCase()}`
       const productTotal = form.amount > 0 ? form.amount : Number(product.retail_price) * form.quantity
       const totalAmount = productTotal + (form.installation_needed ? form.installation_price : 0)
 
@@ -137,7 +161,7 @@ export function AdminOrders() {
           notes: form.notes,
           created_by_auth_id: (await supabase.auth.getSession()).data.session?.user?.id
         }])
-        .select('*, dsa:users!orders_dsa_id_fkey(email, full_name)')
+        .select()
         .single()
 
       if (error) throw error
@@ -151,13 +175,19 @@ export function AdminOrders() {
           }).catch(console.error);
         }
         
-        setOrders([data, ...orders])
+        const createdOrder = {
+          ...data,
+          dsa: form.dsa_id
+            ? dsas.find(dsa => dsa.id === form.dsa_id)
+            : undefined,
+        } as Order
+        setOrders(current => [createdOrder, ...current])
         setIsModalOpen(false)
         setForm({ is_dsa_registered: true, unregistered_dsa_name: '', dsa_id: '', customer_name: '', customer_email: '', customer_phone: '', customer_address: '', product_id: '', quantity: 1, amount: 0, installation_needed: false, installation_price: 0, expected_delivery_date: '', notes: '' })
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error creating order:', err)
-      alert('Failed to create order')
+      setCreateError(err?.message || 'Failed to create order. Please try again.')
     } finally {
       setSubmitting(false)
     }
@@ -732,7 +762,7 @@ export function AdminOrders() {
               <div className="p-6 space-y-4 overflow-y-auto flex-1">
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <label className="label mb-0">DSA In Charge *</label>
+                    <label className="label mb-0">DSA In Charge (Optional)</label>
                     <label className="flex items-center gap-2 text-xs font-medium text-surface-600 cursor-pointer">
                       <input 
                         type="checkbox" 
@@ -747,8 +777,8 @@ export function AdminOrders() {
                   {form.is_dsa_registered ? (
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
-                      <select required className="input pl-10" value={form.dsa_id} onChange={e => setForm({...form, dsa_id: e.target.value})}>
-                        <option value="" disabled>Select a DSA</option>
+                      <select className="input pl-10" value={form.dsa_id} onChange={e => setForm({...form, dsa_id: e.target.value})}>
+                        <option value="">No DSA / System order</option>
                         {dsas.map(dsa => (
                           <option key={dsa.id} value={dsa.id}>{dsa.full_name} ({dsa.email})</option>
                         ))}
@@ -853,6 +883,12 @@ export function AdminOrders() {
                   <label className="label">Additional Notes</label>
                   <textarea rows={2} className="input resize-none" placeholder="Special instructions?" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
                 </div>
+
+                {createError && (
+                  <div role="alert" className="rounded-xl border border-danger-200 bg-danger-50 p-3 text-sm font-semibold text-danger-700">
+                    {createError}
+                  </div>
+                )}
 
               </div>
               <div className="px-6 py-4 flex items-center justify-end gap-3 border-t border-surface-100 bg-white shrink-0">
