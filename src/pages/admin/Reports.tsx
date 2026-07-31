@@ -3,10 +3,12 @@ import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import {
   BarChart3, Download, Calendar, Users, ShoppingBag,
-  Camera, Banknote, Clock, TrendingUp, Filter, RefreshCw, Tag
+  Camera, Banknote, Clock, TrendingUp, Filter, RefreshCw, Tag,
+  Printer, FileSpreadsheet
 } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import { StatCardSkeleton, TableSkeleton } from '@/components/shared/Skeletons'
+import { exportToExcel, exportToCSV, triggerPrintReport } from '@/utils/exportUtils'
 
 function formatCompactAmount(amount: number): string {
   if (amount >= 1_000_000) {
@@ -54,21 +56,6 @@ interface RemittanceRow {
   net: number
 }
 
-// ── CSV Helper ─────────────────────────────────────────────────
-function exportCSV(data: any[], filename: string) {
-  if (!data.length) return
-  const keys = Object.keys(data[0])
-  const header = keys.join(',')
-  const rows = data.map(row => keys.map(k => `"${String(row[k] ?? '').replace(/"/g, '""')}"`).join(','))
-  const csv = [header, ...rows].join('\n')
-  const blob = new Blob([csv], { type: 'text/csv' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${filename}-${new Date().toISOString().slice(0, 10)}.csv`
-  a.click()
-  URL.revokeObjectURL(url)
-}
 
 // ── Component ──────────────────────────────────────────────────
 export function AdminReports() {
@@ -439,12 +426,40 @@ export function AdminReports() {
           <h1 className="text-2xl font-bold text-surface-900 tracking-tight">Reports & Analytics</h1>
           <p className="text-sm text-surface-500 mt-1">Full business overview — cameras, orders, commissions, and remittance.</p>
         </div>
-        <button
-          onClick={fetchAll}
-          className="flex items-center gap-2 px-4 py-2 rounded-xl border border-surface-200 bg-white text-sm font-bold text-surface-600 hover:bg-surface-50 transition-colors"
-        >
-          <RefreshCw className="w-4 h-4" /> Refresh
-        </button>
+        <div className="flex items-center gap-2 flex-wrap">
+          <button
+            onClick={() => exportToExcel({
+              filename: 'optismart-full-executive-report',
+              sheetTitle: 'Full Executive Report',
+              reportSubHeading: selectedMonth ? `Month: ${selectedMonth}` : 'All Time Overview',
+              data: dsaSummaries.map(d => ({
+                DSA: d.dsa_name,
+                Email: d.dsa_email,
+                'Cameras Sold': d.cameras_sold,
+                'Orders Count': d.orders_count,
+                'Pending Orders': d.pending_orders,
+                'Revenue (₦)': d.total_revenue,
+                'Commission (₦)': d.total_commission,
+                'Paid (₦)': d.commission_paid,
+              }))
+            })}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-colors shadow-sm"
+          >
+            <FileSpreadsheet className="w-4 h-4" /> Export Excel
+          </button>
+          <button
+            onClick={triggerPrintReport}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-surface-200 bg-white text-sm font-bold text-surface-700 hover:bg-surface-50 transition-colors shadow-sm"
+          >
+            <Printer className="w-4 h-4 text-surface-600" /> Print
+          </button>
+          <button
+            onClick={fetchAll}
+            className="flex items-center gap-2 px-4 py-2 rounded-xl border border-surface-200 bg-white text-sm font-bold text-surface-600 hover:bg-surface-50 transition-colors"
+          >
+            <RefreshCw className="w-4 h-4" /> Refresh
+          </button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -534,17 +549,41 @@ export function AdminReports() {
             </h2>
             <p className="text-xs text-surface-400 mt-0.5">Camera sold, orders, and commission per DSA</p>
           </div>
-          <button
-            onClick={() => exportCSV(dsaSummaries.map(d => ({
-              DSA: d.dsa_name, Email: d.dsa_email,
-              'Cameras Sold': d.cameras_sold, 'Orders': d.orders_count,
-              'Pending Orders': d.pending_orders, 'Revenue (₦)': d.total_revenue,
-              'Commission (₦)': d.total_commission, 'Paid (₦)': d.commission_paid,
-            })), 'dsa-performance')}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-bold hover:bg-brand-700 transition-colors"
-          >
-            <Download className="w-4 h-4" /> Download CSV
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => exportToExcel({
+                filename: 'dsa-performance',
+                sheetTitle: 'DSA Performance Breakdown',
+                reportSubHeading: selectedMonth ? `Month: ${selectedMonth}` : 'All Time',
+                data: dsaSummaries.map(d => ({
+                  DSA: d.dsa_name,
+                  Email: d.dsa_email,
+                  'Cameras Sold': d.cameras_sold,
+                  'Orders': d.orders_count,
+                  'Pending Orders': d.pending_orders,
+                  'Revenue (₦)': d.total_revenue,
+                  'Commission (₦)': d.total_commission,
+                  'Paid (₦)': d.commission_paid,
+                }))
+              })}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-colors shadow-sm"
+              title="Export to Microsoft Excel"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" /> Export Excel
+            </button>
+            <button
+              onClick={() => exportToCSV(dsaSummaries.map(d => ({
+                DSA: d.dsa_name, Email: d.dsa_email,
+                'Cameras Sold': d.cameras_sold, 'Orders': d.orders_count,
+                'Pending Orders': d.pending_orders, 'Revenue (₦)': d.total_revenue,
+                'Commission (₦)': d.total_commission, 'Paid (₦)': d.commission_paid,
+              })), 'dsa-performance')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-surface-200 bg-white text-surface-700 text-xs font-bold hover:bg-surface-50 transition-colors shadow-sm"
+              title="Download UTF-8 CSV"
+            >
+              <Download className="w-3.5 h-3.5" /> CSV
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -616,16 +655,35 @@ export function AdminReports() {
                 All Time
               </button>
             </div>
-            <button
-              onClick={() => exportCSV(monthlyData.map(m => ({
-                Month: m.month, 'Cameras': m.cameras, 'Orders': m.orders,
-                'Active DSAs': m.active_dsas, 'Top DSA': m.top_dsa,
-                'Revenue (₦)': m.revenue, 'Commissions (₦)': m.commissions,
-              })), 'monthly-breakdown')}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-bold hover:bg-brand-700 transition-colors"
-            >
-              <Download className="w-4 h-4" /> Download CSV
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => exportToExcel({
+                  filename: 'monthly-breakdown',
+                  sheetTitle: 'Monthly Breakdown',
+                  reportSubHeading: monthlyView === 'monthly' ? 'Last 12 Months' : 'All Time Overview',
+                  data: monthlyData.map(m => ({
+                    Month: m.month, 'Cameras': m.cameras, 'Orders': m.orders,
+                    'Active DSAs': m.active_dsas, 'Top DSA': m.top_dsa,
+                    'Revenue (₦)': m.revenue, 'Commissions (₦)': m.commissions,
+                  }))
+                })}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-colors shadow-sm"
+                title="Export to Microsoft Excel"
+              >
+                <FileSpreadsheet className="w-3.5 h-3.5" /> Export Excel
+              </button>
+              <button
+                onClick={() => exportToCSV(monthlyData.map(m => ({
+                  Month: m.month, 'Cameras': m.cameras, 'Orders': m.orders,
+                  'Active DSAs': m.active_dsas, 'Top DSA': m.top_dsa,
+                  'Revenue (₦)': m.revenue, 'Commissions (₦)': m.commissions,
+                })), 'monthly-breakdown')}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-surface-200 bg-white text-surface-700 text-xs font-bold hover:bg-surface-50 transition-colors shadow-sm"
+                title="Download UTF-8 CSV"
+              >
+                <Download className="w-3.5 h-3.5" /> CSV
+              </button>
+            </div>
           </div>
         </div>
         <div className="overflow-x-auto">
@@ -675,18 +733,39 @@ export function AdminReports() {
               <span className="text-emerald-600 font-semibold">HQ owes DSA</span> = pending commission not yet paid
             </p>
           </div>
-          <button
-            onClick={() => exportCSV(remittanceData.map(r => ({
-              'DSA': r.dsa_name, 'Email': r.dsa_email,
-              'Collected from Customers (₦)': r.collected_from_customers,
-              'Commission Owed to DSA (₦)': r.commission_owed_to_dsa,
-              'Net Balance (₦)': r.net,
-              'Status': r.net > 0 ? 'DSA owes HQ' : r.net < 0 ? 'HQ owes DSA' : 'Settled',
-            })), 'remittance')}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-600 text-white text-sm font-bold hover:bg-emerald-700 transition-colors"
-          >
-            <Download className="w-4 h-4" /> Download CSV
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => exportToExcel({
+                filename: 'remittance',
+                sheetTitle: 'Remittance Summary',
+                reportSubHeading: selectedMonth ? `Month: ${selectedMonth}` : 'All Time Overview',
+                data: remittanceData.map(r => ({
+                  'DSA': r.dsa_name, 'Email': r.dsa_email,
+                  'Collected from Customers (₦)': r.collected_from_customers,
+                  'Commission Owed to DSA (₦)': r.commission_owed_to_dsa,
+                  'Net Balance (₦)': r.net,
+                  'Status': r.net > 0 ? 'DSA owes HQ' : r.net < 0 ? 'HQ owes DSA' : 'Settled',
+                }))
+              })}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-colors shadow-sm"
+              title="Export to Microsoft Excel"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" /> Export Excel
+            </button>
+            <button
+              onClick={() => exportToCSV(remittanceData.map(r => ({
+                'DSA': r.dsa_name, 'Email': r.dsa_email,
+                'Collected from Customers (₦)': r.collected_from_customers,
+                'Commission Owed to DSA (₦)': r.commission_owed_to_dsa,
+                'Net Balance (₦)': r.net,
+                'Status': r.net > 0 ? 'DSA owes HQ' : r.net < 0 ? 'HQ owes DSA' : 'Settled',
+              })), 'remittance')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-surface-200 bg-white text-surface-700 text-xs font-bold hover:bg-surface-50 transition-colors shadow-sm"
+              title="Download UTF-8 CSV"
+            >
+              <Download className="w-3.5 h-3.5" /> CSV
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -747,21 +826,45 @@ export function AdminReports() {
             </h2>
             <p className="text-xs text-surface-400 mt-0.5">Upcoming and recent deliveries (Total: {totalDeliveryOrders})</p>
           </div>
-          <button
-            onClick={() => exportCSV(deliveryOrders.map(o => ({
-              'Order #': o.order_number,
-              'Customer Name': o.customer_name || '—',
-              'Product': o.product?.name || 'Unknown',
-              'Quantity': o.quantity,
-              'Total Amount (₦)': o.total_amount,
-              'Status': o.status,
-              'Expected Delivery': o.expected_delivery_date || '',
-              'DSA Name': o.dsa?.full_name || 'Unregistered'
-            })), 'delivery-orders')}
-            className="flex items-center gap-2 px-4 py-2 rounded-xl bg-brand-600 text-white text-sm font-bold hover:bg-brand-700 transition-colors"
-          >
-            <Download className="w-4 h-4" /> Download CSV
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => exportToExcel({
+                filename: 'delivery-orders',
+                sheetTitle: 'Orders by Delivery Date',
+                reportSubHeading: `Total Delivery Orders: ${totalDeliveryOrders}`,
+                data: deliveryOrders.map(o => ({
+                  'Order #': o.order_number,
+                  'Customer Name': o.customer_name || '—',
+                  'Product': o.product?.name || 'Unknown',
+                  'Quantity': o.quantity,
+                  'Total Amount (₦)': o.total_amount,
+                  'Status': o.status,
+                  'Expected Delivery': o.expected_delivery_date || '',
+                  'DSA Name': o.dsa?.full_name || 'Unregistered'
+                }))
+              })}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-600 text-white text-xs font-bold hover:bg-emerald-700 transition-colors shadow-sm"
+              title="Export to Microsoft Excel"
+            >
+              <FileSpreadsheet className="w-3.5 h-3.5" /> Export Excel
+            </button>
+            <button
+              onClick={() => exportToCSV(deliveryOrders.map(o => ({
+                'Order #': o.order_number,
+                'Customer Name': o.customer_name || '—',
+                'Product': o.product?.name || 'Unknown',
+                'Quantity': o.quantity,
+                'Total Amount (₦)': o.total_amount,
+                'Status': o.status,
+                'Expected Delivery': o.expected_delivery_date || '',
+                'DSA Name': o.dsa?.full_name || 'Unregistered'
+              })), 'delivery-orders')}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-surface-200 bg-white text-surface-700 text-xs font-bold hover:bg-surface-50 transition-colors shadow-sm"
+              title="Download UTF-8 CSV"
+            >
+              <Download className="w-3.5 h-3.5" /> CSV
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto flex-1">
           <table className="w-full text-sm">

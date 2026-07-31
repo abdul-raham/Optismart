@@ -4,9 +4,10 @@ import { supabase } from '@/lib/supabase'
 import { StatCard } from '@/components/shared/StatCard'
 import { OrderStatusBadge } from '@/components/shared/Badges'
 import { StatCardSkeleton, TableSkeleton } from '@/components/shared/Skeletons'
-import { ShoppingBag, Users, Banknote, Wrench, ArrowUpRight, Download } from 'lucide-react'
+import { ShoppingBag, Users, Banknote, Wrench, ArrowUpRight, Download, FileSpreadsheet } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { MobileDashboardNav } from '@/components/layout/MobileDashboardNav'
+import { exportToExcel, exportToCSV } from '@/utils/exportUtils'
 import type { Order } from '@/types'
 
 export function AdminDashboard() {
@@ -63,25 +64,34 @@ export function AdminDashboard() {
     return () => { supabase.removeChannel(channel) }
   }, [])
 
-  const downloadCSV = () => {
-    const escape = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`
-    const headers = ['Order Number', 'Date', 'Customer Name', 'Phone', 'Address', 'DSA', 'Status', 'Qty', 'Amount (₦)', 'Notes']
-    const rows = allOrders
+  const getExportData = () => {
+    return allOrders
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      .map(o => [
-        o.order_number, formatDate(o.created_at), o.customer_name,
-        o.customer_phone ?? '', o.customer_address ?? '',
-        (o as any).dsa?.full_name ?? o.unregistered_dsa_name ?? 'System',
-        o.status, o.quantity, o.total_amount, o.notes ?? ''
-      ])
-    const csv = [headers, ...rows].map(r => r.map(escape).join(',')).join('\n')
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `optismart-orders-${new Date().toISOString().split('T')[0]}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+      .map(o => ({
+        'Order Number': o.order_number,
+        'Date': formatDate(o.created_at),
+        'Customer Name': o.customer_name,
+        'Phone': o.customer_phone ?? '',
+        'Address': o.customer_address ?? '',
+        'DSA': (o as any).dsa?.full_name ?? o.unregistered_dsa_name ?? 'System',
+        'Status': o.status,
+        'Qty': o.quantity,
+        'Amount (₦)': o.total_amount,
+        'Notes': o.notes ?? ''
+      }))
+  }
+
+  const handleExportExcel = () => {
+    exportToExcel({
+      filename: 'optismart-orders-overview',
+      sheetTitle: 'System Orders Overview',
+      reportSubHeading: `Total Orders: ${allOrders.length}`,
+      data: getExportData()
+    })
+  }
+
+  const handleExportCSV = () => {
+    exportToCSV(getExportData(), 'optismart-orders-overview')
   }
 
   return (
@@ -91,9 +101,12 @@ export function AdminDashboard() {
           <h1 className="text-2xl font-bold text-surface-900 tracking-tight">System Overview</h1>
           <p className="text-sm text-surface-500 mt-1">Real-time metrics and operations control.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <button onClick={downloadCSV} className="btn-outline h-10 px-4 text-sm font-semibold flex items-center gap-2">
-            <Download className="w-4 h-4" /> Generate Report
+        <div className="flex items-center gap-2">
+          <button onClick={handleExportExcel} className="btn-primary h-10 px-4 text-sm font-semibold flex items-center gap-2">
+            <FileSpreadsheet className="w-4 h-4" /> Export Excel
+          </button>
+          <button onClick={handleExportCSV} className="btn-outline h-10 px-4 text-sm font-semibold flex items-center gap-2">
+            <Download className="w-4 h-4" /> Export CSV
           </button>
         </div>
       </div>

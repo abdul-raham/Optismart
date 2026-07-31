@@ -2,8 +2,9 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
-import { ShoppingBag, Search, Calendar, Check, X, ArrowRightLeft, Plus, MapPin, Package, User, Edit2, ChevronDown, Filter } from 'lucide-react'
+import { ShoppingBag, Search, Calendar, Check, X, ArrowRightLeft, Plus, MapPin, Package, User, Edit2, ChevronDown, Filter, Download, FileSpreadsheet } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
+import { exportToExcel, exportToCSV } from '@/utils/exportUtils'
 import { OrderStatusBadge } from '@/components/shared/Badges'
 import { AssignInstallerModal } from '@/components/shared/AssignInstallerModal'
 import { TableSkeleton } from '@/components/shared/Skeletons'
@@ -301,6 +302,24 @@ export function AdminOrders() {
     return matchesSearch && (statusFilter === 'all' || order.status === statusFilter)
   })
 
+  const getOrdersExportData = () => {
+    return filteredOrders.map(o => ({
+      'Order Number': o.order_number,
+      'Date': formatDate(o.created_at),
+      'Customer Name': o.customer_name,
+      'Email': o.customer_email || '—',
+      'Phone': o.customer_phone || '—',
+      'Address': o.customer_address || '—',
+      'Product': (o as any).product?.name || 'Camera',
+      'Quantity': o.quantity,
+      'Total Amount (₦)': o.total_amount,
+      'Status': o.status,
+      'DSA': (o as any).dsa?.full_name || o.unregistered_dsa_name || 'System',
+      'Expected Delivery': o.expected_delivery_date || '—',
+      'Notes': o.notes || ''
+    }))
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -327,6 +346,25 @@ export function AdminOrders() {
               <option value="dispatched">Dispatched</option><option value="rescheduled">Rescheduled</option><option value="delivered">Delivered</option><option value="cancelled">Cancelled</option>
             </select>
           </div>
+          <button
+            onClick={() => exportToExcel({
+              filename: 'optismart-system-orders',
+              sheetTitle: 'System Orders',
+              reportSubHeading: `Status Filter: ${statusFilter.toUpperCase()} | Total Orders: ${filteredOrders.length}`,
+              data: getOrdersExportData()
+            })}
+            className="flex items-center gap-1.5 h-10 px-3 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors shadow-sm"
+            title="Export to Microsoft Excel"
+          >
+            <FileSpreadsheet className="w-4 h-4" /> <span className="hidden sm:inline">Excel</span>
+          </button>
+          <button
+            onClick={() => exportToCSV(getOrdersExportData(), 'optismart-system-orders')}
+            className="flex items-center gap-1.5 h-10 px-3 rounded-lg border border-surface-200 bg-white text-surface-700 text-sm font-semibold hover:bg-surface-50 transition-colors shadow-sm"
+            title="Download UTF-8 CSV"
+          >
+            <Download className="w-4 h-4" /> <span className="hidden sm:inline">CSV</span>
+          </button>
           <button 
             onClick={() => setIsModalOpen(true)}
             className="btn-primary flex items-center gap-2 py-2"

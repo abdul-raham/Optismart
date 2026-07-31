@@ -63,18 +63,36 @@ export function DSAReports() {
         case 'day': return d >= startOfDay
         case 'week': return d >= startOfWeek
         case 'month': return d >= startOfMonth
-        case 'year': return d >= startOfYear
-        default: return true
-      }
-    }
 
-    return {
-      filteredOrders: allOrders.filter(o => filterByDate(o.created_at)),
-      filteredCommissions: allCommissions.filter(c => filterByDate(c.triggered_at))
+    if (filter === 'year') {
+      return d.getFullYear() === now.getFullYear()
     }
-  }, [allOrders, allCommissions, timeFilter])
+    if (filter === 'month') {
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
+    }
+    if (filter === 'week') {
+      const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+      return d >= oneWeekAgo
+    }
+    if (filter === 'day') {
+      return d.toDateString() === now.toDateString()
+    }
+    return true
+  }
 
-  const stats = useMemo(() => {
+  const filteredOrders = useMemo(() => {
+    return allOrders.filter(o => {
+      const matchesTime = isWithinTimeRange(o.created_at, timeFilter)
+      const matchesStatus = selectedStatus === 'all' || o.status === selectedStatus
+      return matchesTime && matchesStatus
+    })
+  }, [allOrders, timeFilter, selectedStatus])
+
+  const filteredCommissions = useMemo(() => {
+    return allCommissions.filter(c => isWithinTimeRange(c.triggered_at, timeFilter))
+  }, [allCommissions, timeFilter])
+
+  const metrics = useMemo(() => {
     const totalOrders = filteredOrders.length
     const deliveredOrders = filteredOrders.filter(o => o.status === 'delivered').length
     const outstandingOrders = filteredOrders.filter(o => !['delivered', 'cancelled', 'returned'].includes(o.status)).length
@@ -83,47 +101,47 @@ export function DSAReports() {
     return { totalOrders, deliveredOrders, outstandingOrders, percentDelivered, totalRemittance }
   }, [filteredOrders, filteredCommissions])
 
-  const downloadCSV = () => {
-    const escape = (v: any) => `"${String(v ?? '').replace(/"/g, '""')}"`
+  const getExportData = () => {
+    const orderRows = allOrders.map(o => ({
+      Type: 'Order',
+      Date: formatDate(o.created_at),
+      'Order Number': o.order_number,
+      'Customer Name': o.customer_name,
+      'Phone': o.customer_phone ?? '',
+      'Address / Location': o.customer_address ?? '',
+      'Status': o.status,
+      'Qty': o.quantity,
+      'Amount (₦)': o.total_amount,
+      'Notes': o.notes ?? '',
+    }))
 
-    const headers = ['Type', 'Date', 'Order Number', 'Customer Name', 'Phone', 'Address / Location', 'Status', 'Qty', 'Amount (₦)', 'Notes']
+    const leadRows = allLeads.map(l => ({
+      Type: 'Lead',
+      Date: formatDate(l.created_at),
+      'Order Number': '—',
+      'Customer Name': l.customer_name,
+      'Phone': l.phone ?? '',
+      'Address / Location': l.location ?? '',
+      'Status': l.status,
+      'Qty': 0,
+      'Amount (₦)': 0,
+      'Notes': l.notes ?? '',
+    }))
 
-    const orderRows = allOrders.map(o => [
-      'Order',
-      formatDate(o.created_at),
-      o.order_number,
-      o.customer_name,
-      o.customer_phone ?? '',
-      o.customer_address ?? '',
-      o.status,
-      o.quantity,
-      o.total_amount,
-      o.notes ?? '',
-    ])
+    return [...orderRows, ...leadRows]
+  }
 
-    const leadRows = allLeads.map(l => [
-      'Lead',
-      formatDate(l.created_at),
-      '',
-      l.customer_name,
-      l.phone ?? '',
-      l.location ?? '',
-      l.status,
-      '',
-      '',
-      l.notes ?? '',
-    ])
+  const handleExportExcel = () => {
+    exportToExcel({
+      filename: 'dsa-analytics-report',
+      sheetTitle: 'DSA Performance Report',
+      reportSubHeading: `DSA: ${user?.full_name || 'Agent'}`,
+      data: getExportData()
+    })
+  }
 
-    const rows = [headers, ...orderRows, ...leadRows]
-    const csv = rows.map(r => r.map(escape).join(',')).join('\n')
-
-    const blob = new Blob([csv], { type: 'text/csv' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `optismart-report-${new Date().toISOString().split('T')[0]}.csv`
-    a.click()
-    URL.revokeObjectURL(url)
+  const handleExportCSV = () => {
+    exportToCSV(getExportData(), 'dsa-analytics-report')
   }
 
   return (
@@ -134,14 +152,22 @@ export function DSAReports() {
           <p className="text-sm text-surface-500 mt-1">Detailed performance metrics and historical data.</p>
         </div>
         
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={downloadCSV}
+            onClick={handleExportExcel}
             disabled={loading}
             className="btn-primary flex items-center gap-2 h-10 px-4 text-sm font-semibold"
           >
+            <FileSpreadsheet className="w-4 h-4" /> Export Excel
+          </button>
+          <button
+            onClick={handleExportCSV}
+            disabled={loading}
+            className="btn-outline flex items-center gap-2 h-10 px-4 text-sm font-semibold"
+          >
             <Download className="w-4 h-4" /> Download CSV
           </button>
+        </div>
 
           {/* Time Filters */}
           <div className="flex items-center gap-2 bg-surface-100 p-1 rounded-xl overflow-x-auto hide-scrollbar">

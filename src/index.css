@@ -285,3 +285,39 @@
   .scrollbar-hidden::-webkit-scrollbar { display: none; }
   .scrollbar-hidden { -ms-overflow-style: none; scrollbar-width: none; }
 }
+
+/* Print Styles for Executive Reports */
+@media print {
+  aside, header, nav, .no-print, button, input, select {
+    display: none !important;
+  }
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 11pt !important;
+  }
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+  .table-container, table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto !important;
+  }
+  tr {
+    page-break-inside: avoid !important;
+    page-break-after: auto !important;
+  }
+  th, td {
+    border: 1px solid #CBD5E1 !important;
+    padding: 6px 10px !important;
+    font-size: 10pt !important;
+  }
+  th {
+    background-color: #F1F5F9 !important;
+    color: #0F172A !important;
+  }
+}
+
