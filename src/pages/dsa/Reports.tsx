@@ -6,26 +6,29 @@ import { OrderStatusBadge } from '@/components/shared/Badges'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import type { Order } from '@/types'
 import { MobileDashboardNav } from '@/components/layout/MobileDashboardNav'
-import { Calendar as CalendarIcon, Clock, Package, CheckCircle2, AlertCircle, Banknote, Percent, Download } from 'lucide-react'
+import { Calendar as CalendarIcon, Clock, Package, CheckCircle2, AlertCircle, Banknote, Percent, Download, FileSpreadsheet } from 'lucide-react'
+import { exportToExcel, exportToCSV } from '@/utils/exportUtils'
 
 type TimeFilter = 'total' | 'year' | 'month' | 'week' | 'day'
 
 export function DSAReports() {
   const { user } = useAuthStore()
-  
-  const [timeFilter, setTimeFilter] = useState<TimeFilter>('month')
-  const [allOrders, setAllOrders] = useState<Order[]>([])
-  const [allCommissions, setAllCommissions] = useState<any[]>([])
-  const [allLeads, setAllLeads] = useState<any[]>([])
+
   const [loading, setLoading] = useState(true)
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('total')
+  const [selectedStatus, setSelectedStatus] = useState<string>('all')
 
-  useEffect(() => {
-    if (user?.id) {
-      fetchData(user.id)
+  const [allOrders, setAllOrders] = useState<Order[]>([])
+  const [allLeads, setAllLeads] = useState<any[]>([])
+  const [allCommissions, setAllCommissions] = useState<any[]>([])
+
+  const fetchReportsData = async () => {
+    const userId = user?.id
+    if (!userId) {
+      setLoading(false)
+      return
     }
-  }, [user?.id])
 
-  const fetchData = async (userId: string) => {
     setLoading(true)
     try {
       const { data: { session } } = await supabase.auth.getSession()
@@ -49,6 +52,10 @@ export function DSAReports() {
     }
   }
 
+  useEffect(() => {
+    fetchReportsData()
+  }, [user?.id])
+
   const { filteredOrders, filteredCommissions } = useMemo(() => {
     const now = new Date()
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
@@ -63,36 +70,22 @@ export function DSAReports() {
         case 'day': return d >= startOfDay
         case 'week': return d >= startOfWeek
         case 'month': return d >= startOfMonth
-
-    if (filter === 'year') {
-      return d.getFullYear() === now.getFullYear()
+        case 'year': return d >= startOfYear
+        default: return true
+      }
     }
-    if (filter === 'month') {
-      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth()
-    }
-    if (filter === 'week') {
-      const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
-      return d >= oneWeekAgo
-    }
-    if (filter === 'day') {
-      return d.toDateString() === now.toDateString()
-    }
-    return true
-  }
 
-  const filteredOrders = useMemo(() => {
-    return allOrders.filter(o => {
-      const matchesTime = isWithinTimeRange(o.created_at, timeFilter)
-      const matchesStatus = selectedStatus === 'all' || o.status === selectedStatus
-      return matchesTime && matchesStatus
-    })
-  }, [allOrders, timeFilter, selectedStatus])
+    return {
+      filteredOrders: allOrders.filter(o => {
+        const matchesTime = filterByDate(o.created_at)
+        const matchesStatus = selectedStatus === 'all' || o.status === selectedStatus
+        return matchesTime && matchesStatus
+      }),
+      filteredCommissions: allCommissions.filter(c => filterByDate(c.triggered_at))
+    }
+  }, [allOrders, allCommissions, timeFilter, selectedStatus])
 
-  const filteredCommissions = useMemo(() => {
-    return allCommissions.filter(c => isWithinTimeRange(c.triggered_at, timeFilter))
-  }, [allCommissions, timeFilter])
-
-  const metrics = useMemo(() => {
+  const stats = useMemo(() => {
     const totalOrders = filteredOrders.length
     const deliveredOrders = filteredOrders.filter(o => o.status === 'delivered').length
     const outstandingOrders = filteredOrders.filter(o => !['delivered', 'cancelled', 'returned'].includes(o.status)).length
@@ -145,29 +138,30 @@ export function DSAReports() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 pb-20 md:pb-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-surface-900 tracking-tight">Analytics & Reports</h1>
           <p className="text-sm text-surface-500 mt-1">Detailed performance metrics and historical data.</p>
         </div>
         
-        <div className="flex items-center gap-2 flex-wrap">
-          <button
-            onClick={handleExportExcel}
-            disabled={loading}
-            className="btn-primary flex items-center gap-2 h-10 px-4 text-sm font-semibold"
-          >
-            <FileSpreadsheet className="w-4 h-4" /> Export Excel
-          </button>
-          <button
-            onClick={handleExportCSV}
-            disabled={loading}
-            className="btn-outline flex items-center gap-2 h-10 px-4 text-sm font-semibold"
-          >
-            <Download className="w-4 h-4" /> Download CSV
-          </button>
-        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportExcel}
+              disabled={loading}
+              className="btn-primary flex items-center gap-2 h-10 px-4 text-sm font-semibold"
+            >
+              <FileSpreadsheet className="w-4 h-4" /> Export Excel
+            </button>
+            <button
+              onClick={handleExportCSV}
+              disabled={loading}
+              className="btn-outline flex items-center gap-2 h-10 px-4 text-sm font-semibold"
+            >
+              <Download className="w-4 h-4" /> Download CSV
+            </button>
+          </div>
 
           {/* Time Filters */}
           <div className="flex items-center gap-2 bg-surface-100 p-1 rounded-xl overflow-x-auto hide-scrollbar">
@@ -268,38 +262,31 @@ export function DSAReports() {
                     <th className="px-4 py-3 font-bold text-surface-600 uppercase tracking-wider text-xs">Date</th>
                     <th className="px-4 py-3 font-bold text-surface-600 uppercase tracking-wider text-xs">Order #</th>
                     <th className="px-4 py-3 font-bold text-surface-600 uppercase tracking-wider text-xs">Customer</th>
-                    <th className="px-4 py-3 font-bold text-surface-600 uppercase tracking-wider text-xs">Phone</th>
-                    <th className="px-4 py-3 font-bold text-surface-600 uppercase tracking-wider text-xs">Address</th>
-                    <th className="px-4 py-3 font-bold text-surface-600 uppercase tracking-wider text-xs">Qty</th>
+                    <th className="px-4 py-3 font-bold text-surface-600 uppercase tracking-wider text-xs">Location</th>
+                    <th className="px-4 py-3 font-bold text-surface-600 uppercase tracking-wider text-xs">Amount</th>
                     <th className="px-4 py-3 font-bold text-surface-600 uppercase tracking-wider text-xs">Status</th>
-                    <th className="px-4 py-3 font-bold text-surface-600 uppercase tracking-wider text-xs text-right">Amount</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-surface-100">
+                <tbody className="divide-y divide-surface-200">
                   {filteredOrders.map(order => (
                     <tr key={order.id} className="hover:bg-surface-50 transition-colors">
-                      <td className="px-4 py-3 text-surface-600">
-                        <div className="flex items-center gap-1.5">
-                          <CalendarIcon className="w-3.5 h-3.5" />
-                          {formatDate(order.created_at)}
-                        </div>
+                      <td className="px-4 py-3 text-surface-500 text-xs font-medium">{formatDate(order.created_at)}</td>
+                      <td className="px-4 py-3 font-mono font-bold text-brand-600 text-xs">{order.order_number}</td>
+                      <td className="px-4 py-3">
+                        <div className="font-semibold text-surface-900">{order.customer_name}</div>
+                        {order.customer_phone && <div className="text-xs text-surface-400">{order.customer_phone}</div>}
                       </td>
-                      <td className="px-4 py-3 font-medium text-brand-600">{order.order_number}</td>
-                      <td className="px-4 py-3 font-semibold text-surface-900">{order.customer_name}</td>
-                      <td className="px-4 py-3 text-surface-600">{order.customer_phone}</td>
-                      <td className="px-4 py-3 text-surface-500 max-w-[200px] truncate">{order.customer_address}</td>
-                      <td className="px-4 py-3 text-surface-700">{order.quantity}</td>
-                      <td className="px-4 py-3"><OrderStatusBadge status={order.status} /></td>
-                      <td className="px-4 py-3 font-bold text-brand-700 text-right">{formatCurrency(order.total_amount)}</td>
+                      <td className="px-4 py-3 text-surface-600 text-xs max-w-[200px] truncate">{order.customer_address || '—'}</td>
+                      <td className="px-4 py-3 font-bold text-surface-900">{formatCurrency(order.total_amount)}</td>
+                      <td className="px-4 py-3">
+                        <OrderStatusBadge status={order.status} />
+                      </td>
                     </tr>
                   ))}
                   {filteredOrders.length === 0 && (
                     <tr>
-                      <td colSpan={8} className="px-4 py-12 text-center text-surface-500">
-                        <div className="flex flex-col items-center justify-center">
-                          <Package className="w-12 h-12 text-surface-300 mb-3" />
-                          <p className="font-semibold text-surface-600">No orders found for this {timeFilter}.</p>
-                        </div>
+                      <td colSpan={6} className="px-4 py-12 text-center text-surface-500">
+                        <p className="font-semibold">No orders found for this period.</p>
                       </td>
                     </tr>
                   )}
@@ -309,54 +296,39 @@ export function DSAReports() {
           </motion.div>
 
           {/* Leads Table */}
-          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-card overflow-hidden">
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="glass-card overflow-hidden mt-8">
             <div className="p-5 border-b border-surface-100 bg-surface-50 flex items-center justify-between">
               <h2 className="text-lg font-bold text-surface-900 flex items-center gap-2">
-                <CalendarIcon className="w-5 h-5 text-orange-500" />
-                All Leads
+                <Package className="w-5 h-5 text-brand-600" />
+                Leads
               </h2>
               <span className="text-xs font-bold text-surface-500 bg-surface-200 px-3 py-1 rounded-full uppercase">
-                {allLeads.length} records
+                {allLeads.length} Total Leads
               </span>
             </div>
-
+            
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm whitespace-nowrap">
                 <thead className="bg-surface-50 border-y border-surface-200">
                   <tr>
-                    <th className="px-4 py-3 font-bold text-surface-600 uppercase tracking-wider text-xs">Date Added</th>
-                    <th className="px-4 py-3 font-bold text-surface-600 uppercase tracking-wider text-xs">Customer</th>
+                    <th className="px-4 py-3 font-bold text-surface-600 uppercase tracking-wider text-xs">Date</th>
+                    <th className="px-4 py-3 font-bold text-surface-600 uppercase tracking-wider text-xs">Customer Name</th>
                     <th className="px-4 py-3 font-bold text-surface-600 uppercase tracking-wider text-xs">Phone</th>
                     <th className="px-4 py-3 font-bold text-surface-600 uppercase tracking-wider text-xs">Location</th>
-                    <th className="px-4 py-3 font-bold text-surface-600 uppercase tracking-wider text-xs">Priority</th>
                     <th className="px-4 py-3 font-bold text-surface-600 uppercase tracking-wider text-xs">Status</th>
-                    <th className="px-4 py-3 font-bold text-surface-600 uppercase tracking-wider text-xs">Follow-up</th>
+                    <th className="px-4 py-3 font-bold text-surface-600 uppercase tracking-wider text-xs">Follow Up</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-surface-100">
+                <tbody className="divide-y divide-surface-200">
                   {allLeads.map(lead => (
                     <tr key={lead.id} className="hover:bg-surface-50 transition-colors">
-                      <td className="px-4 py-3 text-surface-600">
-                        <div className="flex items-center gap-1.5">
-                          <CalendarIcon className="w-3.5 h-3.5" />
-                          {formatDate(lead.created_at)}
-                        </div>
-                      </td>
+                      <td className="px-4 py-3 text-surface-500 text-xs font-medium">{formatDate(lead.created_at)}</td>
                       <td className="px-4 py-3 font-semibold text-surface-900">{lead.customer_name}</td>
-                      <td className="px-4 py-3 text-surface-600">{lead.phone}</td>
-                      <td className="px-4 py-3 text-surface-500">{lead.location || '—'}</td>
+                      <td className="px-4 py-3 text-surface-600 text-xs font-mono">{lead.phone || '—'}</td>
+                      <td className="px-4 py-3 text-surface-600 text-xs max-w-[200px] truncate">{lead.location || '—'}</td>
                       <td className="px-4 py-3">
-                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase border ${
-                          lead.temperature === 'hot' ? 'bg-rose-100 text-rose-700 border-rose-200' :
-                          lead.temperature === 'warm' ? 'bg-orange-100 text-orange-700 border-orange-200' :
-                          'bg-blue-100 text-blue-700 border-blue-200'
-                        }`}>
-                          {lead.temperature === 'hot' ? 'High' : lead.temperature === 'warm' ? 'Medium' : 'Low'}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`px-2 py-0.5 rounded text-xs font-bold uppercase ${
-                          lead.status === 'new' ? 'bg-brand-100 text-brand-700' :
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                          lead.status === 'new' ? 'bg-blue-100 text-blue-700' :
                           lead.status === 'contacted' ? 'bg-purple-100 text-purple-700' :
                           lead.status === 'converted' ? 'bg-success-100 text-success-700' :
                           'bg-surface-100 text-surface-700'
@@ -371,7 +343,7 @@ export function DSAReports() {
                   ))}
                   {allLeads.length === 0 && (
                     <tr>
-                      <td colSpan={7} className="px-4 py-12 text-center text-surface-500">
+                      <td colSpan={6} className="px-4 py-12 text-center text-surface-500">
                         <p className="font-semibold">No leads found.</p>
                       </td>
                     </tr>
