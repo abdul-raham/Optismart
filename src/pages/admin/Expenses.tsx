@@ -3,24 +3,40 @@ import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { Plus, Search, Banknote, Wallet, TrendingDown, Calendar, FileText, X } from 'lucide-react'
+import { Plus, Search, Banknote, Wallet, TrendingDown, Calendar, FileText, X, Filter } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { TableSkeleton } from '@/components/shared/Skeletons'
-import type { Expense, ExpenseCategory } from '@/types'
+import type { Expense, ExpenseCategory, Order, User } from '@/types'
+
+const EXPENSE_CATEGORIES: { value: ExpenseCategory; label: string }[] = [
+  { value: 'delivery', label: 'Delivery Cost' },
+  { value: 'waybill', label: 'Waybill Cost' },
+  { value: 'advertising', label: 'Advertising Cost' },
+  { value: 'dsa_salary', label: 'DSA Salary' },
+  { value: 'utilities', label: 'Utilities' },
+  { value: 'equipment', label: 'Equipment' },
+  { value: 'other', label: 'Other' },
+]
 
 export function AdminExpenses() {
   const { user } = useAuthStore()
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7))
+  const [categoryFilter, setCategoryFilter] = useState('all')
+  const [dsas, setDsas] = useState<Pick<User, 'id' | 'full_name'>[]>([])
+  const [orders, setOrders] = useState<Pick<Order, 'id' | 'order_number' | 'customer_name' | 'dsa_id'>[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
   const [form, setForm] = useState({
     description: '',
-    category: 'logistics' as ExpenseCategory,
+    category: 'delivery' as ExpenseCategory,
     amount: '',
     expense_date: new Date().toISOString().split('T')[0],
+    dsa_id: '',
+    order_id: '',
   })
 
   useEffect(() => {
@@ -29,16 +45,17 @@ export function AdminExpenses() {
 
   const fetchExpenses = async () => {
     try {
-      const { data, error } = await supabase
-        .from('expenses')
-        .select(`
-          *,
-          poster:posted_by (full_name)
-        `)
-        .order('expense_date', { ascending: false })
-
-      if (error) throw error
-      if (data) setExpenses(data as any[])
+      const [expensesRes, dsasRes, ordersRes] = await Promise.all([
+        supabase.from('expenses').select('*, poster:users!expenses_posted_by_fkey(full_name), dsa:users!expenses_dsa_id_fkey(full_name), order:orders!expenses_order_id_fkey(order_number, customer_name)').order('expense_date', { ascending: false }),
+        supabase.from('users').select('id, full_name').eq('role', 'dsa').order('full_name'),
+        supabase.from('orders').select('id, order_number, customer_name, dsa_id').order('created_at', { ascending: false }).limit(500),
+      ])
+      if (expensesRes.error) throw expensesRes.error
+      if (dsasRes.error) throw dsasRes.error
+      if (ordersRes.error) throw ordersRes.error
+      setExpenses((expensesRes.data ?? []) as any[])
+      setDsas((dsasRes.data ?? []) as any[])
+      setOrders((ordersRes.data ?? []) as any[])
     } catch (err) {
       console.error('Error fetching expenses:', err)
     } finally {
@@ -51,17 +68,24 @@ export function AdminExpenses() {
     if (!user) return
     setSubmitting(true)
     try {
+      if (form.category === 'dsa_salary' && !form.dsa_id) throw new Error('Select the DSA receiving this salary.')
+      if (['delivery', 'waybill'].includes(form.category) && !form.order_id) throw new Error('Select the related order for this cost.')
+
       const { error } = await supabase
         .from('expenses')
         .insert([{ 
-          ...form, 
+          description: form.description,
+          category: form.category,
           amount: Number(form.amount),
-          posted_by: user.id 
+          expense_date: form.expense_date,
+          dsa_id: form.dsa_id || null,
+          order_id: form.order_id || null,
+          posted_by: user.id,
         }])
 
       if (error) throw error
       setIsModalOpen(false)
-      setForm({ description: '', category: 'logistics', amount: '', expense_date: new Date().toISOString().split('T')[0] })
+      setForm({ description: '', category: 'delivery', amount: '', expense_date: new Date().toISOString().split('T')[0], dsa_id: '', order_id: '' })
       await fetchExpenses()
     } catch (err: any) {
       console.error('Error creating expense:', err)
@@ -71,14 +95,16 @@ export function AdminExpenses() {
     }
   }
 
-  const filteredExpenses = expenses.filter(e => 
-    e.description.toLowerCase().includes(search.toLowerCase()) || 
-    e.category.toLowerCase().includes(search.toLowerCase())
-  )
+  const filteredExpenses = expenses.filter(expense => {
+    const matchesSearch = expense.description.toLowerCase().includes(search.toLowerCase()) || expense.category.toLowerCase().includes(search.toLowerCase())
+    const matchesMonth = !selectedMonth || expense.expense_date.startsWith(selectedMonth)
+    const matchesCategory = categoryFilter === 'all' || expense.category === categoryFilter
+    return matchesSearch && matchesMonth && matchesCategory
+  })
 
   const totalAmount = expenses.reduce((sum, e) => sum + Number(e.amount), 0)
   const thisMonthAmount = expenses
-    .filter(e => new Date(e.expense_date).getMonth() === new Date().getMonth())
+    .filter(e => e.expense_date.startsWith(new Date().toISOString().slice(0, 7)))
     .reduce((sum, e) => sum + Number(e.amount), 0)
 
   return (
@@ -88,7 +114,7 @@ export function AdminExpenses() {
           <h1 className="text-2xl font-bold text-surface-900 tracking-tight">Expenses</h1>
           <p className="text-sm text-surface-500 mt-1">Track internal company costs and operational overhead.</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="relative">
             <Search className="w-4 h-4 text-surface-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input 
@@ -98,6 +124,13 @@ export function AdminExpenses() {
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 pr-4 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none w-full sm:w-64 transition-all"
             />
+          </div>
+          <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="input h-10 w-auto" />
+          <div className="relative">
+            <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-400" />
+            <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="input h-10 pl-9">
+              <option value="all">All categories</option>{EXPENSE_CATEGORIES.map(category => <option key={category.value} value={category.value}>{category.label}</option>)}
+            </select>
           </div>
           <button onClick={() => setIsModalOpen(true)} className="btn-primary h-10 px-4 text-sm font-semibold flex items-center gap-2">
             <Plus className="w-4 h-4" /> Log Expense
@@ -157,6 +190,7 @@ export function AdminExpenses() {
                     <td className="py-4 px-5">
                       <div className="font-bold text-surface-900">{exp.description}</div>
                       <div className="text-xs text-surface-500 mt-0.5">Logged by {(exp.poster as any)?.full_name || 'System'}</div>
+                      <div className="mt-1 text-xs text-surface-400">{(exp.dsa as any)?.full_name ? `DSA: ${(exp.dsa as any).full_name}` : 'Company-wide'}{(exp.order as any)?.order_number ? ` · Order: ${(exp.order as any).order_number}` : ''}</div>
                     </td>
                     <td className="py-4 px-5">
                       <span className="badge-gray uppercase text-[10px] tracking-wider">{exp.category}</span>
@@ -222,18 +256,33 @@ export function AdminExpenses() {
                 <div>
                   <label className="label">Category *</label>
                   <select required className="input" value={form.category} onChange={e => setForm({...form, category: e.target.value as any})}>
-                    <option value="logistics">Logistics</option>
-                    <option value="marketing">Marketing</option>
-                    <option value="salaries">Salaries</option>
-                    <option value="utilities">Utilities</option>
-                    <option value="equipment">Equipment</option>
-                    <option value="other">Other</option>
+                    {EXPENSE_CATEGORIES.map(category => <option key={category.value} value={category.value}>{category.label}</option>)}
                   </select>
                 </div>
                 <div>
                   <label className="label">Date *</label>
                   <input required type="date" className="input" value={form.expense_date} onChange={e => setForm({...form, expense_date: e.target.value})} />
                 </div>
+              </div>
+
+              <div>
+                <label className="label">Related Order {['delivery', 'waybill'].includes(form.category) ? '*' : '(Optional)'}</label>
+                <select required={['delivery', 'waybill'].includes(form.category)} className="input" value={form.order_id} onChange={e => {
+                  const order = orders.find(item => item.id === e.target.value)
+                  setForm({ ...form, order_id: e.target.value, dsa_id: order?.dsa_id || form.dsa_id })
+                }}>
+                  <option value="">No specific order</option>
+                  {orders.map(order => <option key={order.id} value={order.id}>{order.order_number} — {order.customer_name}</option>)}
+                </select>
+              </div>
+
+              <div>
+                <label className="label">Attribute to DSA {form.category === 'dsa_salary' ? '*' : '(Optional)'}</label>
+                <select required={form.category === 'dsa_salary'} className="input" value={form.dsa_id} onChange={e => setForm({ ...form, dsa_id: e.target.value })}>
+                  <option value="">Company-wide expense</option>
+                  {dsas.map(dsa => <option key={dsa.id} value={dsa.id}>{dsa.full_name}</option>)}
+                </select>
+                <p className="mt-1 text-xs text-surface-400">DSA attribution is required for individual DSA profit/loss.</p>
               </div>
 
               <div>

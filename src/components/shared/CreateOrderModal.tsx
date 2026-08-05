@@ -129,6 +129,7 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
         product_id: product.id,
         quantity,
         unit_price: unitPrice,
+        unit_cost: product.cost_price || 0,
         total_amount: totalAmount,
         installation_needed: installationNeeded,
         installation_price: installationNeeded ? installationPrice : 0,

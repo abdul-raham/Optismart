@@ -147,6 +147,7 @@ export function AdminOrders() {
           product_id: form.product_id,
           quantity: form.quantity,
           unit_price: product.retail_price,
+          unit_cost: product.cost_price || 0,
           total_amount: totalAmount,
           installation_needed: form.installation_needed,
           installation_price: form.installation_needed ? form.installation_price : 0,
@@ -191,6 +192,7 @@ export function AdminOrders() {
     setUpdating(orderId)
     try {
       const updatePayload: any = { status: newStatus, updated_at: new Date().toISOString() }
+      if (newStatus === 'delivered') updatePayload.delivered_at = new Date().toISOString()
       const { error } = await supabase
         .from('orders')
         .update(updatePayload)
@@ -264,7 +266,7 @@ export function AdminOrders() {
       const { data, error } = await supabase.from('orders').update({
         customer_name: editForm.customer_name, customer_email: editForm.customer_email || null,
         customer_phone: editForm.customer_phone, customer_address: editForm.customer_address,
-        product_id: editForm.product_id, quantity: editForm.quantity, unit_price: product.retail_price,
+        product_id: editForm.product_id, quantity: editForm.quantity, unit_price: product.retail_price, unit_cost: product.cost_price || 0,
         total_amount: editForm.total_amount, installation_needed: editForm.installation_needed,
         installation_price: editForm.installation_needed ? editForm.installation_price : 0,
         expected_delivery_date: editForm.expected_delivery_date || null, notes: editForm.notes,

@@ -40,6 +40,7 @@ export interface Product {
   description: string
   retail_price: number
   wholesale_price: number
+  cost_price: number
   stock_quantity: number
   min_stock_level: number
   image_url: string | null
@@ -101,6 +102,7 @@ export interface Order {
   product?: Product
   quantity: number
   unit_price: number
+  unit_cost: number
   total_amount: number
   status: OrderStatus
   installation_needed: boolean
@@ -163,12 +165,26 @@ export interface Commission {
 }
 
 // --- EXPENSES ---
-export type ExpenseCategory = 'logistics' | 'marketing' | 'salaries' | 'utilities' | 'equipment' | 'other'
+export type ExpenseCategory =
+  | 'delivery'
+  | 'waybill'
+  | 'advertising'
+  | 'dsa_salary'
+  | 'logistics'
+  | 'marketing'
+  | 'salaries'
+  | 'utilities'
+  | 'equipment'
+  | 'other'
 
 export interface Expense {
   id: string
   posted_by: string
   poster?: User
+  dsa_id: string | null
+  dsa?: User
+  order_id: string | null
+  order?: Order
   category: ExpenseCategory
   description: string
   amount: number
