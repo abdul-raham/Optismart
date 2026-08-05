@@ -66,6 +66,7 @@ export function OrderEditModal({ order, products, onClose, onSaved }: OrderEditM
           product_id: form.product_id,
           quantity: form.quantity,
           unit_price: product.retail_price,
+          unit_cost: product.cost_price || 0,
           total_amount: form.total_amount,
           installation_needed: form.installation_needed,
           installation_price: form.installation_needed ? form.installation_price : 0,

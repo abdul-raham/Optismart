@@ -106,6 +106,7 @@ export function DSAOrders() {
           product_id: form.product_id,
           quantity: form.quantity,
           unit_price: product.retail_price,
+          unit_cost: product.cost_price || 0,
           total_amount: totalAmount,
           installation_needed: form.installation_needed,
           installation_price: form.installation_needed ? form.installation_price : 0,

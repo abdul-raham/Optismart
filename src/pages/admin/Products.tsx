@@ -25,6 +25,7 @@ export function AdminProducts() {
     description: '',
     retail_price: 0,
     wholesale_price: 0,
+    cost_price: 0,
     stock_quantity: 0,
     min_stock_level: 5,
     source_url: '',
@@ -107,7 +108,7 @@ export function AdminProducts() {
   const closeModal = () => {
     setIsModalOpen(false)
     setEditingId(null)
-    setForm({ name: '', description: '', retail_price: 0, wholesale_price: 0, stock_quantity: 0, min_stock_level: 5, source_url: '', image_url: '' })
+    setForm({ name: '', description: '', retail_price: 0, wholesale_price: 0, cost_price: 0, stock_quantity: 0, min_stock_level: 5, source_url: '', image_url: '' })
   }
 
   const toggleProductStatus = async (id: string, currentStatus: boolean) => {
@@ -188,7 +189,7 @@ export function AdminProducts() {
               className="pl-9 pr-4 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none w-full sm:w-64 transition-all"
             />
           </div>
-          <button onClick={() => { setEditingId(null); setForm({ name: '', description: '', retail_price: 0, wholesale_price: 0, stock_quantity: 0, min_stock_level: 5, source_url: '', image_url: '' }); setIsModalOpen(true); }} className="btn-primary h-10 px-4 text-sm font-semibold flex items-center gap-2">
+          <button onClick={() => { setEditingId(null); setForm({ name: '', description: '', retail_price: 0, wholesale_price: 0, cost_price: 0, stock_quantity: 0, min_stock_level: 5, source_url: '', image_url: '' }); setIsModalOpen(true); }} className="btn-primary h-10 px-4 text-sm font-semibold flex items-center gap-2">
             <Plus className="w-4 h-4" /> Add Product
           </button>
           <button onClick={syncOptismartCatalog} disabled={syncing} className="btn-outline h-10 px-4 text-sm font-semibold flex items-center gap-2">
@@ -243,6 +244,7 @@ export function AdminProducts() {
                           description: product.description || '',
                           retail_price: product.retail_price,
                           wholesale_price: product.wholesale_price,
+                          cost_price: product.cost_price || 0,
                           stock_quantity: product.stock_quantity,
                           min_stock_level: product.min_stock_level,
                           source_url: product.source_url || '',
@@ -273,7 +275,11 @@ export function AdminProducts() {
                   </a>
                 )}
 
-                <div className="grid grid-cols-2 gap-2 mb-4">
+                <div className="grid grid-cols-3 gap-2 mb-4">
+                  <div className="bg-danger-50 p-2 rounded-lg border border-danger-100">
+                    <span className="text-[10px] uppercase font-bold text-danger-400 block mb-0.5">Cost</span>
+                    <span className="text-sm font-bold text-danger-700">{formatCurrency(product.cost_price || 0)}</span>
+                  </div>
                   <div className="bg-surface-50 p-2 rounded-lg border border-surface-100">
                     <span className="text-[10px] uppercase font-bold text-surface-400 block mb-0.5">Retail Price</span>
                     <span className="text-sm font-bold text-brand-700">{formatCurrency(product.retail_price)}</span>
@@ -378,6 +384,12 @@ export function AdminProducts() {
                         <label className="label">Wholesale Price (₦) *</label>
                         <input required type="number" min={0} className="input" value={form.wholesale_price} onChange={e => setForm({...form, wholesale_price: Number(e.target.value)})} />
                       </div>
+                    </div>
+
+                    <div>
+                      <label className="label">Company Cost Price (₦) *</label>
+                      <input required type="number" min={0} className="input" value={form.cost_price} onChange={e => setForm({...form, cost_price: Number(e.target.value)})} />
+                      <p className="mt-1 text-xs text-surface-400">Private acquisition cost used for profit/loss. It is copied into each new order.</p>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">

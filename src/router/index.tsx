@@ -22,6 +22,7 @@ import { AdminProducts } from '@/pages/admin/Products'
 import { AdminPayments } from '@/pages/admin/Payments'
 import { AdminUsers } from '@/pages/admin/Users'
 import { AdminExpenses } from '@/pages/admin/Expenses'
+import { AdminFinance } from '@/pages/admin/Finance'
 import { AdminInstallers } from '@/pages/admin/Installers'
 import { AdminAnalytics } from '@/pages/admin/Analytics'
 import { AdminTraining } from '@/pages/admin/Training'
@@ -163,6 +164,7 @@ export function AppRouter() {
             <Route path="/app/admin/payments"   element={<AdminPayments />} />
             <Route path="/app/admin/users"      element={<AdminUsers />} />
             <Route path="/app/admin/expenses"   element={<AdminExpenses />} />
+            <Route path="/app/admin/finance"    element={<AdminFinance />} />
             <Route path="/app/admin/installers" element={<AdminInstallers />} />
             <Route path="/app/admin/analytics"  element={<AdminAnalytics />} />
             <Route path="/app/admin/training"   element={<AdminTraining />} />
