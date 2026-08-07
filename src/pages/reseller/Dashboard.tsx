@@ -7,10 +7,13 @@ import { CardGridSkeleton } from '@/components/shared/Skeletons'
 import { MobileDashboardNav } from '@/components/layout/MobileDashboardNav'
 import type { Product } from '@/types'
 
+import { CreateOrderModal } from '@/components/shared/CreateOrderModal'
+
 export function ResellerDashboard() {
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
 
   useEffect(() => {
     fetchProducts()
@@ -32,14 +35,19 @@ export function ResellerDashboard() {
     }
   }
 
-  const handleBulkOrder = () => {
-    alert('Bulk ordering system will open a checkout modal here.')
-  }
-
   const filteredProducts = products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
 
   return (
     <div className="space-y-6">
+      <CreateOrderModal
+        isOpen={isOrderModalOpen}
+        onClose={() => setIsOrderModalOpen(false)}
+        onSuccess={() => {
+          setIsOrderModalOpen(false)
+          fetchProducts()
+        }}
+      />
+
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-surface-900 tracking-tight">Wholesale Portal</h1>
@@ -56,8 +64,8 @@ export function ResellerDashboard() {
               className="pl-9 pr-4 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none w-full sm:w-64 transition-all"
             />
           </div>
-          <button className="btn-primary h-10 px-4 text-sm font-semibold flex items-center gap-2">
-            <ShoppingCart className="w-4 h-4" /> Cart (0)
+          <button onClick={() => setIsOrderModalOpen(true)} className="btn-primary h-10 px-4 text-sm font-semibold flex items-center gap-2">
+            <ShoppingCart className="w-4 h-4" /> Place Order
           </button>
         </div>
       </div>
@@ -127,8 +135,8 @@ export function ResellerDashboard() {
                   <div className="flex-1 relative">
                     <input type="number" min={10} defaultValue={10} className="input text-center w-full !py-2" />
                   </div>
-                  <button onClick={handleBulkOrder} className="btn-primary py-2 px-4 whitespace-nowrap">
-                    Add
+                  <button onClick={() => setIsOrderModalOpen(true)} className="btn-primary py-2 px-4 whitespace-nowrap">
+                    Order Wholesale
                   </button>
                 </div>
                 <p className="text-[10px] text-center text-surface-400 mt-2">Minimum order quantity: 10</p>

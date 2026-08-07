@@ -51,10 +51,11 @@ export const NAV_ITEMS: Record<UserRole, NavItem[]> = {
   ],
   dsa: [
     { label: 'Dashboard',   href: '/app/dsa',          icon: LayoutDashboard },
-    { label: 'New Lead',    href: '/app/dsa/new-lead', icon: Target },
+    { label: 'New Lead',    href: '/app/dsa/leads?new=true', icon: Target },
     { label: 'My Leads',    href: '/app/dsa/leads',    icon: Target },
+    { label: 'Reminders',   href: '/app/dsa/reminders', icon: Bell },
     { label: 'My Orders',   href: '/app/dsa/orders',   icon: ShoppingBag },
-    { label: 'Training',    href: '/app/dsa/training', icon: BookOpen },
+    { label: 'Training',    href: '/app/training',     icon: BookOpen },
     { label: 'Leaderboard', href: '/app/dsa/leaderboard', icon: Award },
     { label: 'Settings',    href: '/app/settings',     icon: Settings },
   ],
@@ -68,6 +69,7 @@ export const NAV_ITEMS: Record<UserRole, NavItem[]> = {
   reseller: [
     { label: 'Dashboard', href: '/app/reseller',        icon: LayoutDashboard },
     { label: 'My Orders', href: '/app/reseller/orders', icon: ShoppingBag },
+    { label: 'Training',  href: '/app/training',        icon: BookOpen },
     { label: 'Settings',  href: '/app/settings',        icon: Settings },
   ],
 }

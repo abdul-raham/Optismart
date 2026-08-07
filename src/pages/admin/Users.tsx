@@ -321,40 +321,53 @@ export function AdminUsers() {
                       <div className="p-5 bg-surface-50/60">
                         {/* DSA: Commission Settings */}
                         {u.role === 'dsa' && (
-                          <div>
-                            <h4 className="text-sm font-bold text-surface-700 mb-3 flex items-center gap-2">
-                              <Sliders className="w-4 h-4 text-brand-500" /> Commission Settings
+                          <div className="bg-white p-4 rounded-xl border border-surface-200 shadow-xs">
+                            <h4 className="text-sm font-bold text-surface-900 mb-3 flex items-center gap-2">
+                              <Sliders className="w-4 h-4 text-brand-600" /> DSA Commission Qualification Rules
                             </h4>
                             <div className="space-y-3">
                               <div>
-                                <label className="text-xs font-semibold text-surface-600 mb-1 block">
-                                  Camera Threshold
-                                  <span className="font-normal text-surface-400 ml-1">(set 0 = earn from sale #1)</span>
+                                <label className="text-xs font-bold text-surface-700 mb-1 block">
+                                  Min Delivered Orders Required for Qualification
+                                  <span className="font-normal text-surface-400 ml-1">(Default 0 = instant qualification)</span>
                                 </label>
                                 <input
                                   type="number" min={0}
                                   value={localCommissions[u.id]?.threshold ?? 0}
                                   onChange={e => setLocalCommissions(prev => ({ ...prev, [u.id]: { ...prev[u.id], threshold: Number(e.target.value) } }))}
-                                  className="w-full px-3 py-2 rounded-lg border border-surface-200 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
+                                  className="w-full px-3 py-2 rounded-xl border border-surface-200 text-sm font-semibold focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
                                 />
                               </div>
                               <div>
-                                <label className="text-xs font-semibold text-surface-600 mb-1 block">
-                                  Commission per Camera (₦)
+                                <label className="text-xs font-bold text-surface-700 mb-1 block">
+                                  Commission Rate per Delivered Camera (₦)
                                 </label>
                                 <input
                                   type="number" min={0}
                                   value={localCommissions[u.id]?.per_camera ?? 5000}
                                   onChange={e => setLocalCommissions(prev => ({ ...prev, [u.id]: { ...prev[u.id], per_camera: Number(e.target.value) } }))}
-                                  className="w-full px-3 py-2 rounded-lg border border-surface-200 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
+                                  className="w-full px-3 py-2 rounded-xl border border-surface-200 text-sm font-bold text-brand-700 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
                                 />
                               </div>
+
+                              <div className="p-3 bg-brand-50/70 border border-brand-200/60 rounded-xl flex items-center justify-between">
+                                <div>
+                                  <p className="text-xs font-bold text-brand-950">Qualification Status</p>
+                                  <p className="text-[11px] text-brand-800 font-medium">
+                                    {(localCommissions[u.id]?.threshold ?? 0) === 0 ? 'Qualified for payout on all orders' : `Requires min ${localCommissions[u.id]?.threshold} delivered orders`}
+                                  </p>
+                                </div>
+                                <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800">
+                                  Qualified
+                                </span>
+                              </div>
+
                               <button
                                 onClick={() => saveCommission(u.id)}
                                 disabled={savingCommission === u.id}
-                                className="w-full py-2 text-sm font-bold rounded-lg bg-brand-600 text-white hover:bg-brand-700 transition-colors disabled:opacity-60"
+                                className="w-full py-2.5 text-xs font-bold rounded-xl bg-brand-600 hover:bg-brand-700 text-white transition-all shadow-brand disabled:opacity-60"
                               >
-                                {savingCommission === u.id ? 'Saving...' : 'Save Commission Settings'}
+                                {savingCommission === u.id ? 'Saving Qualification Rules...' : 'Save Qualification Rules'}
                               </button>
                             </div>
                           </div>

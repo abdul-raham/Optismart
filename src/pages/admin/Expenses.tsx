@@ -23,7 +23,8 @@ export function AdminExpenses() {
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7))
+  const [timeframe, setTimeframe] = useState<'all' | 'daily' | 'weekly' | 'monthly' | 'yearly'>('all')
+  const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc'>('date_desc')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [dsas, setDsas] = useState<Pick<User, 'id' | 'full_name'>[]>([])
   const [orders, setOrders] = useState<Pick<Order, 'id' | 'order_number' | 'customer_name' | 'dsa_id'>[]>([])
@@ -35,6 +36,7 @@ export function AdminExpenses() {
     category: 'delivery' as ExpenseCategory,
     amount: '',
     expense_date: new Date().toISOString().split('T')[0],
+    expense_scope: 'daily' as 'daily' | 'order_specific',
     dsa_id: '',
     order_id: '',
   })
@@ -68,8 +70,9 @@ export function AdminExpenses() {
     if (!user) return
     setSubmitting(true)
     try {
-      if (form.category === 'dsa_salary' && !form.dsa_id) throw new Error('Select the DSA receiving this salary.')
-      if (['delivery', 'waybill'].includes(form.category) && !form.order_id) throw new Error('Select the related order for this cost.')
+      if (form.expense_scope === 'order_specific' && !form.order_id) {
+        throw new Error('Please select the order linked to this expense.')
+      }
 
       const { error } = await supabase
         .from('expenses')
@@ -85,7 +88,7 @@ export function AdminExpenses() {
 
       if (error) throw error
       setIsModalOpen(false)
-      setForm({ description: '', category: 'delivery', amount: '', expense_date: new Date().toISOString().split('T')[0], dsa_id: '', order_id: '' })
+      setForm({ description: '', category: 'delivery', amount: '', expense_date: new Date().toISOString().split('T')[0], expense_scope: 'daily', dsa_id: '', order_id: '' })
       await fetchExpenses()
     } catch (err: any) {
       console.error('Error creating expense:', err)
@@ -97,24 +100,51 @@ export function AdminExpenses() {
 
   const filteredExpenses = expenses.filter(expense => {
     const matchesSearch = expense.description.toLowerCase().includes(search.toLowerCase()) || expense.category.toLowerCase().includes(search.toLowerCase())
-    const matchesMonth = !selectedMonth || expense.expense_date.startsWith(selectedMonth)
     const matchesCategory = categoryFilter === 'all' || expense.category === categoryFilter
-    return matchesSearch && matchesMonth && matchesCategory
+    
+    // Timeframe filtering logic
+    const expDate = new Date(expense.expense_date)
+    const now = new Date()
+    let matchesTimeframe = true
+
+    if (timeframe === 'daily') {
+      matchesTimeframe = expense.expense_date === now.toISOString().split('T')[0]
+    } else if (timeframe === 'weekly') {
+      const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+      matchesTimeframe = expDate >= oneWeekAgo
+    } else if (timeframe === 'monthly') {
+      matchesTimeframe = expense.expense_date.startsWith(now.toISOString().slice(0, 7))
+    } else if (timeframe === 'yearly') {
+      matchesTimeframe = expense.expense_date.startsWith(now.getFullYear().toString())
+    }
+
+    return matchesSearch && matchesCategory && matchesTimeframe
+  }).sort((a, b) => {
+    if (sortBy === 'date_desc') return new Date(b.expense_date).getTime() - new Date(a.expense_date).getTime()
+    if (sortBy === 'date_asc') return new Date(a.expense_date).getTime() - new Date(b.expense_date).getTime()
+    if (sortBy === 'amount_desc') return Number(b.amount) - Number(a.amount)
+    if (sortBy === 'amount_asc') return Number(a.amount) - Number(b.amount)
+    return 0
   })
 
   const totalAmount = expenses.reduce((sum, e) => sum + Number(e.amount), 0)
-  const thisMonthAmount = expenses
-    .filter(e => e.expense_date.startsWith(new Date().toISOString().slice(0, 7)))
-    .reduce((sum, e) => sum + Number(e.amount), 0)
+  const filteredTotal = filteredExpenses.reduce((sum, e) => sum + Number(e.amount), 0)
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-surface-900 tracking-tight">Expenses</h1>
-          <p className="text-sm text-surface-500 mt-1">Track internal company costs and operational overhead.</p>
+          <h1 className="text-2xl font-bold text-surface-900 tracking-tight">Expense Records</h1>
+          <p className="text-sm text-surface-500 mt-1">Track operational costs, order linkages, and timeframe analytics.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)} className="input h-10 px-3 text-xs font-semibold bg-white">
+            <option value="date_desc">Sort: Newest Date</option>
+            <option value="date_asc">Sort: Oldest Date</option>
+            <option value="amount_desc">Sort: Amount (High to Low)</option>
+            <option value="amount_asc">Sort: Amount (Low to High)</option>
+          </select>
+
           <div className="relative">
             <Search className="w-4 h-4 text-surface-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input 
@@ -122,20 +152,36 @@ export function AdminExpenses() {
               placeholder="Search expenses..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 pr-4 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none w-full sm:w-64 transition-all"
+              className="pl-9 pr-4 py-2 border border-surface-200 rounded-xl text-xs font-semibold outline-none w-full sm:w-48 transition-all bg-white"
             />
           </div>
-          <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="input h-10 w-auto" />
-          <div className="relative">
-            <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-400" />
-            <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="input h-10 pl-9">
-              <option value="all">All categories</option>{EXPENSE_CATEGORIES.map(category => <option key={category.value} value={category.value}>{category.label}</option>)}
-            </select>
-          </div>
-          <button onClick={() => setIsModalOpen(true)} className="btn-primary h-10 px-4 text-sm font-semibold flex items-center gap-2">
+          
+          <button onClick={() => setIsModalOpen(true)} className="btn-primary h-10 px-4 text-xs font-bold flex items-center gap-2">
             <Plus className="w-4 h-4" /> Log Expense
           </button>
         </div>
+      </div>
+
+      {/* Timeframe Filter Tabs */}
+      <div className="flex items-center justify-between gap-3 border-b border-surface-200 pb-2 overflow-x-auto">
+        <div className="flex items-center gap-1">
+          {['all', 'daily', 'weekly', 'monthly', 'yearly'].map(t => (
+            <button
+              key={t}
+              onClick={() => setTimeframe(t as any)}
+              className={`px-4 py-2 text-xs font-bold rounded-xl capitalize transition-all whitespace-nowrap ${
+                timeframe === t ? 'bg-brand-600 text-white shadow-sm' : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
+              }`}
+            >
+              {t === 'all' ? 'All Time' : t}
+            </button>
+          ))}
+        </div>
+
+        <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="input h-9 px-3 text-xs bg-white w-48">
+          <option value="all">All Categories</option>
+          {EXPENSE_CATEGORIES.map(category => <option key={category.value} value={category.value}>{category.label}</option>)}
+        </select>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -265,25 +311,68 @@ export function AdminExpenses() {
                 </div>
               </div>
 
+              {/* Scope Selection: Daily vs Order-specific */}
               <div>
-                <label className="label">Related Order {['delivery', 'waybill'].includes(form.category) ? '*' : '(Optional)'}</label>
-                <select required={['delivery', 'waybill'].includes(form.category)} className="input" value={form.order_id} onChange={e => {
-                  const order = orders.find(item => item.id === e.target.value)
-                  setForm({ ...form, order_id: e.target.value, dsa_id: order?.dsa_id || form.dsa_id })
-                }}>
-                  <option value="">No specific order</option>
-                  {orders.map(order => <option key={order.id} value={order.id}>{order.order_number} — {order.customer_name}</option>)}
-                </select>
+                <label className="label">Expense Type / Scope *</label>
+                <div className="grid grid-cols-2 gap-2 p-1 bg-surface-100 rounded-xl">
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, expense_scope: 'daily', order_id: '', dsa_id: '' })}
+                    className={`py-2 text-xs font-bold rounded-lg transition-all ${
+                      form.expense_scope === 'daily' ? 'bg-white text-surface-900 shadow-sm' : 'text-surface-600 hover:text-surface-900'
+                    }`}
+                  >
+                    📅 Daily / General Order
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setForm({ ...form, expense_scope: 'order_specific' })}
+                    className={`py-2 text-xs font-bold rounded-lg transition-all ${
+                      form.expense_scope === 'order_specific' ? 'bg-white text-brand-700 shadow-sm' : 'text-surface-600 hover:text-surface-900'
+                    }`}
+                  >
+                    📦 Single DSA Order
+                  </button>
+                </div>
               </div>
 
-              <div>
-                <label className="label">Attribute to DSA {form.category === 'dsa_salary' ? '*' : '(Optional)'}</label>
-                <select required={form.category === 'dsa_salary'} className="input" value={form.dsa_id} onChange={e => setForm({ ...form, dsa_id: e.target.value })}>
-                  <option value="">Company-wide expense</option>
-                  {dsas.map(dsa => <option key={dsa.id} value={dsa.id}>{dsa.full_name}</option>)}
-                </select>
-                <p className="mt-1 text-xs text-surface-400">DSA attribution is required for individual DSA profit/loss.</p>
-              </div>
+              {form.expense_scope === 'order_specific' && (
+                <div className="p-3 bg-brand-50/60 border border-brand-200/60 rounded-xl space-y-3">
+                  <div>
+                    <label className="label text-brand-900 text-xs">Select DSA Order *</label>
+                    <select
+                      required={form.expense_scope === 'order_specific'}
+                      className="input bg-white text-xs"
+                      value={form.order_id}
+                      onChange={e => {
+                        const order = orders.find(item => item.id === e.target.value)
+                        setForm({ ...form, order_id: e.target.value, dsa_id: order?.dsa_id || form.dsa_id })
+                      }}
+                    >
+                      <option value="">Select order number...</option>
+                      {orders.map(order => (
+                        <option key={order.id} value={order.id}>
+                          {order.order_number} — {order.customer_name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="label text-brand-900 text-xs">Attributed DSA</label>
+                    <select
+                      className="input bg-white text-xs"
+                      value={form.dsa_id}
+                      onChange={e => setForm({ ...form, dsa_id: e.target.value })}
+                    >
+                      <option value="">Select DSA agent...</option>
+                      {dsas.map(dsa => (
+                        <option key={dsa.id} value={dsa.id}>{dsa.full_name}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="label">Amount (₦) *</label>

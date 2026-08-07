@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
@@ -10,12 +11,19 @@ import type { Lead } from '@/types'
 
 export function DSALeads() {
   const { user, role } = useAuthStore()
+  const location = useLocation()
   const [leads, setLeads] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (location.search.includes('new=true') || location.pathname.endsWith('/new-lead')) {
+      setIsModalOpen(true)
+    }
+  }, [location])
 
   const [form, setForm] = useState({
     customer_name: '',

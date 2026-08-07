@@ -42,6 +42,7 @@ import { DSALeaderboard } from '@/pages/dsa/Leaderboard'
 import { InstallerDashboard } from '@/pages/installer/Dashboard'
 import { InstallerJobs } from '@/pages/installer/Jobs'
 import { InstallerSchedule } from '@/pages/installer/Schedule'
+import { InstallerEarnings } from '@/pages/installer/Earnings'
 
 // Reseller pages
 import { ResellerDashboard } from '@/pages/reseller/Dashboard'
@@ -175,6 +176,7 @@ export function AppRouter() {
           <Route element={<RequireAuth roles={['dsa']} />}>
             <Route path="/app/dsa"            element={<DSADashboard />} />
             <Route path="/app/dsa/leads"      element={<DSALeads />} />
+            <Route path="/app/dsa/new-lead"   element={<DSALeads />} />
             <Route path="/app/dsa/orders"     element={<DSAOrders />} />
             <Route path="/app/dsa/installers" element={<DSAInstallerBooking />} />
             <Route path="/app/dsa/commission" element={<DSACommissions />} />
@@ -188,6 +190,7 @@ export function AppRouter() {
             <Route path="/app/installer"          element={<InstallerDashboard />} />
             <Route path="/app/installer/jobs"     element={<InstallerJobs />} />
             <Route path="/app/installer/schedule" element={<InstallerSchedule />} />
+            <Route path="/app/installer/earnings" element={<InstallerEarnings />} />
           </Route>
 
           {/* Reseller */}

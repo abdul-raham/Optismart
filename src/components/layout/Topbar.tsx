@@ -68,7 +68,70 @@ export function Topbar() {
       {/* Right side actions */}
       <div className="flex items-center gap-2 md:gap-4 ml-auto">
         
+        {/* Notifications Dropdown */}
         <div className="relative">
+          <button
+            onClick={() => setShowNotifications(!showNotifications)}
+            className="relative p-2 text-surface-600 hover:text-surface-900 hover:bg-white/80 rounded-full transition-all border border-transparent hover:border-surface-200/80"
+          >
+            <Bell className="w-5 h-5" />
+            {unreadCount > 0 && (
+              <span className="absolute top-1 right-1 w-4 h-4 bg-brand-600 text-white font-bold text-[9px] rounded-full flex items-center justify-center border-2 border-white shadow-xs">
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </button>
+
+          <AnimatePresence>
+            {showNotifications && (
+              <>
+                <div 
+                  className="fixed inset-0 z-30" 
+                  onClick={() => setShowNotifications(false)}
+                />
+                <motion.div
+                  initial={{ opacity: 0, y: 10, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 10, scale: 0.95 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute right-0 top-full mt-3 w-80 sm:w-96 rounded-2xl p-3 z-40 border border-white/80 shadow-2xl"
+                  style={{
+                    backdropFilter: 'blur(24px) saturate(180%)',
+                    background: 'rgba(255, 255, 255, 0.94)',
+                    boxShadow: '0 20px 40px -15px rgba(15, 23, 42, 0.18)'
+                  }}
+                >
+                  <div className="flex items-center justify-between px-3 py-2 border-b border-surface-100/80 mb-2">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-surface-900 flex items-center gap-2">
+                      <Bell className="w-3.5 h-3.5 text-brand-600" /> Notifications ({unreadCount})
+                    </h3>
+                    {unreadCount > 0 && (
+                      <button
+                        onClick={() => user?.id && markAllRead(user.id)}
+                        className="text-[11px] font-bold text-brand-600 hover:text-brand-700 transition-colors"
+                      >
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+
+                  <div className="max-h-72 overflow-y-auto space-y-1 divide-y divide-surface-100/60">
+                    {notifications.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-surface-400">No notifications yet.</div>
+                    ) : (
+                      notifications.slice(0, 10).map((n) => (
+                        <div key={n.id} className={`p-2.5 rounded-xl transition-colors ${n.read ? 'opacity-70 bg-transparent' : 'bg-brand-50/50'}`}>
+                          <p className="text-xs font-bold text-surface-900">{n.title}</p>
+                          <p className="text-xs text-surface-600 mt-0.5 leading-snug">{n.message}</p>
+                          <p className="text-[10px] text-surface-400 mt-1 font-medium">{formatDate(n.created_at)}</p>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </motion.div>
+              </>
+            )}
+          </AnimatePresence>
         </div>
 
         <div className="h-6 w-px bg-surface-200/80 hidden md:block"></div>

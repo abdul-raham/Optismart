@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
-import { ShoppingBag, Search, Calendar, Check, X, ArrowRightLeft, Plus, MapPin, Package, User, Edit2, ChevronDown, Filter, Download, FileSpreadsheet } from 'lucide-react'
+import { ShoppingBag, Search, Calendar, Check, X, ArrowRightLeft, Plus, MapPin, Package, User, Edit2, ChevronDown, Filter, Download, FileSpreadsheet, Share2 } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { exportToExcel, exportToCSV } from '@/utils/exportUtils'
 import { OrderStatusBadge } from '@/components/shared/Badges'
@@ -11,6 +11,29 @@ import { TableSkeleton } from '@/components/shared/Skeletons'
 import { sendEmail } from '@/lib/email'
 import { sendWebPush } from '@/lib/push'
 import type { Order, OrderStatus, Product, User as AppUser } from '@/types'
+
+const getWhatsAppShareUrl = (order: Order) => {
+  const text = `*OptiSmart Order Details*\n\n` +
+    `*Order #:* ${order.order_number}\n` +
+    `*Customer:* ${order.customer_name}\n` +
+    `*Phone:* ${order.customer_phone || 'N/A'}\n` +
+    `*Address:* ${order.customer_address || 'N/A'}\n` +
+    `*Quantity:* ${order.quantity}\n` +
+    `*Total Amount:* ₦${Number(order.total_amount).toLocaleString()}\n` +
+    `*Status:* ${order.status.toUpperCase()}\n` +
+    `*Notes:* ${order.notes || 'None'}\n\n` +
+    `_Sent via OptiSmart Portal_`
+
+  let rawPhone = (order.customer_phone || '').replace(/\D/g, '')
+  if (rawPhone.startsWith('0')) {
+    rawPhone = '234' + rawPhone.slice(1)
+  }
+  
+  if (rawPhone.length >= 10) {
+    return `https://api.whatsapp.com/send?phone=${rawPhone}&text=${encodeURIComponent(text)}`
+  }
+  return `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`
+}
 
 export function AdminOrders() {
   const [orders, setOrders] = useState<Order[]>([])
@@ -500,6 +523,18 @@ export function AdminOrders() {
                                         </button>
                                       ))}
                                     </div>
+
+                                     <div className="py-1 border-t border-surface-100">
+                                       <a
+                                         href={getWhatsAppShareUrl(order)}
+                                         target="_blank"
+                                         rel="noopener noreferrer"
+                                         onClick={() => setOpenDropdownId(null)}
+                                         className="w-full px-3.5 py-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 flex items-center gap-2 transition-colors cursor-pointer"
+                                       >
+                                         <Share2 className="w-3.5 h-3.5 text-emerald-600" /> Export to WhatsApp
+                                       </a>
+                                     </div>
 
                                     {((order.installation_needed && !assignedOrderIds.has(order.id)) || order.status === 'cancelled') && (
                                       <div className="py-1">

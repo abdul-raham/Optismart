@@ -1,9 +1,12 @@
 import nodemailer from 'nodemailer'
 
-const gmailUser = process.env.GMAIL_USER
-const gmailAppPassword = process.env.GMAIL_APP_PASSWORD
+const emailUser = process.env.SMTP_USER || process.env.GMAIL_USER
+const emailPass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD
+const smtpHost = process.env.SMTP_HOST
+const smtpPort = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 465
+const smtpSecure = process.env.SMTP_SECURE !== 'false'
 const fromName = process.env.EMAIL_FROM_NAME || 'OptiSmart Portal'
-const supportEmail = process.env.EMAIL_SUPPORT_ADDRESS || gmailUser
+const supportEmail = process.env.EMAIL_SUPPORT_ADDRESS || emailUser
 const appUrl = process.env.APP_URL || 'http://localhost:5173'
 const allowedOrigins = new Set(
   String(process.env.EMAIL_ALLOWED_ORIGINS || appUrl)
@@ -12,12 +15,23 @@ const allowedOrigins = new Set(
     .filter(Boolean),
 )
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: { user: gmailUser, pass: gmailAppPassword },
-  pool: true,
-  rateLimit: true,
-})
+const transporter = nodemailer.createTransport(
+  smtpHost
+    ? {
+        host: smtpHost,
+        port: smtpPort,
+        secure: smtpSecure,
+        auth: { user: emailUser, pass: emailPass },
+        pool: true,
+        rateLimit: true,
+      }
+    : {
+        service: 'gmail',
+        auth: { user: emailUser, pass: emailPass },
+        pool: true,
+        rateLimit: true,
+      }
+)
 
 function escapeHtml(value) {
   return String(value ?? '')
@@ -108,26 +122,30 @@ const templates = {
     `),
   }),
 
-  new_order: ({ recipientEmail, orderNumber, customerName, totalAmount }) => ({
-    to: recipientEmail,
-    subject: `Order Confirmation - ${orderNumber}`,
-    html: layout('Order Confirmed', `
-      <h2>Order Successfully Placed</h2>
-      <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin: 24px 0;">
-        <p style="margin: 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 700; letter-spacing: 1px;">Order Reference</p>
-        <p style="margin: 4px 0 0 0; font-size: 20px; font-weight: 800; color: #0f172a;">${escapeHtml(orderNumber)}</p>
-        <div style="margin-top: 16px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
-          <p style="margin: 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 700; letter-spacing: 1px;">Customer</p>
-          <p style="margin: 4px 0 0 0; font-size: 16px; font-weight: 600; color: #334155;">${escapeHtml(customerName)}</p>
-          ${totalAmount ? `
-          <p style="margin: 8px 0 0 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 700; letter-spacing: 1px;">Total Amount</p>
-          <p style="margin: 4px 0 0 0; font-size: 16px; font-weight: 600; color: #334155;">&#8358;${Number(totalAmount).toLocaleString()}</p>
-          ` : ''}
+  new_order: ({ recipientEmail, customerEmail, dsaEmail, orderNumber, customerName, totalAmount, amount }) => {
+    const to = recipientEmail || customerEmail || dsaEmail
+    const amt = totalAmount || amount
+    return {
+      to,
+      subject: `New Order Created - ${orderNumber}`,
+      html: layout('New Order Alert', `
+        <h2>New Order Placed</h2>
+        <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px; padding: 20px; margin: 24px 0;">
+          <p style="margin: 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 700; letter-spacing: 1px;">Order Reference</p>
+          <p style="margin: 4px 0 0 0; font-size: 20px; font-weight: 800; color: #0f172a;">${escapeHtml(orderNumber)}</p>
+          <div style="margin-top: 16px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
+            <p style="margin: 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 700; letter-spacing: 1px;">Customer</p>
+            <p style="margin: 4px 0 0 0; font-size: 16px; font-weight: 600; color: #334155;">${escapeHtml(customerName)}</p>
+            ${amt ? `
+            <p style="margin: 8px 0 0 0; color: #64748b; font-size: 13px; text-transform: uppercase; font-weight: 700; letter-spacing: 1px;">Total Amount</p>
+            <p style="margin: 4px 0 0 0; font-size: 16px; font-weight: 600; color: #334155;">&#8358;${Number(amt).toLocaleString()}</p>
+            ` : ''}
+          </div>
         </div>
-      </div>
-      ${button(`${appUrl}/app/orders`, 'Track Order')}
-    `),
-  }),
+        ${button(`${appUrl}/app/admin/orders`, 'View Order in Portal')}
+      `),
+    }
+  },
 
   order_status_update: ({ recipientEmail, customerName, orderNumber, status }) => ({
     to: recipientEmail,
@@ -196,8 +214,8 @@ export default async function handler(req, res) {
 
   if (req.method === 'OPTIONS') return res.status(204).end()
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' })
-  if (!gmailUser || !gmailAppPassword) {
-    return res.status(500).json({ error: 'Email environment variables are missing' })
+  if (!emailUser || !emailPass) {
+    return res.status(500).json({ error: 'Email environment variables are missing (SMTP_USER/GMAIL_USER or SMTP_PASS/GMAIL_APP_PASSWORD)' })
   }
 
   try {
@@ -209,7 +227,7 @@ export default async function handler(req, res) {
     if (!email.to) return res.status(400).json({ error: 'Recipient email is required' })
 
     await transporter.sendMail({
-      from: `"${String(fromName).replace(/["\\r\\n]/g, '')}" <${gmailUser}>`,
+      from: `"${String(fromName).replace(/["\r\n]/g, '')}" <${emailUser}>`,
       ...email,
     })
 

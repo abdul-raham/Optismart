@@ -10,7 +10,12 @@ import { optismartCatalogProducts } from '@/data/optismartProducts'
 import { getProductImage } from '@/lib/productImages'
 import { optimizeImage, uploadProductImage } from '@/utils/imageUpload'
 
+import { useAuthStore } from '@/stores/authStore'
+
 export function AdminProducts() {
+  const { user } = useAuthStore()
+  const isSuperAdmin = user?.role === 'super_admin'
+
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -386,11 +391,13 @@ export function AdminProducts() {
                       </div>
                     </div>
 
-                    <div>
-                      <label className="label">Company Cost Price (₦) *</label>
-                      <input required type="number" min={0} className="input" value={form.cost_price} onChange={e => setForm({...form, cost_price: Number(e.target.value)})} />
-                      <p className="mt-1 text-xs text-surface-400">Private acquisition cost used for profit/loss. It is copied into each new order.</p>
-                    </div>
+                    {isSuperAdmin && (
+                      <div>
+                        <label className="label">Company Cost Price (₦) *</label>
+                        <input required type="number" min={0} className="input font-semibold text-brand-700" value={form.cost_price} onChange={e => setForm({...form, cost_price: Number(e.target.value)})} />
+                        <p className="mt-1 text-xs text-surface-400">Superadmin-only acquisition cost used for profit/loss calculation.</p>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>

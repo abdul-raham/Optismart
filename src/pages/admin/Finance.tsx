@@ -5,6 +5,9 @@ import { Banknote, Camera, Loader2, PieChart, TrendingDown, TrendingUp, Users } 
 import { supabase } from '@/lib/supabase'
 import { formatCurrency } from '@/lib/utils'
 
+import { useAuthStore } from '@/stores/authStore'
+import { ShieldAlert } from 'lucide-react'
+
 const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 interface FinanceOrder {
@@ -43,6 +46,9 @@ interface DsaProfitLoss {
 const monthKey = (value: string | null | undefined) => value?.slice(0, 7) || ''
 
 export function AdminFinance() {
+  const { user } = useAuthStore()
+  const isSuperAdmin = user?.role === 'super_admin'
+
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7))
@@ -140,6 +146,23 @@ export function AdminFinance() {
     selectedExpenses.forEach(expense => { values[expense.category] = (values[expense.category] || 0) + Number(expense.amount) })
     return Object.entries(values).filter(([, amount]) => amount > 0).sort((a, b) => b[1] - a[1])
   }, [cameraCost, selectedExpenses])
+
+  if (!isSuperAdmin) {
+    return (
+      <div className="glass-card p-12 text-center max-w-xl mx-auto my-12">
+        <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mx-auto mb-4 border border-amber-200">
+          <ShieldAlert className="w-8 h-8" />
+        </div>
+        <h2 className="text-xl font-bold text-surface-900 mb-2">Restricted Superadmin Feature</h2>
+        <p className="text-surface-600 text-sm leading-relaxed mb-6">
+          Company Profit & Loss metrics, camera acquisition cost margins, and DSA profitability reports are confidential and accessible exclusively to <strong>Superadmin</strong> accounts.
+        </p>
+        <button onClick={() => window.location.href = '/app/admin'} className="btn-primary px-6 py-2.5 text-xs">
+          Return to Dashboard
+        </button>
+      </div>
+    )
+  }
 
   if (loading) return <div className="flex h-64 items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-brand-500" /></div>
 

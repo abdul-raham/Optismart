@@ -36,6 +36,7 @@ const MOBILE_NAV_ITEMS: Record<UserRole, { label: string; href: string; icon: an
   reseller: [
     { label: 'Home',   href: '/app/reseller',        icon: LayoutDashboard },
     { label: 'Orders', href: '/app/reseller/orders', icon: ShoppingBag },
+    { label: 'Learn',  href: '/app/training',        icon: BookOpen },
     { label: 'Profile',href: '/app/settings',        icon: Settings },
   ],
 }

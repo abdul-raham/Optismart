@@ -35,6 +35,43 @@ export async function sendEmail(
       options.onError(error)
       return { success: false, error: error.message }
     }
-    throw error
+    console.error('sendEmail failed:', error)
+    return { success: false, error: error.message }
   }
 }
+
+export async function notifyAdminsNewOrder(orderData: {
+  orderNumber: string
+  customerName: string
+  amount: number
+  creatorName?: string
+}) {
+  try {
+    const { supabase } = await import('@/lib/supabase')
+    const { data: admins } = await supabase
+      .from('users')
+      .select('email')
+      .in('role', ['admin', 'super_admin'])
+
+    if (!admins || admins.length === 0) return
+
+    for (const admin of admins) {
+      if (admin.email) {
+        sendEmail(
+          'new_order',
+          {
+            recipientEmail: admin.email,
+            orderNumber: orderData.orderNumber,
+            customerName: orderData.customerName,
+            amount: orderData.amount,
+            creatorName: orderData.creatorName || 'Portal User'
+          },
+          { onError: (err) => console.warn(`Admin notification failed for ${admin.email}:`, err) }
+        )
+      }
+    }
+  } catch (error) {
+    console.warn('Error fetching admin emails for order notification:', error)
+  }
+}
+

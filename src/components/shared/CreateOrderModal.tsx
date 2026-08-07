@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { X, Loader2, Package, User, Phone, MapPin, Building2, CheckCircle2, Copy } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { sendEmail } from '@/lib/email'
+import { sendEmail, notifyAdminsNewOrder } from '@/lib/email'
 import { useAuthStore } from '@/stores/authStore'
 import type { Product } from '@/types'
 
@@ -140,6 +140,14 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
       })
 
       if (insertError) throw insertError
+
+      // Notify all Admins and Superadmins via email alert
+      notifyAdminsNewOrder({
+        orderNumber: orderNumber,
+        customerName: customerName,
+        amount: totalAmount,
+        creatorName: user?.full_name || 'Portal User'
+      })
 
       // Trigger email notification in background
       // This sends a "receipt / invoice" email to the customer if email is provided

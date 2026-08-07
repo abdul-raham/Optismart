@@ -83,36 +83,93 @@ export function AdminPayments() {
     }
   }
 
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [sortBy, setSortBy] = useState<'newest' | 'oldest' | 'amount_high' | 'amount_low'>('newest')
+
   const filteredPayments = payments.filter((payment) => {
     const term = search.toLowerCase()
-    return (
+    const matchesSearch = (
       payment.orders?.order_number?.toLowerCase().includes(term) ||
       payment.orders?.customer_name?.toLowerCase().includes(term) ||
       payment.reference_code?.toLowerCase().includes(term) ||
       payment.receipt_number?.toLowerCase().includes(term)
     )
+
+    if (!matchesSearch) return false
+
+    if (statusFilter === 'all') return true
+    if (statusFilter === 'pending') return payment.status === 'pending'
+    if (statusFilter === 'confirmed') return payment.status === 'confirmed' || payment.status === 'delivered'
+    if (statusFilter === 'outstanding') return payment.status === 'outstanding' || (payment.status === 'pending' && payment.orders?.status === 'pending')
+    if (statusFilter === 'cancelled') return payment.status === 'cancelled' || payment.orders?.status === 'cancelled'
+
+    return true
+  }).sort((a, b) => {
+    if (sortBy === 'newest') return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    if (sortBy === 'oldest') return new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    if (sortBy === 'amount_high') return Number(b.amount) - Number(a.amount)
+    if (sortBy === 'amount_low') return Number(a.amount) - Number(b.amount)
+    return 0
   })
 
-  const pendingCount = payments.filter((payment) => payment.status === 'pending').length
-  const confirmedCount = payments.filter((payment) => payment.status === 'confirmed').length
+  // Calculate metrics for each status: count and total monetary value
+  const pendingPayments = payments.filter(p => p.status === 'pending')
+  const confirmedPayments = payments.filter(p => p.status === 'confirmed' || p.status === 'delivered')
+  const outstandingPayments = payments.filter(p => p.status === 'outstanding' || (p.status === 'pending' && p.orders?.status === 'pending'))
+  const cancelledPayments = payments.filter(p => p.status === 'cancelled' || p.orders?.status === 'cancelled')
+
+  const pendingVal = pendingPayments.reduce((s, p) => s + Number(p.amount), 0)
+  const confirmedVal = confirmedPayments.reduce((s, p) => s + Number(p.amount), 0)
+  const outstandingVal = outstandingPayments.reduce((s, p) => s + Number(p.amount), 0)
+  const cancelledVal = cancelledPayments.reduce((s, p) => s + Number(p.amount), 0)
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-surface-900">Payments</h1>
-          <p className="mt-1 text-sm text-surface-500">Confirm transactions and unlock the order lifecycle.</p>
+          <h1 className="text-2xl font-bold tracking-tight text-surface-900">Payments & Transactions</h1>
+          <p className="mt-1 text-sm text-surface-500">Track payment verification, status metrics, and sorting control.</p>
         </div>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-400" />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} className="input h-10 w-full pl-9 sm:w-72" placeholder="Search payment..." />
+        <div className="flex flex-wrap items-center gap-3">
+          <select
+            value={sortBy}
+            onChange={(e) => setSortBy(e.target.value as any)}
+            className="input h-10 px-3 text-xs font-semibold bg-white border-surface-200 rounded-xl"
+          >
+            <option value="newest">Sort: Newest First</option>
+            <option value="oldest">Sort: Oldest First</option>
+            <option value="amount_high">Sort: Amount (High to Low)</option>
+            <option value="amount_low">Sort: Amount (Low to High)</option>
+          </select>
+
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-400" />
+            <input value={search} onChange={(e) => setSearch(e.target.value)} className="input h-10 w-full pl-9 sm:w-64" placeholder="Search reference, customer..." />
+          </div>
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <SummaryCard title="Pending" value={pendingCount} icon={CreditCard} tone="warning" />
-        <SummaryCard title="Confirmed" value={confirmedCount} icon={CheckCircle2} tone="success" />
-        <SummaryCard title="Total Value" value={formatCurrency(payments.reduce((sum, payment) => sum + Number(payment.amount), 0))} icon={ReceiptText} tone="brand" />
+      {/* Metric Cards showing numbers AND ₦ values */}
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
+        <SummaryCard title="Pending Payments" count={pendingPayments.length} value={formatCurrency(pendingVal)} icon={CreditCard} tone="warning" />
+        <SummaryCard title="Confirmed / Delivered" count={confirmedPayments.length} value={formatCurrency(confirmedVal)} icon={CheckCircle2} tone="success" />
+        <SummaryCard title="Outstanding Balances" count={outstandingPayments.length} value={formatCurrency(outstandingVal)} icon={ReceiptText} tone="brand" />
+        <SummaryCard title="Cancelled" count={cancelledPayments.length} value={formatCurrency(cancelledVal)} icon={ReceiptText} tone="danger" />
+      </div>
+
+      {/* Filter Tabs */}
+      <div className="flex items-center gap-2 border-b border-surface-200 pb-2 overflow-x-auto">
+        {['all', 'pending', 'confirmed', 'outstanding', 'cancelled'].map(tab => (
+          <button
+            key={tab}
+            onClick={() => setStatusFilter(tab)}
+            className={`px-4 py-2 text-xs font-bold rounded-xl capitalize transition-all whitespace-nowrap ${
+              statusFilter === tab ? 'bg-brand-600 text-white shadow-sm' : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
+            }`}
+          >
+            {tab}
+          </button>
+        ))}
       </div>
 
       {loading ? (
@@ -123,7 +180,7 @@ export function AdminPayments() {
             <CreditCard className="h-8 w-8 text-brand-600" />
           </div>
           <h2 className="text-lg font-bold text-surface-900">No payments found</h2>
-          <p className="mt-1 text-sm text-surface-500">New order payment records appear here automatically.</p>
+          <p className="mt-1 text-sm text-surface-500">No transactions match your current search or status filter.</p>
         </div>
       ) : (
         <div className="glass-card overflow-hidden">
@@ -133,9 +190,9 @@ export function AdminPayments() {
               <table className="w-full text-left text-sm">
               <thead className="bg-surface-50/70 text-xs uppercase tracking-wider text-surface-500">
                 <tr>
-                  <th className="px-5 py-4 font-bold">Order</th>
+                  <th className="px-5 py-4 font-bold">Order #</th>
                   <th className="px-5 py-4 font-bold">Customer</th>
-                  <th className="px-5 py-4 font-bold">Reference</th>
+                  <th className="px-5 py-4 font-bold">Reference / Receipt</th>
                   <th className="px-5 py-4 font-bold">Amount</th>
                   <th className="px-5 py-4 font-bold">Status</th>
                   <th className="px-5 py-4 text-right font-bold">Action</th>
@@ -159,17 +216,21 @@ export function AdminPayments() {
                       </td>
                       <td className="px-5 py-4 font-bold text-surface-900">{formatCurrency(payment.amount)}</td>
                       <td className="px-5 py-4">
-                        <span className={payment.status === 'confirmed' ? 'badge-green' : 'badge-yellow'}>
+                        <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
+                          payment.status === 'confirmed' || payment.status === 'delivered' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                          payment.status === 'cancelled' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
+                          'bg-amber-50 text-amber-700 border border-amber-200'
+                        }`}>
                           {payment.status}
                         </span>
                       </td>
                       <td className="px-5 py-4 text-right">
                         {payment.status === 'pending' ? (
                           <button onClick={() => confirmPayment(payment)} disabled={updating === payment.id} className="btn-primary h-9 px-3 text-xs">
-                            {updating === payment.id ? 'Confirming...' : 'Confirm'}
+                            {updating === payment.id ? 'Confirming...' : 'Confirm Payment'}
                           </button>
                         ) : (
-                          <span className="text-xs font-bold text-success-600">Confirmed</span>
+                          <span className="text-xs font-bold text-success-600">Verified</span>
                         )}
                       </td>
                     </motion.tr>
@@ -196,7 +257,9 @@ export function AdminPayments() {
                     </div>
                     <div className="text-right">
                       <p className="font-bold text-surface-900">{formatCurrency(payment.amount)}</p>
-                      <span className={`mt-2 inline-block ${payment.status === 'confirmed' ? 'badge-green' : 'badge-yellow'}`}>
+                      <span className={`mt-2 inline-block px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                        payment.status === 'confirmed' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700'
+                      }`}>
                         {payment.status}
                       </span>
                     </div>
@@ -213,7 +276,7 @@ export function AdminPayments() {
                           {updating === payment.id ? 'Confirming...' : 'Confirm'}
                         </button>
                       ) : (
-                        <span className="text-xs font-bold text-success-600">Confirmed</span>
+                        <span className="text-xs font-bold text-success-600">Verified</span>
                       )}
                     </div>
                   </div>
@@ -228,20 +291,26 @@ export function AdminPayments() {
   )
 }
 
-function SummaryCard({ title, value, icon: Icon, tone }: { title: string; value: string | number; icon: React.ElementType; tone: 'brand' | 'warning' | 'success' }) {
+function SummaryCard({ title, count, value, icon: Icon, tone }: { title: string; count: number; value: string; icon: React.ElementType; tone: 'brand' | 'warning' | 'success' | 'danger' }) {
   const colors = {
-    brand: 'bg-brand-50 text-brand-600',
-    warning: 'bg-warning-50 text-warning-600',
-    success: 'bg-success-50 text-success-600',
+    brand: 'bg-brand-50 text-brand-600 border-brand-200',
+    warning: 'bg-warning-50 text-warning-600 border-warning-200',
+    success: 'bg-success-50 text-success-600 border-success-200',
+    danger: 'bg-danger-50 text-danger-600 border-danger-200',
   }
 
   return (
-    <div className="glass-card p-5">
-      <div className={`mb-4 flex h-11 w-11 items-center justify-center rounded-2xl ${colors[tone]}`}>
-        <Icon className="h-5 w-5" />
+    <div className="glass-card p-5 border shadow-sm">
+      <div className="flex items-center justify-between mb-3">
+        <div className={`flex h-10 w-10 items-center justify-center rounded-xl border ${colors[tone]}`}>
+          <Icon className="h-5 w-5" />
+        </div>
+        <span className="px-2.5 py-0.5 rounded-full text-xs font-extrabold bg-surface-100 text-surface-700">
+          {count} transactions
+        </span>
       </div>
-      <p className="text-sm font-semibold text-surface-500">{title}</p>
-      <p className="mt-1 text-2xl font-black text-surface-900">{value}</p>
+      <p className="text-xs font-bold uppercase tracking-wider text-surface-500">{title}</p>
+      <p className="mt-1 text-xl font-black text-surface-900">{value}</p>
     </div>
   )
 }

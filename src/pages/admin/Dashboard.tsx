@@ -1,23 +1,30 @@
 import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
+import { useAuthStore } from '@/stores/authStore'
 import { StatCard } from '@/components/shared/StatCard'
 import { OrderStatusBadge } from '@/components/shared/Badges'
 import { StatCardSkeleton, TableSkeleton } from '@/components/shared/Skeletons'
-import { ShoppingBag, Users, Banknote, Wrench, ArrowUpRight, Download, FileSpreadsheet } from 'lucide-react'
+import { ShoppingBag, Users, Banknote, Wrench, ArrowUpRight, Download, FileSpreadsheet, AlertTriangle, Clock } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { MobileDashboardNav } from '@/components/layout/MobileDashboardNav'
 import { exportToExcel, exportToCSV } from '@/utils/exportUtils'
 import type { Order } from '@/types'
 
 export function AdminDashboard() {
+  const { user } = useAuthStore()
+  const isSuperAdmin = user?.role === 'super_admin'
+
   const [stats, setStats] = useState({
     totalRevenue: 0,
     totalOrders: 0,
     activeDSAs: 0,
-    activeInstallers: 0
+    activeInstallers: 0,
+    outstandingOrdersCount: 0,
+    outstandingOrdersValue: 0
   })
   const [recentOrders, setRecentOrders] = useState<Order[]>([])
+  const [outstandingOrders, setOutstandingOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
 
   const [allOrders, setAllOrders] = useState<Order[]>([])
@@ -34,8 +41,21 @@ export function AdminDashboard() {
       if (orders) {
         const activeOrders = orders.filter(o => o.status !== 'cancelled')
         const revenue = activeOrders.reduce((sum, o) => sum + Number(o.total_amount), 0)
-        setStats(prev => ({ ...prev, totalRevenue: revenue, totalOrders: activeOrders.length }))
+        
+        // Outstanding orders: pending, unassigned, in_progress, processing
+        const outstanding = orders.filter(o => ['pending', 'unassigned', 'in_progress', 'processing'].includes(o.status))
+        const outstandingVal = outstanding.reduce((sum, o) => sum + Number(o.total_amount), 0)
+
+        setStats(prev => ({
+          ...prev,
+          totalRevenue: revenue,
+          totalOrders: activeOrders.length,
+          outstandingOrdersCount: outstanding.length,
+          outstandingOrdersValue: outstandingVal
+        }))
         setAllOrders(orders)
+        setOutstandingOrders(outstanding)
+
         const recent = [...orders].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 5)
         setRecentOrders(recent)
       }
@@ -115,14 +135,26 @@ export function AdminDashboard() {
         <StatCardSkeleton count={4} />
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard
-            title="Total Revenue"
-            value={formatCurrency(stats.totalRevenue)}
-            icon={Banknote}
-            color="brand"
-            trend={{ value: 12.5, isPositive: true }}
-            delay={0.1}
-          />
+          {/* Total Revenue visible ONLY to super_admin; admin sees Outstanding Orders Value */}
+          {isSuperAdmin ? (
+            <StatCard
+              title="Total Revenue"
+              value={formatCurrency(stats.totalRevenue)}
+              icon={Banknote}
+              color="brand"
+              trend={{ value: 12.5, isPositive: true }}
+              delay={0.1}
+            />
+          ) : (
+            <StatCard
+              title="Outstanding Orders Value"
+              value={formatCurrency(stats.outstandingOrdersValue)}
+              icon={Clock}
+              color="warning"
+              delay={0.1}
+            />
+          )}
+
           <StatCard
             title="Total Orders"
             value={stats.totalOrders}
@@ -147,6 +179,67 @@ export function AdminDashboard() {
           />
         </div>
       )}
+
+      {/* PRIORITY: Outstanding Orders Section */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="glass-card overflow-hidden border-2 border-amber-300/80 shadow-md"
+      >
+        <div className="p-4 bg-amber-50/80 border-b border-amber-200/80 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-full bg-amber-500 text-white flex items-center justify-center font-bold">
+              <AlertTriangle className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-amber-950 flex items-center gap-2">
+                Outstanding Orders Needing Action ({stats.outstandingOrdersCount})
+              </h2>
+              <p className="text-xs text-amber-800 font-medium">Orders pending assignment, dispatch, or confirmation.</p>
+            </div>
+          </div>
+          <button onClick={() => window.location.href = '/app/admin/orders'} className="btn-sm bg-amber-600 hover:bg-amber-700 text-white font-bold">
+            Manage Orders <ArrowUpRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse text-sm">
+            <thead>
+              <tr className="bg-surface-50/60 text-surface-500 text-xs uppercase tracking-wider font-semibold border-b border-surface-100">
+                <th className="py-3 px-5">Order #</th>
+                <th className="py-3 px-5">Customer</th>
+                <th className="py-3 px-5">Date</th>
+                <th className="py-3 px-5">Amount</th>
+                <th className="py-3 px-5">Status</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-surface-100">
+              {loading ? (
+                <tr>
+                  <td colSpan={5} className="py-6 text-center text-surface-400">Loading outstanding orders...</td>
+                </tr>
+              ) : outstandingOrders.length === 0 ? (
+                <tr>
+                  <td colSpan={5} className="py-6 text-center text-emerald-700 bg-emerald-50/50 font-semibold">
+                    ✓ All caught up! No pending or unassigned orders.
+                  </td>
+                </tr>
+              ) : (
+                outstandingOrders.slice(0, 6).map((order) => (
+                  <tr key={order.id} className="hover:bg-amber-50/30 transition-colors">
+                    <td className="py-3 px-5 font-bold text-surface-900">{order.order_number}</td>
+                    <td className="py-3 px-5 font-medium text-surface-800">{order.customer_name}</td>
+                    <td className="py-3 px-5 text-surface-500">{formatDate(order.created_at)}</td>
+                    <td className="py-3 px-5 font-bold text-surface-900">{formatCurrency(order.total_amount)}</td>
+                    <td className="py-3 px-5"><OrderStatusBadge status={order.status} /></td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </motion.div>
 
       {/* Recent Orders Section */}
       <motion.div
