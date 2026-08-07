@@ -25,6 +25,38 @@ export function AdminProducts() {
   const [syncing, setSyncing] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
 
+  const [activeTab, setActiveTab] = useState<'products' | 'promos'>('products')
+  const [promoPackages, setPromoPackages] = useState<any[]>([
+    {
+      id: 'promo_ptz_bulb',
+      title: 'Buy PTZ Camera + Get Smart Bulb FREE',
+      description: 'Outdoor PTZ Security Camera bundled with 1 Free Smart Bulb',
+      bonus_item_name: 'Smart Bulb 12W',
+      promo_price: 45000,
+      cost_price: 25000,
+      is_active: true,
+    },
+    {
+      id: 'promo_solar_kit',
+      title: 'Solar PTZ 4G + Free Heavy-Duty Bracket',
+      description: 'Solar powered 4G PTZ Camera bundled with Free Mounting Bracket',
+      bonus_item_name: 'Heavy Duty Pole Bracket',
+      promo_price: 75000,
+      cost_price: 45000,
+      is_active: true,
+    },
+  ])
+  const [editingPromo, setEditingPromo] = useState<any | null>(null)
+  const [isPromoModalOpen, setIsPromoModalOpen] = useState(false)
+  const [promoForm, setPromoForm] = useState({
+    title: '',
+    description: '',
+    bonus_item_name: '',
+    promo_price: 0,
+    cost_price: 0,
+    is_active: true,
+  })
+
   const [form, setForm] = useState({
     name: '',
     description: '',
@@ -180,32 +212,59 @@ export function AdminProducts() {
     <div className="space-y-6 relative">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-surface-900 tracking-tight">Product Catalog</h1>
-          <p className="text-sm text-surface-500 mt-1">Manage physical hardware, pricing, and stock levels.</p>
+          <h1 className="text-2xl font-bold text-surface-900 tracking-tight">Product & Promo Catalog</h1>
+          <p className="text-sm text-surface-500 mt-1">Manage cameras, acquisition costs, and promo bundle packages.</p>
         </div>
         <div className="flex items-center gap-3">
           <div className="relative">
             <Search className="w-4 h-4 text-surface-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input 
               type="text" 
-              placeholder="Search products..." 
+              placeholder="Search..." 
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9 pr-4 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none w-full sm:w-64 transition-all"
             />
           </div>
-          <button onClick={() => { setEditingId(null); setForm({ name: '', description: '', retail_price: 0, wholesale_price: 0, cost_price: 0, stock_quantity: 0, min_stock_level: 5, source_url: '', image_url: '' }); setIsModalOpen(true); }} className="btn-primary h-10 px-4 text-sm font-semibold flex items-center gap-2">
-            <Plus className="w-4 h-4" /> Add Product
-          </button>
+          {activeTab === 'products' ? (
+            <button onClick={() => { setEditingId(null); setForm({ name: '', description: '', retail_price: 0, wholesale_price: 0, cost_price: 0, stock_quantity: 0, min_stock_level: 5, source_url: '', image_url: '' }); setIsModalOpen(true); }} className="btn-primary h-10 px-4 text-sm font-semibold flex items-center gap-2">
+              <Plus className="w-4 h-4" /> Add Product
+            </button>
+          ) : (
+            <button onClick={() => { setEditingPromo(null); setPromoForm({ title: '', description: '', bonus_item_name: '', promo_price: 0, cost_price: 0, is_active: true }); setIsPromoModalOpen(true); }} className="btn-primary h-10 px-4 text-sm font-semibold flex items-center gap-2">
+              <Plus className="w-4 h-4" /> Create Promo Package
+            </button>
+          )}
           <button onClick={syncOptismartCatalog} disabled={syncing} className="btn-outline h-10 px-4 text-sm font-semibold flex items-center gap-2">
             <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} /> Sync OptiSmart
           </button>
         </div>
       </div>
 
-      {loading ? (
-        <CardGridSkeleton count={6} />
-      ) : filteredProducts.length === 0 ? (
+      {/* Header Tabs */}
+      <div className="flex items-center gap-2 border-b border-surface-200 pb-3">
+        <button
+          onClick={() => setActiveTab('products')}
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${
+            activeTab === 'products' ? 'bg-brand-600 text-white shadow-sm' : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
+          }`}
+        >
+          📦 Camera Catalog ({products.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('promos')}
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${
+            activeTab === 'promos' ? 'bg-brand-600 text-white shadow-sm' : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
+          }`}
+        >
+          🎁 Promo Packages ({promoPackages.length})
+        </button>
+      </div>
+
+      {activeTab === 'products' ? (
+        loading ? (
+          <CardGridSkeleton count={6} />
+        ) : filteredProducts.length === 0 ? (
         <div className="glass-card p-12 flex flex-col items-center justify-center text-center">
           <div className="w-16 h-16 rounded-2xl bg-surface-100 flex items-center justify-center mb-4">
             <Package className="w-8 h-8 text-surface-400" />
@@ -307,8 +366,185 @@ export function AdminProducts() {
             ))}
           </AnimatePresence>
         </div>
-      )}
+      )) : (
+        /* PROMO PACKAGES TAB */
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
+          {promoPackages.map(promo => (
+            <div key={promo.id} className="glass-card p-5 border border-brand-100/80 bg-gradient-to-br from-white to-brand-50/20 relative overflow-hidden">
+              <div className="flex items-start justify-between mb-3">
+                <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-brand-100 text-brand-700">
+                  🎁 Promo Package
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => {
+                      setEditingPromo(promo)
+                      setPromoForm({
+                        title: promo.title,
+                        description: promo.description || '',
+                        bonus_item_name: promo.bonus_item_name || '',
+                        promo_price: promo.promo_price || 0,
+                        cost_price: promo.cost_price || 0,
+                        is_active: promo.is_active,
+                      })
+                      setIsPromoModalOpen(true)
+                    }}
+                    className="p-1.5 text-surface-400 hover:text-brand-600 hover:bg-brand-50 rounded-md transition-colors"
+                    title="Edit Promo Package"
+                  >
+                    <Edit2 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => setPromoPackages(prev => prev.filter(p => p.id !== promo.id))}
+                    className="p-1.5 text-surface-400 hover:text-danger-600 hover:bg-danger-50 rounded-md transition-colors"
+                    title="Delete Promo"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
 
+              <h3 className="font-bold text-surface-900 text-base mb-1">{promo.title}</h3>
+              <p className="text-xs text-surface-600 mb-4 leading-relaxed">{promo.description}</p>
+
+              <div className="p-3 bg-white rounded-xl border border-surface-100 space-y-2 mb-4">
+                <div className="flex justify-between items-center text-xs">
+                  <span className="text-surface-500 font-semibold">Included Free Gift:</span>
+                  <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">✨ {promo.bonus_item_name}</span>
+                </div>
+                <div className="flex justify-between items-center text-xs pt-1 border-t border-surface-100">
+                  <span className="text-surface-500 font-semibold">Promo Package Price:</span>
+                  <span className="font-extrabold text-brand-700 text-sm">{formatCurrency(promo.promo_price)}</span>
+                </div>
+                {isSuperAdmin && (
+                  <div className="flex justify-between items-center text-xs pt-1 border-t border-surface-100">
+                    <span className="text-surface-400 font-medium">Acquisition Cost:</span>
+                    <span className="font-bold text-surface-600">{formatCurrency(promo.cost_price)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+      {createPortal(
+        <AnimatePresence>
+          {isPromoModalOpen && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+              <motion.div
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm"
+                onClick={() => setIsPromoModalOpen(false)}
+              />
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95, y: 20 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                className="bg-white w-full max-w-md relative z-10 rounded-2xl shadow-card-xl overflow-hidden"
+              >
+                <div className="px-6 py-4 border-b border-surface-100 flex items-center justify-between bg-surface-50">
+                  <h2 className="text-lg font-bold text-surface-900">
+                    {editingPromo ? 'Edit Promo Package' : 'Create Promo Package'}
+                  </h2>
+                  <button onClick={() => setIsPromoModalOpen(false)} className="text-surface-400 hover:text-surface-900">
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+
+                <form
+                  onSubmit={e => {
+                    e.preventDefault()
+                    if (editingPromo) {
+                      setPromoPackages(prev =>
+                        prev.map(p => (p.id === editingPromo.id ? { ...p, ...promoForm } : p))
+                      )
+                    } else {
+                      setPromoPackages(prev => [
+                        ...prev,
+                        { id: `promo_${Date.now()}`, ...promoForm },
+                      ])
+                    }
+                    setIsPromoModalOpen(false)
+                  }}
+                  className="p-6 space-y-4"
+                >
+                  <div>
+                    <label className="label">Promo Title *</label>
+                    <input
+                      required
+                      type="text"
+                      className="input"
+                      placeholder="e.g. Buy PTZ Camera + Free Smart Bulb"
+                      value={promoForm.title}
+                      onChange={e => setPromoForm({ ...promoForm, title: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="label">Description</label>
+                    <textarea
+                      rows={2}
+                      className="input resize-none"
+                      placeholder="Describe what is in this promotional bundle..."
+                      value={promoForm.description}
+                      onChange={e => setPromoForm({ ...promoForm, description: e.target.value })}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="label">Included Free Gift / Bonus Item *</label>
+                    <input
+                      required
+                      type="text"
+                      className="input font-semibold text-emerald-700"
+                      placeholder="e.g. Smart Bulb 12W or Solar Bracket"
+                      value={promoForm.bonus_item_name}
+                      onChange={e => setPromoForm({ ...promoForm, bonus_item_name: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="label">Promo Retail Price (₦) *</label>
+                      <input
+                        required
+                        type="number"
+                        min={0}
+                        className="input font-bold text-brand-700"
+                        value={promoForm.promo_price}
+                        onChange={e => setPromoForm({ ...promoForm, promo_price: Number(e.target.value) })}
+                      />
+                    </div>
+                    {isSuperAdmin && (
+                      <div>
+                        <label className="label">Acquisition Cost (₦) *</label>
+                        <input
+                          required
+                          type="number"
+                          min={0}
+                          className="input font-bold text-surface-700"
+                          value={promoForm.cost_price}
+                          onChange={e => setPromoForm({ ...promoForm, cost_price: Number(e.target.value) })}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="pt-4 border-t border-surface-100 flex justify-end gap-3">
+                    <button type="button" onClick={() => setIsPromoModalOpen(false)} className="btn-outline">
+                      Cancel
+                    </button>
+                    <button type="submit" className="btn-primary">
+                      {editingPromo ? 'Save Changes' : 'Create Package'}
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
 
       {/* PRODUCT MODAL — always-mounted portal, AnimatePresence inside */}
       {createPortal(

@@ -106,10 +106,23 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
     try {
       if (!user) throw new Error('Not authenticated')
       
-      const product = products.find(p => p.id === selectedProductId)
-      if (!product) throw new Error('Please select a product')
+      let product = products.find(p => p.id === selectedProductId)
+      let unitPrice = product?.retail_price || 0
+      let unitCost = product?.cost_price || 0
+      let targetProductId = product?.id || products[0]?.id
 
-      const unitPrice = product.retail_price
+      if (selectedProductId === 'promo_ptz_bulb') {
+        unitPrice = 45000
+        unitCost = 25000
+        targetProductId = products[0]?.id || selectedProductId
+      } else if (selectedProductId === 'promo_solar_kit') {
+        unitPrice = 75000
+        unitCost = 45000
+        targetProductId = products[0]?.id || selectedProductId
+      } else if (!product) {
+        throw new Error('Please select a valid product or promo package')
+      }
+
       const totalAmount = (unitPrice * quantity) + (installationNeeded ? installationPrice : 0)
       const orderNumber = `ORD-${Date.now().toString().slice(-6)}`
 
@@ -126,15 +139,15 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
         customer_email: customerEmail || null,
         customer_phone: customerPhone,
         customer_address: customerAddress,
-        product_id: product.id,
+        product_id: targetProductId,
         quantity,
         unit_price: unitPrice,
-        unit_cost: product.cost_price || 0,
+        unit_cost: unitCost,
         total_amount: totalAmount,
         installation_needed: installationNeeded,
         installation_price: installationNeeded ? installationPrice : 0,
         expected_delivery_date: expectedDeliveryDate || null,
-        notes: notes,
+        notes: selectedProductId === 'promo_ptz_bulb' ? `[PROMO BUNDLE: Buy PTZ Camera + Free Smart Bulb] ${notes}`.trim() : selectedProductId === 'promo_solar_kit' ? `[PROMO BUNDLE: Solar PTZ 4G + Free Mounting Bracket] ${notes}`.trim() : notes,
         status: 'pending',
         created_by_auth_id: authId
       })
@@ -366,13 +379,23 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="col-span-2">
-                  <label className="block text-sm font-bold text-surface-700 mb-1.5">Product</label>
+                  <label className="block text-sm font-bold text-surface-700 mb-1.5">Product / Promo Package *</label>
                   <div className="relative">
                     <Package className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-surface-400" />
                     <select disabled={fetchingProducts} value={selectedProductId} onChange={e => setSelectedProductId(e.target.value)} className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-surface-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none text-sm transition-all appearance-none bg-white">
-                      {fetchingProducts ? <option>Loading products...</option> : products.map(p => (
-                        <option key={p.id} value={p.id}>{p.name}</option>
-                      ))}
+                      {fetchingProducts ? <option>Loading products...</option> : (
+                        <>
+                          <optgroup label="Standard Catalog Cameras">
+                            {products.map(p => (
+                              <option key={p.id} value={p.id}>{p.name} (₦{p.retail_price.toLocaleString()})</option>
+                            ))}
+                          </optgroup>
+                          <optgroup label="🔥 Promo Packages">
+                            <option value="promo_ptz_bulb">🎁 PROMO: Buy PTZ Camera + Get Smart Bulb FREE (₦45,000)</option>
+                            <option value="promo_solar_kit">🎁 PROMO: Solar PTZ 4G + Free Mounting Bracket (₦75,000)</option>
+                          </optgroup>
+                        </>
+                      )}
                     </select>
                   </div>
                 </div>

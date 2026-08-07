@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { ShoppingBag, Plus, Search, Calendar, MapPin, X, Package, Edit2, Filter } from 'lucide-react'
+import { ShoppingBag, Plus, Search, Calendar, MapPin, X, Package, Edit2, Filter, Share2 } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { OrderStatusBadge } from '@/components/shared/Badges'
 import { TableSkeleton } from '@/components/shared/Skeletons'
@@ -10,6 +10,31 @@ import { OrderEditModal } from '@/components/shared/OrderEditModal'
 import { sendEmail } from '@/lib/email'
 import { sendWebPush } from '@/lib/push'
 import type { Order, Product } from '@/types'
+
+const getWhatsAppShareUrl = (order: Order, currentDsaName?: string) => {
+  const dsaName = order.dsa?.full_name || order.unregistered_dsa_name || currentDsaName || 'OptiSmart DSA'
+  const text = `*OptiSmart Order Details*\n\n` +
+    `*Order #:* ${order.order_number}\n` +
+    `*Customer:* ${order.customer_name}\n` +
+    `*Phone:* ${order.customer_phone || 'N/A'}\n` +
+    `*Address:* ${order.customer_address || 'N/A'}\n` +
+    `*Quantity:* ${order.quantity}\n` +
+    `*Total Amount:* ₦${Number(order.total_amount).toLocaleString()}\n` +
+    `*DSA Agent:* ${dsaName}\n` +
+    `*Status:* ${order.status.toUpperCase()}\n` +
+    `*Notes:* ${order.notes || 'None'}\n\n` +
+    `_Sent via OptiSmart Portal_`
+
+  let rawPhone = (order.customer_phone || '').replace(/\D/g, '')
+  if (rawPhone.startsWith('0')) {
+    rawPhone = '234' + rawPhone.slice(1)
+  }
+  
+  if (rawPhone.length >= 10) {
+    return `https://api.whatsapp.com/send?phone=${rawPhone}&text=${encodeURIComponent(text)}`
+  }
+  return `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`
+}
 
 export function DSAOrders() {
   const { user } = useAuthStore()
@@ -245,16 +270,27 @@ export function DSAOrders() {
                         <OrderStatusBadge status={order.status} />
                       </td>
                       <td className="py-4 px-6 text-right">
-                        {order.status === 'pending' && (
-                          <button type="button" onClick={() => setEditingOrder(order)} className="mr-2 inline-flex items-center gap-1 rounded-lg border border-surface-200 bg-white px-3 py-1.5 text-xs font-bold text-surface-700 transition-colors hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700">
-                            <Edit2 className="h-3.5 w-3.5" /> Edit
-                          </button>
-                        )}
-                        {order.installation_needed && (
-                          <span className="inline-flex items-center gap-1 text-xs font-bold text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full">
-                            🔧 Installer Needed
-                          </span>
-                        )}
+                        <div className="flex items-center justify-end gap-2">
+                          <a
+                            href={getWhatsAppShareUrl(order, user?.full_name)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition-colors"
+                            title="Export order details to WhatsApp"
+                          >
+                            <Share2 className="h-3.5 w-3.5" /> WhatsApp
+                          </a>
+                          {order.status === 'pending' && (
+                            <button type="button" onClick={() => setEditingOrder(order)} className="inline-flex items-center gap-1 rounded-lg border border-surface-200 bg-white px-3 py-1.5 text-xs font-bold text-surface-700 transition-colors hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700">
+                              <Edit2 className="h-3.5 w-3.5" /> Edit
+                            </button>
+                          )}
+                          {order.installation_needed && (
+                            <span className="inline-flex items-center gap-1 text-xs font-bold text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full">
+                              🔧 Installer Needed
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </motion.tr>
                   ))}
@@ -292,13 +328,21 @@ export function DSAOrders() {
                     </span>
                   </div>
 
-                  {order.status === 'pending' && (
-                    <div className="flex justify-end">
+                  <div className="flex items-center justify-end gap-2 border-t border-surface-100 pt-3">
+                    <a
+                      href={getWhatsAppShareUrl(order, user?.full_name)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100 transition-colors"
+                    >
+                      <Share2 className="h-3.5 w-3.5" /> Export to WhatsApp
+                    </a>
+                    {order.status === 'pending' && (
                       <button type="button" onClick={() => setEditingOrder(order)} className="inline-flex items-center gap-1 rounded-lg border border-surface-200 bg-white px-3 py-1.5 text-xs font-bold text-surface-700">
                         <Edit2 className="h-3.5 w-3.5" /> Edit Order
                       </button>
-                    </div>
-                  )}
+                    )}
+                  </div>
 
                   {order.installation_needed && (
                     <div className="flex justify-end pt-2">

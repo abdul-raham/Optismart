@@ -51,6 +51,21 @@ export interface Product {
   updated_at?: string
 }
 
+// --- PROMO PACKAGES ---
+export interface PromoPackage {
+  id: string
+  title: string
+  description: string
+  main_product_id?: string | null
+  main_product?: Product | null
+  bonus_item_name: string
+  promo_price: number
+  cost_price: number
+  image_url?: string | null
+  is_active: boolean
+  created_at?: string
+}
+
 // --- LEADS ---
 export type LeadStatus = 'new' | 'contacted' | 'converted' | 'lost'
 export type LeadTemperature = 'hot' | 'warm' | 'cold'
@@ -100,6 +115,8 @@ export interface Order {
   customer_address: string
   product_id: string
   product?: Product
+  promo_package_id?: string | null
+  promo_package?: PromoPackage | null
   quantity: number
   unit_price: number
   unit_cost: number

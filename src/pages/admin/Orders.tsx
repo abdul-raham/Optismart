@@ -13,6 +13,7 @@ import { sendWebPush } from '@/lib/push'
 import type { Order, OrderStatus, Product, User as AppUser } from '@/types'
 
 const getWhatsAppShareUrl = (order: Order) => {
+  const dsaName = order.dsa?.full_name || order.unregistered_dsa_name || 'Direct / System'
   const text = `*OptiSmart Order Details*\n\n` +
     `*Order #:* ${order.order_number}\n` +
     `*Customer:* ${order.customer_name}\n` +
@@ -20,6 +21,7 @@ const getWhatsAppShareUrl = (order: Order) => {
     `*Address:* ${order.customer_address || 'N/A'}\n` +
     `*Quantity:* ${order.quantity}\n` +
     `*Total Amount:* ₦${Number(order.total_amount).toLocaleString()}\n` +
+    `*DSA Agent:* ${dsaName}\n` +
     `*Status:* ${order.status.toUpperCase()}\n` +
     `*Notes:* ${order.notes || 'None'}\n\n` +
     `_Sent via OptiSmart Portal_`
