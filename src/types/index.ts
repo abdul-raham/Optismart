@@ -145,7 +145,7 @@ export interface Payment {
   payment_method: string
   reference_code: string | null
   receipt_number: string | null
-  status: 'pending' | 'confirmed'
+  status: 'pending' | 'confirmed' | 'delivered' | 'outstanding' | 'cancelled'
   confirmed_by: string | null
   confirmer?: User
   confirmed_at: string | null

@@ -127,7 +127,9 @@ export function AdminExpenses() {
     return 0
   })
 
-  const totalAmount = expenses.reduce((sum, e) => sum + Number(e.amount), 0)
+  const totalAmount = filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount || 0), 0)
+  const currentMonthStr = new Date().toISOString().slice(0, 7)
+  const thisMonthAmount = expenses.filter(exp => exp.expense_date?.startsWith(currentMonthStr)).reduce((sum, exp) => sum + Number(exp.amount || 0), 0)
   const filteredTotal = filteredExpenses.reduce((sum, e) => sum + Number(e.amount), 0)
 
   return (

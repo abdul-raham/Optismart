@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Target, ShoppingBag, Users, Package,
   CreditCard, Receipt, TrendingUp, Wrench, BookOpen,
   FileText, Award, Settings, ChevronLeft, ChevronRight,
-  CalendarDays, Banknote, BarChart3, UserCheck,
+  CalendarDays, Banknote, BarChart3, UserCheck, Bell,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { useUIStore } from '@/stores/uiStore'

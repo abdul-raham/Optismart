@@ -98,10 +98,10 @@ export function AdminPayments() {
     if (!matchesSearch) return false
 
     if (statusFilter === 'all') return true
-    if (statusFilter === 'pending') return payment.status === 'pending'
-    if (statusFilter === 'confirmed') return payment.status === 'confirmed' || payment.status === 'delivered'
-    if (statusFilter === 'outstanding') return payment.status === 'outstanding' || (payment.status === 'pending' && payment.orders?.status === 'pending')
-    if (statusFilter === 'cancelled') return payment.status === 'cancelled' || payment.orders?.status === 'cancelled'
+    if (statusFilter === 'pending') return (payment.status as string) === 'pending'
+    if (statusFilter === 'confirmed') return (payment.status as string) === 'confirmed' || (payment.status as string) === 'delivered'
+    if (statusFilter === 'outstanding') return (payment.status as string) === 'outstanding' || ((payment.status as string) === 'pending' && payment.orders?.status === 'pending')
+    if (statusFilter === 'cancelled') return (payment.status as string) === 'cancelled' || payment.orders?.status === 'cancelled'
 
     return true
   }).sort((a, b) => {
@@ -113,10 +113,10 @@ export function AdminPayments() {
   })
 
   // Calculate metrics for each status: count and total monetary value
-  const pendingPayments = payments.filter(p => p.status === 'pending')
-  const confirmedPayments = payments.filter(p => p.status === 'confirmed' || p.status === 'delivered')
-  const outstandingPayments = payments.filter(p => p.status === 'outstanding' || (p.status === 'pending' && p.orders?.status === 'pending'))
-  const cancelledPayments = payments.filter(p => p.status === 'cancelled' || p.orders?.status === 'cancelled')
+  const pendingPayments = payments.filter(p => (p.status as string) === 'pending')
+  const confirmedPayments = payments.filter(p => (p.status as string) === 'confirmed' || (p.status as string) === 'delivered')
+  const outstandingPayments = payments.filter(p => (p.status as string) === 'outstanding' || ((p.status as string) === 'pending' && p.orders?.status === 'pending'))
+  const cancelledPayments = payments.filter(p => (p.status as string) === 'cancelled' || p.orders?.status === 'cancelled')
 
   const pendingVal = pendingPayments.reduce((s, p) => s + Number(p.amount), 0)
   const confirmedVal = confirmedPayments.reduce((s, p) => s + Number(p.amount), 0)
@@ -217,8 +217,8 @@ export function AdminPayments() {
                       <td className="px-5 py-4 font-bold text-surface-900">{formatCurrency(payment.amount)}</td>
                       <td className="px-5 py-4">
                         <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                          payment.status === 'confirmed' || payment.status === 'delivered' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
-                          payment.status === 'cancelled' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
+                          (payment.status as string) === 'confirmed' || (payment.status as string) === 'delivered' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' :
+                          (payment.status as string) === 'cancelled' ? 'bg-rose-50 text-rose-700 border border-rose-200' :
                           'bg-amber-50 text-amber-700 border border-amber-200'
                         }`}>
                           {payment.status}

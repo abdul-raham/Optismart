@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useEffect, useState } from 'react'
 import { useAuthStore } from '@/stores/authStore'
 import { useNotificationsStore } from '@/stores/notificationsStore'
-import { getInitials } from '@/lib/utils'
+import { getInitials, formatDate } from '@/lib/utils'
 import optismartLogo from '@/assets/optismart-logo.png'
 import { supabase } from '@/lib/supabase'
 
@@ -120,7 +120,7 @@ export function Topbar() {
                       <div className="p-6 text-center text-xs text-surface-400">No notifications yet.</div>
                     ) : (
                       notifications.slice(0, 10).map((n) => (
-                        <div key={n.id} className={`p-2.5 rounded-xl transition-colors ${n.read ? 'opacity-70 bg-transparent' : 'bg-brand-50/50'}`}>
+                        <div key={n.id} className={`p-2.5 rounded-xl transition-colors ${n.is_read ? 'opacity-70 bg-transparent' : 'bg-brand-50/50'}`}>
                           <p className="text-xs font-bold text-surface-900">{n.title}</p>
                           <p className="text-xs text-surface-600 mt-0.5 leading-snug">{n.message}</p>
                           <p className="text-[10px] text-surface-400 mt-1 font-medium">{formatDate(n.created_at)}</p>
