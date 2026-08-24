@@ -182,6 +182,9 @@ export function AdminUsers() {
     const matchesSearch = u.full_name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase())
     const matchesRole = roleFilter === 'all' || u.role === roleFilter
     return matchesSearch && matchesRole
+  }).sort((a, b) => {
+    if (a.status === b.status) return new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+    return a.status === 'active' ? -1 : 1
   })
 
   const canModifyUser = (targetRole: string) => {
@@ -269,7 +272,11 @@ export function AdminUsers() {
                     <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border ${getRoleColor(u.role)}`}>
                       {u.role.replace('_', ' ')}
                     </span>
-                    {u.status === 'suspended' && (
+                    {u.status === 'active' ? (
+                      <span className="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Active
+                      </span>
+                    ) : (
                       <span className="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-danger-50 text-danger-600 border border-danger-200 flex items-center gap-1">
                         <Ban className="w-3 h-3" /> Suspended
                       </span>

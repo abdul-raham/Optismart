@@ -256,11 +256,33 @@ export function AdminOrders() {
         }).catch(console.error);
       }
 
+      // Auto-create commission for DSA when order status is marked DELIVERED
+      if (newStatus === 'delivered' && updatedOrder?.dsa_id) {
+        try {
+          const { data: dsaUser } = await supabase
+            .from('users')
+            .select('commission_per_camera, commission_threshold')
+            .eq('id', updatedOrder.dsa_id)
+            .single()
+
+          const perCameraRate = dsaUser?.commission_per_camera || 5000
+          const commAmount = (updatedOrder.quantity || 1) * perCameraRate
+
+          await supabase.from('commissions').insert([{
+            dsa_id: updatedOrder.dsa_id,
+            order_id: updatedOrder.id,
+            amount: commAmount,
+            status: 'pending',
+            triggered_at: new Date().toISOString(),
+            notes: `Commission for delivered order #${updatedOrder.order_number}`
+          }])
+        } catch (commErr) {
+          console.warn('Auto-commission insertion skipped:', commErr)
+        }
+      }
+
       // Update local state
       setOrders(orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o))
-      
-      // NOTE: In production, Supabase Edge Functions or Triggers would catch the 'delivered' status 
-      // and automatically write to the `commissions` table for the DSA.
     } catch (err) {
       console.error('Failed to update status:', err)
       alert('Failed to update order status')

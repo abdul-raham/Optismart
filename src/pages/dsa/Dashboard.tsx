@@ -137,11 +137,10 @@ export function DSADashboard() {
       ) : (
         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
           <StatCard
-            title="Delivered Sales"
-            value={formatCurrency(stats.totalSales)}
+            title="Delivered Orders"
+            value={stats.totalDeliveredTillDate}
             icon={ShoppingBag}
             color="brand"
-            trend={{ value: 15.2, isPositive: true }}
             delay={0.1}
           />
           <StatCard

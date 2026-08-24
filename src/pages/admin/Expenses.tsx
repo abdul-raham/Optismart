@@ -9,13 +9,18 @@ import { TableSkeleton } from '@/components/shared/Skeletons'
 import type { Expense, ExpenseCategory, Order, User } from '@/types'
 
 const EXPENSE_CATEGORIES: { value: ExpenseCategory; label: string }[] = [
+  { value: 'advertising', label: 'Advertising / Ad Cost' },
+  { value: 'remittance', label: 'DSA Remittance' },
+  { value: 'commission', label: 'Commission Expense' },
   { value: 'delivery', label: 'Delivery Cost' },
   { value: 'waybill', label: 'Waybill Cost' },
-  { value: 'advertising', label: 'Advertising Cost' },
   { value: 'dsa_salary', label: 'DSA Salary' },
+  { value: 'logistics', label: 'Logistics' },
+  { value: 'marketing', label: 'Marketing' },
+  { value: 'salaries', label: 'Salaries' },
   { value: 'utilities', label: 'Utilities' },
   { value: 'equipment', label: 'Equipment' },
-  { value: 'other', label: 'Other' },
+  { value: 'other', label: 'Other Expenses' },
 ]
 
 export function AdminExpenses() {
@@ -24,6 +29,8 @@ export function AdminExpenses() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [timeframe, setTimeframe] = useState<'all' | 'daily' | 'weekly' | 'monthly' | 'yearly'>('all')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [sortBy, setSortBy] = useState<'date_desc' | 'date_asc' | 'amount_desc' | 'amount_asc'>('date_desc')
   const [categoryFilter, setCategoryFilter] = useState('all')
   const [dsas, setDsas] = useState<Pick<User, 'id' | 'full_name'>[]>([])
@@ -102,6 +109,15 @@ export function AdminExpenses() {
     const matchesSearch = expense.description.toLowerCase().includes(search.toLowerCase()) || expense.category.toLowerCase().includes(search.toLowerCase())
     const matchesCategory = categoryFilter === 'all' || expense.category === categoryFilter
     
+    // Custom Date Range Filtering (From Date & To Date)
+    let matchesDateRange = true
+    if (startDate) {
+      matchesDateRange = matchesDateRange && expense.expense_date >= startDate
+    }
+    if (endDate) {
+      matchesDateRange = matchesDateRange && expense.expense_date <= endDate
+    }
+
     // Timeframe filtering logic
     const expDate = new Date(expense.expense_date)
     const now = new Date()
@@ -118,7 +134,7 @@ export function AdminExpenses() {
       matchesTimeframe = expense.expense_date.startsWith(now.getFullYear().toString())
     }
 
-    return matchesSearch && matchesCategory && matchesTimeframe
+    return matchesSearch && matchesCategory && matchesTimeframe && matchesDateRange
   }).sort((a, b) => {
     if (sortBy === 'date_desc') return new Date(b.expense_date).getTime() - new Date(a.expense_date).getTime()
     if (sortBy === 'date_asc') return new Date(a.expense_date).getTime() - new Date(b.expense_date).getTime()
@@ -130,14 +146,13 @@ export function AdminExpenses() {
   const totalAmount = filteredExpenses.reduce((sum, exp) => sum + Number(exp.amount || 0), 0)
   const currentMonthStr = new Date().toISOString().slice(0, 7)
   const thisMonthAmount = expenses.filter(exp => exp.expense_date?.startsWith(currentMonthStr)).reduce((sum, exp) => sum + Number(exp.amount || 0), 0)
-  const filteredTotal = filteredExpenses.reduce((sum, e) => sum + Number(e.amount), 0)
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-surface-900 tracking-tight">Expense Records</h1>
-          <p className="text-sm text-surface-500 mt-1">Track operational costs, order linkages, and timeframe analytics.</p>
+          <p className="text-sm text-surface-500 mt-1">Track operational costs, ad expenses, remittances, and date range analytics.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <select value={sortBy} onChange={(e) => setSortBy(e.target.value as any)} className="input h-10 px-3 text-xs font-semibold bg-white">
@@ -164,15 +179,19 @@ export function AdminExpenses() {
         </div>
       </div>
 
-      {/* Timeframe Filter Tabs */}
-      <div className="flex items-center justify-between gap-3 border-b border-surface-200 pb-2 overflow-x-auto">
-        <div className="flex items-center gap-1">
+      {/* Date Range & Timeframe Filter Bar */}
+      <div className="glass-card p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-1 overflow-x-auto">
           {['all', 'daily', 'weekly', 'monthly', 'yearly'].map(t => (
             <button
               key={t}
-              onClick={() => setTimeframe(t as any)}
-              className={`px-4 py-2 text-xs font-bold rounded-xl capitalize transition-all whitespace-nowrap ${
-                timeframe === t ? 'bg-brand-600 text-white shadow-sm' : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
+              onClick={() => {
+                setTimeframe(t as any)
+                setStartDate('')
+                setEndDate('')
+              }}
+              className={`px-3.5 py-1.5 text-xs font-bold rounded-xl capitalize transition-all whitespace-nowrap ${
+                timeframe === t && !startDate && !endDate ? 'bg-brand-600 text-white shadow-sm' : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
               }`}
             >
               {t === 'all' ? 'All Time' : t}
@@ -180,10 +199,51 @@ export function AdminExpenses() {
           ))}
         </div>
 
-        <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="input h-9 px-3 text-xs bg-white w-48">
-          <option value="all">All Categories</option>
-          {EXPENSE_CATEGORIES.map(category => <option key={category.value} value={category.value}>{category.label}</option>)}
-        </select>
+        {/* Date Range Picker (From & To Date) */}
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="font-semibold text-surface-500 flex items-center gap-1"><Calendar className="w-3.5 h-3.5 text-brand-600" /> From:</span>
+            <input
+              type="date"
+              value={startDate}
+              onChange={e => {
+                setStartDate(e.target.value)
+                setTimeframe('all')
+              }}
+              className="input h-8 text-xs py-0 px-2 bg-white rounded-lg border-surface-200"
+            />
+          </div>
+
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="font-semibold text-surface-500">To:</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={e => {
+                setEndDate(e.target.value)
+                setTimeframe('all')
+              }}
+              className="input h-8 text-xs py-0 px-2 bg-white rounded-lg border-surface-200"
+            />
+          </div>
+
+          {(startDate || endDate) && (
+            <button
+              onClick={() => {
+                setStartDate('')
+                setEndDate('')
+              }}
+              className="text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200"
+            >
+              Clear Date Filter
+            </button>
+          )}
+
+          <select value={categoryFilter} onChange={e => setCategoryFilter(e.target.value)} className="input h-8 px-2 text-xs bg-white w-44 rounded-lg">
+            <option value="all">All Categories</option>
+            {EXPENSE_CATEGORIES.map(category => <option key={category.value} value={category.value}>{category.label}</option>)}
+          </select>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

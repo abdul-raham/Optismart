@@ -180,13 +180,15 @@ export function AdminReports() {
       }
       map[dsaId].cameras_sold += o.quantity || 0
       map[dsaId].orders_count += 1
-      map[dsaId].total_revenue += o.total_amount || 0
+      if (o.status !== 'cancelled') {
+        map[dsaId].total_revenue += o.total_amount || 0
+        totalRev += o.total_amount || 0
+      }
       if (o.status === 'pending') map[dsaId].pending_orders += 1
 
       totalCam += o.quantity || 0
       totalOrd += 1
       if (o.status === 'pending') pendOrd += 1
-      totalRev += o.total_amount || 0
     });
 
     (comms || []).forEach((c: any) => {
@@ -250,7 +252,9 @@ export function AdminReports() {
       
       monthMap[month].cameras += o.quantity || 0
       monthMap[month].orders += 1
-      monthMap[month].revenue += o.total_amount || 0
+      if (o.status !== 'cancelled') {
+        monthMap[month].revenue += o.total_amount || 0
+      }
 
       const dsaName = o.dsa?.full_name || 'Unregistered'
       if (!dsaMonthSales[month]) dsaMonthSales[month] = {}
@@ -319,12 +323,10 @@ export function AdminReports() {
 
     let pendingComms: any[] = []
     try {
-      const { data, error } = await pendingCommsQuery
-      if (error) throw error
+      const { data } = await pendingCommsQuery
       if (data) pendingComms = data
     } catch (error) {
-      console.error('Error fetching pending commissions:', error)
-      throw error
+      console.warn('Commissions table query skipped or not initialized:', error)
     }
 
     const map: Record<string, RemittanceRow> = {}

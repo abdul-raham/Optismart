@@ -192,6 +192,8 @@ export type ExpenseCategory =
   | 'salaries'
   | 'utilities'
   | 'equipment'
+  | 'remittance'
+  | 'commission'
   | 'other'
 
 export interface Expense {

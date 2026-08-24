@@ -203,10 +203,10 @@ export function DSALeaderboard() {
 
                     <div className="text-right shrink-0">
                       <p className={`font-bold text-sm sm:text-base ${isFirst ? 'text-yellow-600' : isSecond ? 'text-slate-600' : isThird ? 'text-amber-700' : 'text-surface-700'}`}>
-                        {formatCurrency(entry.totalRevenue)}
+                        {entry.deliveredOrders}
                       </p>
                       <p className="text-[10px] sm:text-xs font-semibold text-surface-400 uppercase tracking-wider mt-0.5">
-                        Revenue Generated
+                        Delivered Orders
                       </p>
                     </div>
                   </div>
