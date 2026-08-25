@@ -84,6 +84,8 @@ export function AdminReports() {
 
   // Filters
   const [selectedMonth, setSelectedMonth] = useState('')
+  const [startDate, setStartDate] = useState('')
+  const [endDate, setEndDate] = useState('')
   const [selectedDsa, setSelectedDsa] = useState('')
   const [selectedStatus, setSelectedStatus] = useState('')
   const [dsaList, setDsaList] = useState<{ id: string; full_name: string }[]>([])
@@ -99,14 +101,14 @@ export function AdminReports() {
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [selectedMonth, selectedDsa, selectedStatus, monthlyView, deliveryPage])
+  }, [selectedMonth, startDate, endDate, selectedDsa, selectedStatus, monthlyView, deliveryPage])
 
   useEffect(() => {
     setDsaPage(1)
     setMonthlyPage(1)
     setRemittancePage(1)
     setDeliveryPage(1)
-  }, [selectedMonth, selectedDsa, selectedStatus])
+  }, [selectedMonth, startDate, endDate, selectedDsa, selectedStatus])
 
   const fetchAll = async () => {
     setLoading(true)
@@ -122,6 +124,12 @@ export function AdminReports() {
   }
 
   const monthRange = () => {
+    if (startDate || endDate) {
+      return {
+        start: startDate ? new Date(`${startDate}T00:00:00.000Z`).toISOString() : new Date('2020-01-01').toISOString(),
+        end: endDate ? new Date(`${endDate}T23:59:59.999Z`).toISOString() : new Date('2099-12-31').toISOString(),
+      }
+    }
     if (!selectedMonth) return null
     const [year, month] = selectedMonth.split('-').map(Number)
     return {
@@ -467,15 +475,48 @@ export function AdminReports() {
       {/* Filters */}
       <div className="glass-card p-4 flex flex-wrap gap-3 items-center">
         <Filter className="w-4 h-4 text-surface-400" />
-        <div className="flex items-center gap-2">
-          <Calendar className="w-4 h-4 text-surface-400" />
-          <input
-            type="month"
-            value={selectedMonth}
-            onChange={e => setSelectedMonth(e.target.value)}
-            className="px-3 py-1.5 rounded-lg border border-surface-200 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
-          />
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5 text-xs">
+            <span className="font-semibold text-surface-500 flex items-center gap-1"><Calendar className="w-3.5 h-3.5 text-brand-600" /> Month:</span>
+            <input
+              type="month"
+              value={selectedMonth}
+              onChange={e => {
+                setSelectedMonth(e.target.value)
+                setStartDate('')
+                setEndDate('')
+              }}
+              className="px-2.5 py-1.5 rounded-lg border border-surface-200 text-xs bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
+            />
+          </div>
+
+          <div className="flex items-center gap-1 text-xs">
+            <span className="font-semibold text-surface-500">From:</span>
+            <input
+              type="date"
+              value={startDate}
+              onChange={e => {
+                setStartDate(e.target.value)
+                setSelectedMonth('')
+              }}
+              className="px-2 py-1.5 rounded-lg border border-surface-200 text-xs bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
+            />
+          </div>
+
+          <div className="flex items-center gap-1 text-xs">
+            <span className="font-semibold text-surface-500">To:</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={e => {
+                setEndDate(e.target.value)
+                setSelectedMonth('')
+              }}
+              className="px-2 py-1.5 rounded-lg border border-surface-200 text-xs bg-white focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
+            />
+          </div>
         </div>
+
         <div className="flex items-center gap-2">
           <Users className="w-4 h-4 text-surface-400" />
           <select
@@ -507,9 +548,9 @@ export function AdminReports() {
             <option value="cancelled">Cancelled</option>
           </select>
         </div>
-        {(selectedMonth || selectedDsa || selectedStatus) && (
-          <button onClick={() => { setSelectedMonth(''); setSelectedDsa(''); setSelectedStatus('') }}
-            className="text-xs font-bold text-brand-600 hover:text-brand-700 underline"
+        {(selectedMonth || startDate || endDate || selectedDsa || selectedStatus) && (
+          <button onClick={() => { setSelectedMonth(''); setStartDate(''); setEndDate(''); setSelectedDsa(''); setSelectedStatus('') }}
+            className="text-xs font-bold text-rose-600 hover:text-rose-700 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-200"
           >Clear filters</button>
         )}
       </div>

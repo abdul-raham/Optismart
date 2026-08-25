@@ -1,8 +1,8 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
-import { Users, Search, Shield, ShieldAlert, Mail, MoreVertical, Ban, CheckCircle2, ChevronDown, ChevronUp, Settings2, Sliders } from 'lucide-react'
-import { formatDate } from '@/lib/utils'
+import { Users, Search, Shield, ShieldAlert, Mail, MoreVertical, Ban, CheckCircle2, ChevronDown, ChevronUp, Settings2, Sliders, Activity, Eye, X, ShoppingBag, Banknote, Wrench, FileText, Phone, MapPin, Calendar, DollarSign, Award, Target } from 'lucide-react'
+import { formatDate, formatCurrency } from '@/lib/utils'
 import { sendEmail } from '@/lib/email'
 import { sendWebPush } from '@/lib/push'
 import { useAuthStore } from '@/stores/authStore'
@@ -77,9 +77,71 @@ export function AdminUsers() {
   const [savingCommission, setSavingCommission] = useState<string | null>(null)
   const [localCommissions, setLocalCommissions] = useState<Record<string, { threshold: number; per_camera: number }>>({})
 
+  // User Profile & Activity Drawer State
+  const [selectedProfileUser, setSelectedProfileUser] = useState<SystemUser | null>(null)
+  const [loadingActivity, setLoadingActivity] = useState(false)
+  const [userOrders, setUserOrders] = useState<any[]>([])
+  const [userLeads, setUserLeads] = useState<any[]>([])
+  const [userCommissions, setUserCommissions] = useState<any[]>([])
+  const [userJobs, setUserJobs] = useState<any[]>([])
+
   useEffect(() => {
     fetchUsers()
   }, [])
+
+  const openUserProfile = async (targetUser: SystemUser) => {
+    setSelectedProfileUser(targetUser)
+    setLoadingActivity(true)
+    setUserOrders([])
+    setUserLeads([])
+    setUserCommissions([])
+    setUserJobs([])
+
+    try {
+      // 1. Fetch Orders (Created by or Assigned to user)
+      const { data: orders } = await supabase
+        .from('orders')
+        .select('*')
+        .or(`dsa_id.eq.${targetUser.id},created_by_auth_id.eq.${targetUser.id}`)
+        .order('created_at', { ascending: false })
+      if (orders) setUserOrders(orders)
+
+      // 2. Fetch Leads (Assigned to DSA)
+      if (targetUser.role === 'dsa') {
+        const { data: leads } = await supabase
+          .from('leads')
+          .select('*')
+          .eq('dsa_id', targetUser.id)
+          .order('created_at', { ascending: false })
+        if (leads) setUserLeads(leads)
+
+        // 3. Fetch Commissions
+        try {
+          const { data: comms } = await supabase
+            .from('commissions')
+            .select('*')
+            .eq('dsa_id', targetUser.id)
+            .order('triggered_at', { ascending: false })
+          if (comms) setUserCommissions(comms)
+        } catch (_) {}
+      }
+
+      // 4. Fetch Installer Jobs
+      if (targetUser.role === 'installer') {
+        const { data: jobs } = await supabase
+          .from('installer_jobs')
+          .select('*, order:orders(order_number, customer_name, customer_address, status)')
+          .eq('installer_id', targetUser.id)
+          .order('created_at', { ascending: false })
+        if (jobs) setUserJobs(jobs)
+      }
+
+    } catch (err) {
+      console.error('Error fetching user activity report:', err)
+    } finally {
+      setLoadingActivity(false)
+    }
+  }
 
   const fetchUsers = async () => {
     try {
@@ -285,12 +347,20 @@ export function AdminUsers() {
 
                   <div className="pt-4 border-t border-surface-100 flex items-center justify-between">
                     <span className="text-xs text-surface-400 font-medium">Joined {formatDate(u.created_at)}</span>
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={() => openUserProfile(u)}
+                        className="text-xs font-bold px-2.5 py-1.5 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 border border-brand-200 transition-colors flex items-center gap-1"
+                        title="View Full User Activity & Report"
+                      >
+                        <Activity className="w-3.5 h-3.5" /> Activity
+                      </button>
+
                       {/* Expand panel — for DSA (commission) or Admin (permissions) */}
                       {(u.role === 'dsa' || (u.role === 'admin' && currentRole === 'super_admin')) && (
                         <button
                           onClick={() => handleExpand(u.id, u.role)}
-                          className="text-xs font-bold px-3 py-1.5 rounded-lg border border-surface-200 bg-white text-brand-600 hover:border-brand-200 hover:bg-brand-50 transition-colors flex items-center gap-1.5"
+                          className="text-xs font-bold px-2.5 py-1.5 rounded-lg border border-surface-200 bg-white text-surface-700 hover:border-brand-200 hover:bg-brand-50 transition-colors flex items-center gap-1"
                         >
                           {u.role === 'dsa' ? <Sliders className="w-3.5 h-3.5" /> : <Settings2 className="w-3.5 h-3.5" />}
                           {expandedUser === u.id ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
@@ -299,7 +369,7 @@ export function AdminUsers() {
                       {canModifyUser(u.role) && u.id !== currentUser?.id ? (
                         <button
                           onClick={() => toggleUserStatus(u.id, u.status)}
-                          className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-colors flex items-center gap-1.5 ${
+                          className={`text-xs font-bold px-2.5 py-1.5 rounded-lg border transition-colors flex items-center gap-1 ${
                             u.status === 'active'
                               ? 'bg-white border-surface-200 text-danger-600 hover:border-danger-200 hover:bg-danger-50'
                               : 'bg-white border-surface-200 text-success-600 hover:border-success-200 hover:bg-success-50'
@@ -308,7 +378,7 @@ export function AdminUsers() {
                           {u.status === 'active' ? <><Ban className="w-3.5 h-3.5" /> Suspend</> : <><CheckCircle2 className="w-3.5 h-3.5" /> Reactivate</>}
                         </button>
                       ) : (
-                        <button disabled className="text-xs font-bold px-3 py-1.5 rounded-lg border border-surface-200 bg-surface-100 text-surface-400 opacity-50 cursor-not-allowed flex items-center gap-1.5">
+                        <button disabled className="text-xs font-bold px-2.5 py-1.5 rounded-lg border border-surface-200 bg-surface-100 text-surface-400 opacity-50 cursor-not-allowed flex items-center gap-1">
                           <ShieldAlert className="w-3.5 h-3.5" /> Restricted
                         </button>
                       )}
@@ -350,31 +420,19 @@ export function AdminUsers() {
                                   Commission Rate per Delivered Camera (₦)
                                 </label>
                                 <input
-                                  type="number" min={0}
+                                  type="number" min={0} step={500}
                                   value={localCommissions[u.id]?.per_camera ?? 5000}
                                   onChange={e => setLocalCommissions(prev => ({ ...prev, [u.id]: { ...prev[u.id], per_camera: Number(e.target.value) } }))}
-                                  className="w-full px-3 py-2 rounded-xl border border-surface-200 text-sm font-bold text-brand-700 focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
+                                  className="w-full px-3 py-2 rounded-xl border border-surface-200 text-sm font-semibold focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none"
                                 />
-                              </div>
-
-                              <div className="p-3 bg-brand-50/70 border border-brand-200/60 rounded-xl flex items-center justify-between">
-                                <div>
-                                  <p className="text-xs font-bold text-brand-950">Qualification Status</p>
-                                  <p className="text-[11px] text-brand-800 font-medium">
-                                    {(localCommissions[u.id]?.threshold ?? 0) === 0 ? 'Qualified for payout on all orders' : `Requires min ${localCommissions[u.id]?.threshold} delivered orders`}
-                                  </p>
-                                </div>
-                                <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-emerald-100 text-emerald-800">
-                                  Qualified
-                                </span>
                               </div>
 
                               <button
                                 onClick={() => saveCommission(u.id)}
                                 disabled={savingCommission === u.id}
-                                className="w-full py-2.5 text-xs font-bold rounded-xl bg-brand-600 hover:bg-brand-700 text-white transition-all shadow-brand disabled:opacity-60"
+                                className="w-full py-2 text-xs font-bold rounded-xl bg-brand-600 hover:bg-brand-700 text-white transition-all shadow-brand disabled:opacity-60"
                               >
-                                {savingCommission === u.id ? 'Saving Qualification Rules...' : 'Save Qualification Rules'}
+                                {savingCommission === u.id ? 'Saving...' : 'Save Commission Settings'}
                               </button>
                             </div>
                           </div>
@@ -417,6 +475,229 @@ export function AdminUsers() {
           </AnimatePresence>
         </div>
       )}
+
+      {/* User Activity & Full Report Modal / Drawer */}
+      <AnimatePresence>
+        {selectedProfileUser && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-surface-950/60 backdrop-blur-xs">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-3xl shadow-2xl border border-surface-100 w-full max-w-4xl max-h-[90vh] overflow-hidden flex flex-col"
+            >
+              {/* Modal Header */}
+              <div className="p-6 border-b border-surface-100 flex items-center justify-between bg-surface-50/50">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-brand-500 to-cyan-500 flex items-center justify-center text-2xl font-bold text-white shadow-md">
+                    {selectedProfileUser.full_name?.charAt(0) || selectedProfileUser.email.charAt(0).toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-xl font-bold text-surface-900">{selectedProfileUser.full_name || 'No Name'}</h2>
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border ${getRoleColor(selectedProfileUser.role)}`}>
+                        {selectedProfileUser.role.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <p className="text-xs text-surface-500 flex items-center gap-1.5 mt-1">
+                      <Mail className="w-3.5 h-3.5 text-surface-400" /> {selectedProfileUser.email}
+                      <span className="mx-1">•</span>
+                      <Calendar className="w-3.5 h-3.5 text-surface-400" /> Joined {formatDate(selectedProfileUser.created_at)}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => setSelectedProfileUser(null)}
+                  className="p-2 rounded-xl text-surface-400 hover:text-surface-600 hover:bg-surface-100 transition-colors"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Modal Body */}
+              <div className="p-6 overflow-y-auto space-y-6 flex-1">
+                {loadingActivity ? (
+                  <TableSkeleton rows={5} cols={4} />
+                ) : (
+                  <>
+                    {/* Activity KPI Cards */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                      <div className="p-4 rounded-2xl bg-brand-50/60 border border-brand-100">
+                        <span className="text-xs font-bold text-brand-700 uppercase tracking-wider flex items-center gap-1">
+                          <ShoppingBag className="w-3.5 h-3.5" /> Total Orders
+                        </span>
+                        <p className="text-2xl font-black text-brand-900 mt-1">{userOrders.length}</p>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-emerald-50/60 border border-emerald-100">
+                        <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider flex items-center gap-1">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Delivered
+                        </span>
+                        <p className="text-2xl font-black text-emerald-900 mt-1">
+                          {userOrders.filter(o => o.status === 'delivered').length}
+                        </p>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-cyan-50/60 border border-cyan-100">
+                        <span className="text-xs font-bold text-cyan-700 uppercase tracking-wider flex items-center gap-1">
+                          <DollarSign className="w-3.5 h-3.5" /> Sales Revenue
+                        </span>
+                        <p className="text-2xl font-black text-cyan-900 mt-1">
+                          {formatCurrency(userOrders.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + Number(o.total_amount || 0), 0))}
+                        </p>
+                      </div>
+
+                      <div className="p-4 rounded-2xl bg-amber-50/60 border border-amber-100">
+                        <span className="text-xs font-bold text-amber-700 uppercase tracking-wider flex items-center gap-1">
+                          <Banknote className="w-3.5 h-3.5" /> {selectedProfileUser.role === 'installer' ? 'Earnings' : 'Commissions'}
+                        </span>
+                        <p className="text-2xl font-black text-amber-900 mt-1">
+                          {selectedProfileUser.role === 'installer'
+                            ? formatCurrency(userJobs.reduce((sum, j) => sum + Number(j.commission_amount || 0), 0))
+                            : formatCurrency(userCommissions.reduce((sum, c) => sum + Number(c.amount || 0), 0))}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* DSA / User Orders History Table */}
+                    <div className="glass-card overflow-hidden border border-surface-200">
+                      <div className="p-4 bg-surface-50/50 border-b border-surface-100 flex items-center justify-between">
+                        <h3 className="font-bold text-sm text-surface-900 flex items-center gap-2">
+                          <ShoppingBag className="w-4 h-4 text-brand-600" /> Recent Activity & Orders ({userOrders.length})
+                        </h3>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-left text-xs">
+                          <thead>
+                            <tr className="bg-surface-100/60 text-surface-600 font-bold uppercase tracking-wider">
+                              <th className="py-2.5 px-4">Order #</th>
+                              <th className="py-2.5 px-4">Customer</th>
+                              <th className="py-2.5 px-4">Date</th>
+                              <th className="py-2.5 px-4">Qty</th>
+                              <th className="py-2.5 px-4 text-right">Amount</th>
+                              <th className="py-2.5 px-4 text-center">Status</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-surface-100 font-medium">
+                            {userOrders.slice(0, 8).map(o => (
+                              <tr key={o.id} className="hover:bg-surface-50">
+                                <td className="py-2.5 px-4 font-bold text-brand-600">{o.order_number}</td>
+                                <td className="py-2.5 px-4">{o.customer_name}</td>
+                                <td className="py-2.5 px-4 text-surface-500">{formatDate(o.created_at)}</td>
+                                <td className="py-2.5 px-4">{o.quantity}</td>
+                                <td className="py-2.5 px-4 text-right font-bold">{formatCurrency(o.total_amount)}</td>
+                                <td className="py-2.5 px-4 text-center">
+                                  <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
+                                    o.status === 'delivered' ? 'bg-emerald-100 text-emerald-800' :
+                                    o.status === 'cancelled' ? 'bg-rose-100 text-rose-800' :
+                                    'bg-amber-100 text-amber-800'
+                                  }`}>
+                                    {o.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                            {userOrders.length === 0 && (
+                              <tr>
+                                <td colSpan={6} className="py-6 text-center text-surface-400 font-semibold">No orders recorded for this user yet.</td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    {/* DSA Leads Activity Table */}
+                    {selectedProfileUser.role === 'dsa' && (
+                      <div className="glass-card overflow-hidden border border-surface-200">
+                        <div className="p-4 bg-surface-50/50 border-b border-surface-100 flex items-center justify-between">
+                          <h3 className="font-bold text-sm text-surface-900 flex items-center gap-2">
+                            <Target className="w-4 h-4 text-warning-600" /> Assigned Leads ({userLeads.length})
+                          </h3>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead>
+                              <tr className="bg-surface-100/60 text-surface-600 font-bold uppercase tracking-wider">
+                                <th className="py-2.5 px-4">Customer Name</th>
+                                <th className="py-2.5 px-4">Phone</th>
+                                <th className="py-2.5 px-4">Date</th>
+                                <th className="py-2.5 px-4 text-center">Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-surface-100 font-medium">
+                              {userLeads.slice(0, 5).map(l => (
+                                <tr key={l.id} className="hover:bg-surface-50">
+                                  <td className="py-2.5 px-4 font-bold text-surface-900">{l.customer_name}</td>
+                                  <td className="py-2.5 px-4 text-surface-500">{l.phone || '—'}</td>
+                                  <td className="py-2.5 px-4 text-surface-500">{formatDate(l.created_at)}</td>
+                                  <td className="py-2.5 px-4 text-center">
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-surface-100 text-surface-700">
+                                      {l.status}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                              {userLeads.length === 0 && (
+                                <tr>
+                                  <td colSpan={4} className="py-6 text-center text-surface-400 font-semibold">No active leads logged.</td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Installer Jobs Activity Table */}
+                    {selectedProfileUser.role === 'installer' && (
+                      <div className="glass-card overflow-hidden border border-surface-200">
+                        <div className="p-4 bg-surface-50/50 border-b border-surface-100 flex items-center justify-between">
+                          <h3 className="font-bold text-sm text-surface-900 flex items-center gap-2">
+                            <Wrench className="w-4 h-4 text-amber-600" /> Assigned Installation Jobs ({userJobs.length})
+                          </h3>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left text-xs">
+                            <thead>
+                              <tr className="bg-surface-100/60 text-surface-600 font-bold uppercase tracking-wider">
+                                <th className="py-2.5 px-4">Order #</th>
+                                <th className="py-2.5 px-4">Customer</th>
+                                <th className="py-2.5 px-4">Cut (₦)</th>
+                                <th className="py-2.5 px-4 text-center">Job Status</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-surface-100 font-medium">
+                              {userJobs.slice(0, 6).map(j => (
+                                <tr key={j.id} className="hover:bg-surface-50">
+                                  <td className="py-2.5 px-4 font-bold text-brand-600">{j.order?.order_number || '—'}</td>
+                                  <td className="py-2.5 px-4">{j.order?.customer_name || '—'}</td>
+                                  <td className="py-2.5 px-4 font-bold text-emerald-700">{formatCurrency(j.commission_amount || 0)}</td>
+                                  <td className="py-2.5 px-4 text-center">
+                                    <span className="px-2 py-0.5 rounded text-[10px] font-extrabold uppercase bg-amber-100 text-amber-800">
+                                      {j.status}
+                                    </span>
+                                  </td>
+                                </tr>
+                              ))}
+                              {userJobs.length === 0 && (
+                                <tr>
+                                  <td colSpan={4} className="py-6 text-center text-surface-400 font-semibold">No installer jobs assigned.</td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

@@ -147,6 +147,23 @@ export function AdminExpenses() {
   const currentMonthStr = new Date().toISOString().slice(0, 7)
   const thisMonthAmount = expenses.filter(exp => exp.expense_date?.startsWith(currentMonthStr)).reduce((sum, exp) => sum + Number(exp.amount || 0), 0)
 
+  // Category Summary Breakdown Calculations
+  const adExpenses = filteredExpenses
+    .filter(e => ['advertising', 'ad_cost', 'marketing'].includes(e.category.toLowerCase()))
+    .reduce((sum, e) => sum + Number(e.amount), 0)
+
+  const remittanceExpenses = filteredExpenses
+    .filter(e => ['dsa_remittance', 'commissions', 'commission'].includes(e.category.toLowerCase()))
+    .reduce((sum, e) => sum + Number(e.amount), 0)
+
+  const deliveryExpenses = filteredExpenses
+    .filter(e => ['delivery', 'waybill', 'logistics', 'shipping'].includes(e.category.toLowerCase()))
+    .reduce((sum, e) => sum + Number(e.amount), 0)
+
+  const operationalExpenses = filteredExpenses
+    .filter(e => !['advertising', 'ad_cost', 'marketing', 'dsa_remittance', 'commissions', 'commission', 'delivery', 'waybill', 'logistics', 'shipping'].includes(e.category.toLowerCase()))
+    .reduce((sum, e) => sum + Number(e.amount), 0)
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -246,12 +263,55 @@ export function AdminExpenses() {
         </div>
       </div>
 
+      {/* Expense Category Summary Breakdown Grid */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="glass-card p-4 border-l-4 border-l-cyan-500">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold text-surface-500 uppercase tracking-wider">📢 Ads & Marketing</span>
+            <span className="text-[10px] font-extrabold text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded-full border border-cyan-200">
+              {totalAmount > 0 ? `${Math.round((adExpenses / totalAmount) * 100)}%` : '0%'}
+            </span>
+          </div>
+          <p className="text-xl font-black text-surface-900">{formatCurrency(adExpenses)}</p>
+        </div>
+
+        <div className="glass-card p-4 border-l-4 border-l-emerald-500">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold text-surface-500 uppercase tracking-wider">💸 DSA Remittance</span>
+            <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+              {totalAmount > 0 ? `${Math.round((remittanceExpenses / totalAmount) * 100)}%` : '0%'}
+            </span>
+          </div>
+          <p className="text-xl font-black text-surface-900">{formatCurrency(remittanceExpenses)}</p>
+        </div>
+
+        <div className="glass-card p-4 border-l-4 border-l-amber-500">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold text-surface-500 uppercase tracking-wider">🚚 Delivery & Waybill</span>
+            <span className="text-[10px] font-extrabold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+              {totalAmount > 0 ? `${Math.round((deliveryExpenses / totalAmount) * 100)}%` : '0%'}
+            </span>
+          </div>
+          <p className="text-xl font-black text-surface-900">{formatCurrency(deliveryExpenses)}</p>
+        </div>
+
+        <div className="glass-card p-4 border-l-4 border-l-indigo-500">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold text-surface-500 uppercase tracking-wider">🏢 Operational & Other</span>
+            <span className="text-[10px] font-extrabold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
+              {totalAmount > 0 ? `${Math.round((operationalExpenses / totalAmount) * 100)}%` : '0%'}
+            </span>
+          </div>
+          <p className="text-xl font-black text-surface-900">{formatCurrency(operationalExpenses)}</p>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="glass-card p-5">
           <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-brand-50 text-brand-600">
             <Wallet className="h-5 w-5" />
           </div>
-          <p className="text-sm font-semibold text-surface-500">Total Expenses All-Time</p>
+          <p className="text-sm font-semibold text-surface-500">Total Filtered Expenses</p>
           <p className="mt-1 text-2xl font-black text-surface-900">{formatCurrency(totalAmount)}</p>
         </div>
         <div className="glass-card p-5">

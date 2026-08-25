@@ -345,10 +345,17 @@ export function AdminOrders() {
     }
   }
 
+  const [dsaFilter, setDsaFilter] = useState('all')
+
   const filteredOrders = orders.filter(order => {
     const term = search.toLowerCase()
-    const matchesSearch = order.customer_name.toLowerCase().includes(term) || order.order_number.toLowerCase().includes(term)
-    return matchesSearch && (statusFilter === 'all' || order.status === statusFilter)
+    const matchesSearch = order.customer_name.toLowerCase().includes(term) || 
+      order.order_number.toLowerCase().includes(term) ||
+      (order.dsa?.full_name || order.unregistered_dsa_name || '').toLowerCase().includes(term)
+    const matchesStatus = statusFilter === 'all' || order.status === statusFilter
+    const matchesDsa = dsaFilter === 'all' || 
+      (dsaFilter === 'unregistered' ? !order.dsa_id : order.dsa_id === dsaFilter)
+    return matchesSearch && matchesStatus && matchesDsa
   })
 
   const getOrdersExportData = () => {
@@ -390,9 +397,20 @@ export function AdminOrders() {
           <div className="relative">
             <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-400" />
             <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} className="h-10 rounded-lg border border-surface-200 bg-white pl-9 pr-8 text-sm outline-none transition-all focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20">
-              <option value="all">All statuses</option><option value="pending">Pending</option><option value="paid">Paid</option>
+              <option value="all">All Statuses</option><option value="pending">Pending</option><option value="paid">Paid</option>
               <option value="approved">Approved</option><option value="confirmed">Confirmed</option><option value="processing">Processing</option>
               <option value="dispatched">Dispatched</option><option value="rescheduled">Rescheduled</option><option value="delivered">Delivered</option><option value="cancelled">Cancelled</option>
+            </select>
+          </div>
+
+          <div className="relative">
+            <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-400" />
+            <select value={dsaFilter} onChange={e => setDsaFilter(e.target.value)} className="h-10 rounded-lg border border-surface-200 bg-white pl-9 pr-8 text-sm outline-none transition-all focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 max-w-[200px] truncate">
+              <option value="all">All Sales Agents (DSAs)</option>
+              <option value="unregistered">Unregistered / Direct</option>
+              {dsas.map(dsa => (
+                <option key={dsa.id} value={dsa.id}>{dsa.full_name || dsa.email}</option>
+              ))}
             </select>
           </div>
           <button
