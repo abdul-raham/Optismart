@@ -7,6 +7,7 @@ import { useUIStore } from '@/stores/uiStore'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { InstallPWA } from '@/components/pwa/InstallPWA'
 import { NotificationPrompt } from '@/components/shared/NotificationPrompt'
+import { SystemUpdateModal } from '@/components/shared/SystemUpdateModal'
 
 export function AppShell() {
   const { sidebarCollapsed, toggleSidebar } = useUIStore()
@@ -15,6 +16,7 @@ export function AppShell() {
     <div className="flex h-screen overflow-hidden bg-[linear-gradient(180deg,#f8fbff_0%,#f8fafc_44%,#eef7fb_100%)]">
       <InstallPWA />
       <NotificationPrompt />
+      <SystemUpdateModal />
       
       {/* Sidebar — desktop only */}
       <div className="hidden md:block">

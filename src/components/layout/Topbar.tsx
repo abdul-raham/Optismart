@@ -142,10 +142,20 @@ export function Topbar() {
             onClick={() => setShowDropdown(!showDropdown)}
             className="flex items-center gap-2 hover:bg-white/80 p-1.5 pr-3 rounded-full transition-all border border-transparent hover:border-surface-200/80 hover:shadow-sm"
           >
-            <div className="w-8 h-8 rounded-full bg-brand-gradient flex items-center justify-center text-white text-xs font-bold shadow-brand">
-              {getInitials(user?.full_name ?? 'U')}
-            </div>
-            <span className="hidden sm:inline-block text-xs font-bold text-surface-800">{user?.full_name?.split(' ')[0]}</span>
+            {(user as any)?.avatar_url ? (
+              <img
+                src={(user as any).avatar_url}
+                alt={user?.full_name || 'User Avatar'}
+                className="w-8 h-8 rounded-full object-cover shadow-xs border border-surface-200"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-500 to-cyan-500 flex items-center justify-center text-white text-xs font-bold shadow-brand">
+                {getInitials(user?.full_name || user?.email || 'User')}
+              </div>
+            )}
+            <span className="hidden sm:inline-block text-xs font-bold text-surface-800">
+              {user?.full_name?.split(' ')[0] || user?.email?.split('@')[0] || 'Account'}
+            </span>
             <ChevronDown className={`w-3.5 h-3.5 text-surface-400 transition-transform duration-200 ${showDropdown ? 'rotate-180' : ''}`} />
           </button>
 

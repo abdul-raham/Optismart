@@ -61,8 +61,11 @@ export function DSADashboard() {
         })
         const currentMonthDelivered = currentMonthOrders.filter(o => o.status === 'delivered')
         
+        const { data: userProfile } = await supabase.from('users').select('expected_orders_target').eq('id', userId).single()
+        const target = userProfile?.expected_orders_target || 30
+
         const camerasDeliveredMonth = currentMonthDelivered.reduce((sum, o) => sum + o.quantity, 0)
-        setCommissionStatus({ camerasDelivered: camerasDeliveredMonth, target: 30 })
+        setCommissionStatus({ camerasDelivered: camerasDeliveredMonth, target })
         
         const totalDelivered = deliveredOrders.length
         const totalOrders = activeOrders.length
@@ -161,19 +164,32 @@ export function DSADashboard() {
         </div>
       )}
 
-      {/* Commission Status Banner */}
+      {/* Commission Status & Probation Banner */}
       {!loading && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className={`p-5 rounded-2xl border flex items-center justify-between ${
           commissionStatus.camerasDelivered >= commissionStatus.target ? 'bg-success-50 border-success-200 text-success-800' :
-          commissionStatus.camerasDelivered >= commissionStatus.target / 2 ? 'bg-warning-50 border-warning-200 text-warning-800' :
-          'bg-danger-50 border-danger-200 text-danger-800'
+          commissionStatus.camerasDelivered >= 20 ? 'bg-warning-50 border-warning-200 text-warning-800' :
+          'bg-rose-50 border-rose-200 text-rose-800'
         }`}>
           <div>
-            <h3 className="font-bold text-lg">Monthly Commission Target</h3>
+            <div className="flex items-center gap-2">
+              <h3 className="font-bold text-lg">Monthly Sales Target</h3>
+              {commissionStatus.camerasDelivered < 20 ? (
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-black uppercase bg-rose-200 text-rose-900 border border-rose-300">
+                  ⚠️ On Probation (&lt;20 Delivered)
+                </span>
+              ) : (
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-black uppercase bg-emerald-200 text-emerald-900 border border-emerald-300">
+                  Off Probation
+                </span>
+              )}
+            </div>
             <p className="text-sm opacity-90 mt-0.5 font-medium">
               {commissionStatus.camerasDelivered >= commissionStatus.target 
                 ? 'Target reached! Full commission rates unlocked.' 
-                : `${commissionStatus.target - commissionStatus.camerasDelivered} more cameras needed to unlock full commission.`}
+                : commissionStatus.camerasDelivered < 20
+                ? `You need ${20 - commissionStatus.camerasDelivered} more delivered orders to get off probation and unlock commission payouts.`
+                : `${commissionStatus.target - commissionStatus.camerasDelivered} more cameras needed to hit your full target.`}
             </p>
           </div>
           <div className="text-right">

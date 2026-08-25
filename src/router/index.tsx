@@ -21,6 +21,7 @@ import { AdminOrders } from '@/pages/admin/Orders'
 import { AdminProducts } from '@/pages/admin/Products'
 import { AdminPayments } from '@/pages/admin/Payments'
 import { AdminUsers } from '@/pages/admin/Users'
+import { UserDetail } from '@/pages/admin/UserDetail'
 import { AdminExpenses } from '@/pages/admin/Expenses'
 import { AdminFinance } from '@/pages/admin/Finance'
 import { AdminInstallers } from '@/pages/admin/Installers'
@@ -163,7 +164,8 @@ export function AppRouter() {
             <Route path="/app/admin/leads"      element={<DSALeads />} />
             <Route path="/app/admin/products"   element={<AdminProducts />} />
             <Route path="/app/admin/payments"   element={<AdminPayments />} />
-            <Route path="/app/admin/users"      element={<AdminUsers />} />
+            <Route path="/app/admin/users"         element={<AdminUsers />} />
+            <Route path="/app/admin/users/:userId" element={<UserDetail />} />
             <Route path="/app/admin/expenses"   element={<AdminExpenses />} />
             <Route path="/app/admin/finance"    element={<AdminFinance />} />
             <Route path="/app/admin/installers" element={<AdminInstallers />} />
