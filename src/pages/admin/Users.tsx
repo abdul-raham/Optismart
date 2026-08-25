@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { Users, Search, Mail, Ban, CheckCircle2, User, Phone, ExternalLink, AlertTriangle } from 'lucide-react'
@@ -20,12 +20,15 @@ interface SystemUser {
 
 export function AdminUsers() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { user: currentUser } = useAuthStore()
   const [users, setUsers] = useState<SystemUser[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState<string>('all')
-  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [statusFilter, setStatusFilter] = useState<string>(
+    searchParams.get('highlight') === 'probation' ? 'probation' : 'all'
+  )
   const [probationMap, setProbationMap] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
@@ -178,7 +181,7 @@ export function AdminUsers() {
           <p className="text-surface-500 max-w-md text-xs">Try adjusting your search or role filters.</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className={`grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 ${searchParams.get('highlight') ? 'animate-feature-glow p-2 rounded-2xl border border-brand-500' : ''}`}>
           <AnimatePresence>
             {filteredUsers.map(u => (
               <motion.div

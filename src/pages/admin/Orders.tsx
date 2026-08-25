@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
@@ -38,6 +39,7 @@ const getWhatsAppShareUrl = (order: Order) => {
 }
 
 export function AdminOrders() {
+  const [searchParams] = useSearchParams()
   const [orders, setOrders] = useState<Order[]>([])
   const [assignedOrderIds, setAssignedOrderIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
@@ -403,7 +405,7 @@ export function AdminOrders() {
             </select>
           </div>
 
-          <div className="relative">
+          <div className={`relative ${searchParams.get('highlight') === 'dsa-filter' ? 'animate-feature-glow rounded-xl' : ''}`}>
             <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-400" />
             <select value={dsaFilter} onChange={e => setDsaFilter(e.target.value)} className="h-10 rounded-lg border border-surface-200 bg-white pl-9 pr-8 text-sm outline-none transition-all focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 max-w-[200px] truncate">
               <option value="all">All Sales Agents (DSAs)</option>

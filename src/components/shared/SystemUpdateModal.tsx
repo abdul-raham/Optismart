@@ -1,12 +1,14 @@
 import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Sparkles, CheckCircle2, Sliders, Clock, ShoppingBag, Calendar, BarChart3, ShieldCheck, X } from 'lucide-react'
+import { Sparkles, CheckCircle2, Sliders, Clock, ShoppingBag, Calendar, BarChart3, ShieldCheck, X, ArrowRight } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 
 const CURRENT_RELEASE_VERSION = 'v2.0_aug_2026'
 
 export function SystemUpdateModal() {
   const { user } = useAuthStore()
+  const navigate = useNavigate()
   const [isOpen, setIsOpen] = useState(false)
 
   useEffect(() => {
@@ -24,6 +26,11 @@ export function SystemUpdateModal() {
     setIsOpen(false)
   }
 
+  const handleNavigateToFeature = (route: string) => {
+    handleDismiss()
+    navigate(route)
+  }
+
   if (!isOpen) return null
 
   const newFeatures = [
@@ -31,37 +38,43 @@ export function SystemUpdateModal() {
       icon: Clock,
       color: 'text-amber-500 bg-amber-50 border-amber-200',
       title: 'DSA 7-Day Performance Clock & Inactivity Pipeline',
-      description: 'Automated Day 4 warnings to agents, Day 5 underperformance alerts to admins, and Day 7 auto-suspension with direct deletion prompts & nullify options.'
+      description: 'Automated Day 4 warnings to agents, Day 5 underperformance alerts to admins, and Day 7 auto-suspension with direct deletion prompts & nullify options.',
+      route: '/app/admin/users?highlight=performance'
     },
     {
       icon: ShieldCheck,
       color: 'text-emerald-500 bg-emerald-50 border-emerald-200',
       title: 'Monthly Probation Status Badges',
-      description: 'DSAs with under 20 delivered orders per month are automatically flagged as "On Probation" across all dashboards & user lists until target is reached.'
+      description: 'DSAs with under 20 delivered orders per month are automatically flagged as "On Probation" across all dashboards & user lists until target is reached.',
+      route: '/app/admin/users?highlight=probation'
     },
     {
       icon: Sliders,
       color: 'text-brand-500 bg-brand-50 border-brand-200',
       title: 'Dedicated User Profile Workspace',
-      description: 'Clicking any user card opens a role-specific workspace (/app/admin/users/:userId) with custom targets, commission rate controls, and date-filtered historical reports.'
+      description: 'Clicking any user card opens a role-specific workspace (/app/admin/users/:userId) with custom targets, commission rate controls, and date-filtered historical reports.',
+      route: '/app/admin/users'
     },
     {
       icon: ShoppingBag,
       color: 'text-cyan-500 bg-cyan-50 border-cyan-200',
       title: 'Orders Page Sales Agent (DSA) Filter',
-      description: 'Filter orders by specific registered Sales Agents (DSAs) or direct/unregistered orders directly in the Orders toolbar.'
+      description: 'Filter orders by specific registered Sales Agents (DSAs) or direct/unregistered orders directly in the Orders toolbar.',
+      route: '/app/admin/orders?highlight=dsa-filter'
     },
     {
       icon: Calendar,
       color: 'text-purple-500 bg-purple-50 border-purple-200',
       title: 'Custom Date Range Pickers on Reports',
-      description: 'Reports page now features From Date and To Date custom range pickers alongside month filters for precise analytics.'
+      description: 'Reports page now features From Date and To Date custom range pickers alongside month filters for precise analytics.',
+      route: '/app/admin/reports?highlight=date-pickers'
     },
     {
       icon: BarChart3,
       color: 'text-rose-500 bg-rose-50 border-rose-200',
       title: 'Expense Summary Category Breakdown',
-      description: '4-card category summary tracking percentage breakdown for Ads, DSA Remittances, Delivery/Waybill, and Operational expenses.'
+      description: '4-card category summary tracking percentage breakdown for Ads, DSA Remittances, Delivery/Waybill, and Operational expenses.',
+      route: '/app/admin/expenses?highlight=breakdown'
     }
   ]
 
@@ -94,22 +107,32 @@ export function SystemUpdateModal() {
           </div>
 
           {/* Feature List */}
-          <div className="p-6 overflow-y-auto space-y-4 divide-y divide-surface-100 flex-1">
+          <div className="p-6 overflow-y-auto space-y-3 flex-1">
             {newFeatures.map((feat, idx) => {
               const Icon = feat.icon
               return (
-                <div key={idx} className="pt-4 first:pt-0 flex items-start gap-4">
-                  <div className={`p-2.5 rounded-2xl border ${feat.color} shrink-0 mt-0.5`}>
-                    <Icon className="w-5 h-5" />
+                <div
+                  key={idx}
+                  onClick={() => handleNavigateToFeature(feat.route)}
+                  className="p-3.5 rounded-2xl border border-surface-200/80 bg-white hover:bg-brand-50/40 hover:border-brand-300 transition-all cursor-pointer group flex items-center justify-between gap-4 shadow-2xs"
+                >
+                  <div className="flex items-start gap-3.5">
+                    <div className={`p-2.5 rounded-xl border ${feat.color} shrink-0 mt-0.5`}>
+                      <Icon className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h4 className="text-sm font-bold text-surface-900 group-hover:text-brand-600 transition-colors flex items-center gap-1.5">
+                        {feat.title}
+                      </h4>
+                      <p className="text-xs text-surface-500 mt-0.5 leading-relaxed font-medium">
+                        {feat.description}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-surface-900 flex items-center gap-2">
-                      {feat.title}
-                    </h4>
-                    <p className="text-xs text-surface-500 mt-1 leading-relaxed font-medium">
-                      {feat.description}
-                    </p>
-                  </div>
+
+                  <button className="text-xs font-bold text-brand-600 bg-brand-50 group-hover:bg-brand-600 group-hover:text-white px-3 py-1.5 rounded-xl border border-brand-200 transition-all shrink-0 flex items-center gap-1">
+                    Try <ArrowRight className="w-3.5 h-3.5" />
+                  </button>
                 </div>
               )
             })}

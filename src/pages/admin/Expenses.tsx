@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
@@ -24,6 +25,7 @@ const EXPENSE_CATEGORIES: { value: ExpenseCategory; label: string }[] = [
 ]
 
 export function AdminExpenses() {
+  const [searchParams] = useSearchParams()
   const { user } = useAuthStore()
   const [expenses, setExpenses] = useState<Expense[]>([])
   const [loading, setLoading] = useState(true)
@@ -264,7 +266,7 @@ export function AdminExpenses() {
       </div>
 
       {/* Expense Category Summary Breakdown Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={`grid grid-cols-2 lg:grid-cols-4 gap-4 ${searchParams.get('highlight') === 'breakdown' ? 'animate-feature-glow p-2 rounded-2xl border border-brand-500' : ''}`}>
         <div className="glass-card p-4 border-l-4 border-l-cyan-500">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-surface-500 uppercase tracking-wider">📢 Ads & Marketing</span>

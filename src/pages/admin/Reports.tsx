@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import {
@@ -59,6 +60,7 @@ interface RemittanceRow {
 
 // ── Component ──────────────────────────────────────────────────
 export function AdminReports() {
+  const [searchParams] = useSearchParams()
   const [loading, setLoading] = useState(true)
   const [dsaSummaries, setDsaSummaries] = useState<DSASummary[]>([])
   const [monthlyData, setMonthlyData] = useState<MonthlyBreakdown[]>([])
@@ -473,7 +475,7 @@ export function AdminReports() {
       </div>
 
       {/* Filters */}
-      <div className="glass-card p-4 flex flex-wrap gap-3 items-center">
+      <div className={`glass-card p-4 flex flex-wrap gap-3 items-center ${searchParams.get('highlight') === 'date-pickers' ? 'animate-feature-glow border-brand-500' : ''}`}>
         <Filter className="w-4 h-4 text-surface-400" />
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-1.5 text-xs">
