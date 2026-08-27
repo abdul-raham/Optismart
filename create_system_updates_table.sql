@@ -19,7 +19,7 @@ CREATE POLICY "Authenticated users read system updates" ON public.system_updates
 
 DROP POLICY IF EXISTS "Admins write system updates" ON public.system_updates;
 CREATE POLICY "Admins write system updates" ON public.system_updates FOR ALL TO authenticated USING (
-  EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND LOWER(role) IN ('admin', 'super_admin'))
+  EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid() AND LOWER(role::text) IN ('admin', 'super_admin'))
 );
 
 GRANT SELECT ON public.system_updates TO authenticated;

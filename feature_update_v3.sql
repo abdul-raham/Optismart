@@ -72,7 +72,7 @@ BEGIN
   -- Check public.users table
   IF EXISTS (
     SELECT 1 FROM public.users
-    WHERE id = p_uid AND LOWER(REPLACE(role, ' ', '_')) IN ('admin', 'super_admin')
+    WHERE id = p_uid AND LOWER(REPLACE(role::text, ' ', '_')) IN ('admin', 'super_admin')
   ) THEN
     RETURN TRUE;
   END IF;
