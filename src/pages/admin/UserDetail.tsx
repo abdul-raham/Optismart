@@ -28,6 +28,7 @@ interface SystemUser {
   eviction_warning_day4_sent?: boolean
   eviction_alert_day5_sent?: boolean
   probation_status?: string
+  probation_approval_status?: 'none' | 'pending_confirmation' | 'confirmed_probation' | 'waived'
 }
 
 export function UserDetail() {
@@ -54,6 +55,7 @@ export function UserDetail() {
   const [userLeads, setUserLeads] = useState<any[]>([])
   const [userCommissions, setUserCommissions] = useState<any[]>([])
   const [userJobs, setUserJobs] = useState<any[]>([])
+  const [userExpenses, setUserExpenses] = useState<any[]>([])
 
   useEffect(() => {
     if (userId) fetchUserData()
@@ -109,6 +111,14 @@ export function UserDetail() {
           if (endDate) commQuery = commQuery.lte('triggered_at', `${endDate}T23:59:59.999Z`)
           const { data: comms } = await commQuery
           if (comms) setUserCommissions(comms)
+        } catch (_) {}
+
+        try {
+          let expQuery = supabase.from('expenses').select('*').eq('dsa_id', userId).order('expense_date', { ascending: false })
+          if (startDate) expQuery = expQuery.gte('expense_date', startDate)
+          if (endDate) expQuery = expQuery.lte('expense_date', endDate)
+          const { data: exps } = await expQuery
+          if (exps) setUserExpenses(exps)
         } catch (_) {}
       }
 
@@ -302,12 +312,44 @@ export function UserDetail() {
                 {user.role.replace('_', ' ')}
               </span>
 
-              {/* DSA-Specific Probation Badges */}
+              {/* DSA-Specific Probation Badges & Admin Controls */}
               {user.role === 'dsa' && (
-                isOnProbation ? (
-                  <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
-                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600" /> On Probation ({deliveredThisMonth}/20)
+                user.probation_approval_status === 'confirmed_probation' ? (
+                  <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1">
+                    <AlertTriangle className="w-3.5 h-3.5 text-rose-600" /> Confirmed Probation ({deliveredThisMonth}/20)
                   </span>
+                ) : user.probation_approval_status === 'waived' ? (
+                  <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-cyan-100 text-cyan-800 border border-cyan-300 flex items-center gap-1">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-cyan-600" /> Probation Waived ({deliveredThisMonth} Delivered)
+                  </span>
+                ) : isOnProbation ? (
+                  <div className="flex items-center gap-1.5">
+                    <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600" /> Pending Admin Review ({deliveredThisMonth}/20)
+                    </span>
+                    {(currentRole === 'admin' || currentRole === 'super_admin') && (
+                      <>
+                        <button
+                          onClick={async () => {
+                            await supabase.from('users').update({ probation_approval_status: 'confirmed_probation' }).eq('id', user.id)
+                            setUser(prev => prev ? { ...prev, probation_approval_status: 'confirmed_probation' } : null)
+                          }}
+                          className="text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 px-2 py-1 rounded-lg border border-rose-200"
+                        >
+                          Confirm Probation
+                        </button>
+                        <button
+                          onClick={async () => {
+                            await supabase.from('users').update({ probation_approval_status: 'waived' }).eq('id', user.id)
+                            setUser(prev => prev ? { ...prev, probation_approval_status: 'waived' } : null)
+                          }}
+                          className="text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded-lg border border-emerald-200"
+                        >
+                          Waive Probation
+                        </button>
+                      </>
+                    )}
+                  </div>
                 ) : (
                   <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
                     <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Off Probation ({deliveredThisMonth} Delivered)
@@ -418,7 +460,7 @@ export function UserDetail() {
           </p>
         </div>
 
-        {/* Role-Specific Fourth Card: Commissions for DSA, Earnings for Installer, Access for Admin */}
+        {/* Role-Specific Fourth Card */}
         <div className="glass-card p-4">
           {user.role === 'dsa' && (
             <>
@@ -437,7 +479,7 @@ export function UserDetail() {
                 <Wrench className="w-4 h-4 text-amber-600" /> Installer Earnings
               </span>
               <p className="text-2xl font-black text-surface-900 mt-2">
-                {formatCurrency(userJobs.reduce((sum, j) => sum + Number(j.commission_amount || 0), 0))}
+                {formatCurrency(userJobs.filter(j => j.status === 'completed').reduce((sum, j) => sum + Number(j.installer_cut || 0), 0))}
               </p>
             </>
           )}
@@ -445,15 +487,39 @@ export function UserDetail() {
           {(user.role === 'admin' || user.role === 'super_admin') && (
             <>
               <span className="text-xs font-bold text-surface-500 uppercase tracking-wider flex items-center gap-1">
-                <Shield className="w-4 h-4 text-purple-600" /> Admin Privileges
+                <Shield className="w-4 h-4 text-brand-600" /> Administrative Access
               </span>
-              <p className="text-base font-bold text-purple-700 mt-3 uppercase tracking-wide">
-                Full Management Access
-              </p>
+              <p className="text-sm font-bold text-surface-900 mt-2">Full Portal Permissions</p>
             </>
           )}
         </div>
       </div>
+
+      {/* DSA Ad Spend KPI Card (DSA ONLY) */}
+      {user.role === 'dsa' && (
+        <div className="glass-card p-5 border-l-4 border-l-cyan-500 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div>
+            <span className="text-xs font-extrabold uppercase tracking-wider text-cyan-800 bg-cyan-50 px-2.5 py-1 rounded-full border border-cyan-200">
+              📢 Total Ad Spend Allocation
+            </span>
+            <h3 className="text-2xl font-black text-surface-900 mt-2">
+              {formatCurrency(userExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0))}
+            </h3>
+            <p className="text-xs text-surface-500 mt-1 font-medium">
+              Total advertising & marketing expenditure allocated to generate leads/orders for {user.full_name || 'this DSA'}.
+            </p>
+          </div>
+
+          <div className="p-3 bg-white rounded-2xl border border-surface-200 text-right">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-surface-400">Ad Spend Per Delivered Order</span>
+            <p className="text-lg font-black text-surface-900 mt-0.5">
+              {userOrders.filter(o => o.status === 'delivered').length > 0
+                ? formatCurrency(userExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0) / userOrders.filter(o => o.status === 'delivered').length)
+                : '₦0'}
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Date Range Filter Bar for Activity Reports */}
       <div className="glass-card p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">

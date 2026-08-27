@@ -25,7 +25,29 @@ export function AdminProducts() {
   const [syncing, setSyncing] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
 
-  const [activeTab, setActiveTab] = useState<'products' | 'promos'>('products')
+  const [activeTab, setActiveTab] = useState<'products' | 'promos' | 'inventory'>('products')
+  const [locations, setLocations] = useState<any[]>([])
+  const [inventoryList, setInventoryList] = useState<any[]>([])
+  const [movementsList, setMovementsList] = useState<any[]>([])
+
+  // Stock In Modal State
+  const [isStockInModalOpen, setIsStockInModalOpen] = useState(false)
+  const [stockInForm, setStockInForm] = useState({
+    product_id: '',
+    location_id: '',
+    quantity: 10,
+    notes: '',
+  })
+
+  // Stock Transfer Modal State
+  const [isTransferModalOpen, setIsTransferModalOpen] = useState(false)
+  const [transferForm, setTransferForm] = useState({
+    product_id: '',
+    from_location_id: '',
+    to_location_id: '',
+    quantity: 5,
+    notes: '',
+  })
   const [promoPackages, setPromoPackages] = useState<any[]>([
     {
       id: 'promo_ptz_bulb',
@@ -71,7 +93,140 @@ export function AdminProducts() {
 
   useEffect(() => {
     fetchProducts()
+    fetchInventoryData()
   }, [])
+
+  const fetchInventoryData = async () => {
+    try {
+      const [locRes, invRes, movRes] = await Promise.all([
+        supabase.from('inventory_locations').select('*').order('name'),
+        supabase.from('product_inventory').select('*, product:products(name, image_url), location:inventory_locations(name)'),
+        supabase.from('stock_movements').select('*, product:products(name), from_loc:inventory_locations!stock_movements_from_location_id_fkey(name), to_loc:inventory_locations!stock_movements_to_location_id_fkey(name)').order('created_at', { ascending: false }).limit(100),
+      ])
+
+      if (locRes.data) setLocations(locRes.data)
+      if (invRes.data) setInventoryList(invRes.data)
+      if (movRes.data) setMovementsList(movRes.data)
+    } catch (err) {
+      console.error('Error fetching inventory data:', err)
+    }
+  }
+
+  const handleStockIn = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!stockInForm.product_id || !stockInForm.location_id || stockInForm.quantity <= 0) {
+      alert('Please fill out all required stock fields')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      // 1. Log Stock Movement
+      await supabase.from('stock_movements').insert({
+        movement_type: 'stock_in',
+        product_id: stockInForm.product_id,
+        to_location_id: stockInForm.location_id,
+        quantity: stockInForm.quantity,
+        notes: stockInForm.notes || 'Incoming stock addition',
+        created_by_auth_id: user?.id,
+      })
+
+      // 2. Update/Upsert product_inventory
+      const existing = inventoryList.find(i => i.product_id === stockInForm.product_id && i.location_id === stockInForm.location_id)
+      const newQty = (existing?.quantity || 0) + Number(stockInForm.quantity)
+
+      await supabase.from('product_inventory').upsert({
+        product_id: stockInForm.product_id,
+        location_id: stockInForm.location_id,
+        quantity: newQty,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'product_id,location_id' })
+
+      // 3. Update total product stock_quantity in products table
+      const totalProductQty = inventoryList
+        .filter(i => i.product_id === stockInForm.product_id && i.location_id !== stockInForm.location_id)
+        .reduce((sum, i) => sum + i.quantity, 0) + newQty
+
+      await supabase.from('products').update({ stock_quantity: totalProductQty }).eq('id', stockInForm.product_id)
+
+      alert('Stock successfully added!')
+      setIsStockInModalOpen(false)
+      fetchInventoryData()
+      fetchProducts()
+    } catch (err: any) {
+      console.error('Stock In failed:', err)
+      alert(`Failed to add stock: ${err?.message || err}`)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleStockTransfer = async (e: React.FormEvent) => {
+    e.preventDefault()
+    const { product_id, from_location_id, to_location_id, quantity, notes } = transferForm
+    if (!product_id || !from_location_id || !to_location_id || quantity <= 0) {
+      alert('Please fill out all transfer fields')
+      return
+    }
+
+    if (from_location_id === to_location_id) {
+      alert('From and To locations must be different')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      // Check available stock at source location
+      const sourceInv = inventoryList.find(i => i.product_id === product_id && i.location_id === from_location_id)
+      const available = sourceInv?.quantity || 0
+
+      if (available < quantity) {
+        alert(`Insufficient stock at source location! (Available: ${available}, Requested: ${quantity})`)
+        setSubmitting(false)
+        return
+      }
+
+      // 1. Log Stock Transfer movement
+      await supabase.from('stock_movements').insert({
+        movement_type: 'transfer',
+        product_id,
+        from_location_id,
+        to_location_id,
+        quantity,
+        notes: notes || 'Inter-branch stock transfer',
+        created_by_auth_id: user?.id,
+      })
+
+      // 2. Deduct from source branch
+      await supabase.from('product_inventory').upsert({
+        product_id,
+        location_id: from_location_id,
+        quantity: available - Number(quantity),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'product_id,location_id' })
+
+      // 3. Add to target branch
+      const destInv = inventoryList.find(i => i.product_id === product_id && i.location_id === to_location_id)
+      const destAvailable = destInv?.quantity || 0
+
+      await supabase.from('product_inventory').upsert({
+        product_id,
+        location_id: to_location_id,
+        quantity: destAvailable + Number(quantity),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'product_id,location_id' })
+
+      alert('Stock transfer completed successfully!')
+      setIsTransferModalOpen(false)
+      fetchInventoryData()
+      fetchProducts()
+    } catch (err: any) {
+      console.error('Stock Transfer failed:', err)
+      alert(`Transfer failed: ${err?.message || err}`)
+    } finally {
+      setSubmitting(false)
+    }
+  }
 
   const fetchProducts = async () => {
     try {
@@ -230,10 +385,19 @@ export function AdminProducts() {
             <button onClick={() => { setEditingId(null); setForm({ name: '', description: '', retail_price: 0, wholesale_price: 0, cost_price: 0, stock_quantity: 0, min_stock_level: 5, source_url: '', image_url: '' }); setIsModalOpen(true); }} className="btn-primary h-10 px-4 text-sm font-semibold flex items-center gap-2">
               <Plus className="w-4 h-4" /> Add Product
             </button>
-          ) : (
+          ) : activeTab === 'promos' ? (
             <button onClick={() => { setEditingPromo(null); setPromoForm({ title: '', description: '', bonus_item_name: '', promo_price: 0, cost_price: 0, is_active: true }); setIsPromoModalOpen(true); }} className="btn-primary h-10 px-4 text-sm font-semibold flex items-center gap-2">
               <Plus className="w-4 h-4" /> Create Promo Package
             </button>
+          ) : (
+            <div className="flex items-center gap-2">
+              <button onClick={() => setIsStockInModalOpen(true)} className="btn-primary h-10 px-4 text-sm font-semibold flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700">
+                <Plus className="w-4 h-4" /> Stock In
+              </button>
+              <button onClick={() => setIsTransferModalOpen(true)} className="btn-outline h-10 px-4 text-sm font-semibold flex items-center gap-1.5 border-brand-300 text-brand-700 bg-brand-50 hover:bg-brand-100">
+                <RefreshCw className="w-4 h-4 text-brand-600" /> Stock Transfer
+              </button>
+            </div>
           )}
           <button onClick={syncOptismartCatalog} disabled={syncing} className="btn-outline h-10 px-4 text-sm font-semibold flex items-center gap-2">
             <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} /> Sync OptiSmart
@@ -258,6 +422,14 @@ export function AdminProducts() {
           }`}
         >
           🎁 Promo Packages ({promoPackages.length})
+        </button>
+        <button
+          onClick={() => setActiveTab('inventory')}
+          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${
+            activeTab === 'inventory' ? 'bg-brand-600 text-white shadow-sm' : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
+          }`}
+        >
+          🏬 Multi-Branch Inventory ({locations.length} Locations)
         </button>
       </div>
 
@@ -366,7 +538,7 @@ export function AdminProducts() {
             ))}
           </AnimatePresence>
         </div>
-      )) : (
+      )) : activeTab === 'promos' ? (
         /* PROMO PACKAGES TAB */
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {promoPackages.map(promo => (
@@ -389,8 +561,7 @@ export function AdminProducts() {
                       })
                       setIsPromoModalOpen(true)
                     }}
-                    className="p-1.5 text-surface-400 hover:text-brand-600 hover:bg-brand-50 rounded-md transition-colors"
-                    title="Edit Promo Package"
+                    className="p-1.5 rounded-lg text-surface-400 hover:text-brand-600 hover:bg-brand-50 transition-colors"
                   >
                     <Edit2 className="w-4 h-4" />
                   </button>
@@ -425,6 +596,133 @@ export function AdminProducts() {
               </div>
             </div>
           ))}
+        </div>
+      ) : (
+        /* MULTI-BRANCH INVENTORY TAB */
+        <div className="space-y-6">
+          {/* Branch Overview Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {locations.map(loc => {
+              const locTotalStock = inventoryList
+                .filter(i => i.location_id === loc.id)
+                .reduce((sum, i) => sum + (i.quantity || 0), 0)
+              return (
+                <div key={loc.id} className="glass-card p-5 border-l-4 border-l-brand-600 relative">
+                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full border border-brand-200">
+                    🏬 {loc.name}
+                  </span>
+                  <h3 className="text-2xl font-black text-surface-900 mt-2">{locTotalStock} Cameras</h3>
+                  <p className="text-xs text-surface-500 mt-0.5">{loc.address || 'Regional Stock Hub'}</p>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Product Stock Level Breakdown Table */}
+          <div className="glass-card overflow-hidden">
+            <div className="px-6 py-4 border-b border-surface-100 flex items-center justify-between">
+              <h3 className="text-base font-bold text-surface-900 flex items-center gap-2">
+                <Package className="w-5 h-5 text-brand-600" /> Multi-Branch Stock Availability
+              </h3>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setIsStockInModalOpen(true)} className="btn-primary text-xs h-9 px-3 bg-emerald-600 hover:bg-emerald-700">
+                  + Stock In
+                </button>
+                <button onClick={() => setIsTransferModalOpen(true)} className="btn-outline text-xs h-9 px-3 border-brand-300 text-brand-700 bg-brand-50">
+                  🔄 Stock Transfer
+                </button>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className="bg-surface-50/50 border-b border-surface-100 text-xs font-bold text-surface-500 uppercase tracking-wider">
+                    <th className="py-3.5 px-6">Product / Camera</th>
+                    {locations.map(loc => (
+                      <th key={loc.id} className="py-3.5 px-6 text-center">{loc.name}</th>
+                    ))}
+                    <th className="py-3.5 px-6 text-right">Total Available Stock</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-surface-100 text-sm">
+                  {products.map(p => {
+                    const totalProductStock = locations.reduce((total, loc) => {
+                      const item = inventoryList.find(i => i.product_id === p.id && i.location_id === loc.id)
+                      return total + (item?.quantity || 0)
+                    }, 0)
+
+                    return (
+                      <tr key={p.id} className="hover:bg-surface-50/50 transition-colors">
+                        <td className="py-3.5 px-6 font-bold text-surface-900 flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-lg bg-surface-100 flex items-center justify-center font-bold text-brand-600 shrink-0">
+                            📷
+                          </div>
+                          <div>
+                            <p>{p.name}</p>
+                            <p className="text-xs text-surface-400 font-normal">{formatCurrency(p.retail_price)}</p>
+                          </div>
+                        </td>
+                        {locations.map(loc => {
+                          const item = inventoryList.find(i => i.product_id === p.id && i.location_id === loc.id)
+                          const qty = item?.quantity || 0
+                          return (
+                            <td key={loc.id} className="py-3.5 px-6 text-center">
+                              <span className={`px-2.5 py-1 rounded-lg text-xs font-extrabold ${
+                                qty <= 2 ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-surface-100 text-surface-800'
+                              }`}>
+                                {qty} units
+                              </span>
+                            </td>
+                          )
+                        })}
+                        <td className="py-3.5 px-6 text-right font-black text-surface-900">
+                          <span className="px-3 py-1 rounded-full text-xs font-black bg-brand-50 text-brand-700 border border-brand-200">
+                            {totalProductStock} units
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Recent Stock Movement Audit Log */}
+          <div className="glass-card p-6">
+            <h3 className="text-base font-bold text-surface-900 mb-4 flex items-center gap-2">
+              <RefreshCw className="w-5 h-5 text-brand-600" /> Recent Stock Movements (Audit Trail)
+            </h3>
+            <div className="space-y-3 max-h-80 overflow-y-auto">
+              {movementsList.map(m => (
+                <div key={m.id} className="p-3 rounded-xl border border-surface-200 bg-white flex items-center justify-between text-xs">
+                  <div className="flex items-center gap-3">
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
+                      m.movement_type === 'stock_in' ? 'bg-emerald-100 text-emerald-800' :
+                      m.movement_type === 'transfer' ? 'bg-brand-100 text-brand-800' : 'bg-rose-100 text-rose-800'
+                    }`}>
+                      {m.movement_type.replace('_', ' ')}
+                    </span>
+                    <div>
+                      <p className="font-bold text-surface-900">{m.product?.name || 'Camera'}</p>
+                      <p className="text-surface-500 mt-0.5">
+                        {m.movement_type === 'transfer'
+                          ? `Transferred from ${m.from_loc?.name || 'HQ'} ➔ ${m.to_loc?.name || 'Branch'}`
+                          : m.movement_type === 'stock_in'
+                          ? `Stock In added to ${m.to_loc?.name || 'Branch'}`
+                          : `Fulfillment Stock Out from ${m.from_loc?.name || 'Branch'}`}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-black text-surface-900 text-sm">{m.quantity} units</span>
+                    <p className="text-[10px] text-surface-400">{new Date(m.created_at).toLocaleString()}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
       )}
       {createPortal(
@@ -537,6 +835,97 @@ export function AdminProducts() {
                     <button type="submit" className="btn-primary">
                       {editingPromo ? 'Save Changes' : 'Create Package'}
                     </button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          )}
+
+          {/* STOCK IN MODAL */}
+          {isStockInModalOpen && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm" onClick={() => setIsStockInModalOpen(false)} />
+              <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="bg-white w-full max-w-md relative z-10 rounded-2xl shadow-card-xl overflow-hidden">
+                <div className="px-6 py-4 border-b border-surface-100 flex items-center justify-between bg-emerald-50 text-emerald-900">
+                  <h2 className="text-lg font-bold flex items-center gap-2">📥 Log Stock In (New Stock)</h2>
+                  <button onClick={() => setIsStockInModalOpen(false)} className="text-emerald-700 hover:text-emerald-950"><X className="w-5 h-5" /></button>
+                </div>
+                <form onSubmit={handleStockIn} className="p-6 space-y-4">
+                  <div>
+                    <label className="label">Select Camera Product *</label>
+                    <select required className="input bg-white text-sm" value={stockInForm.product_id} onChange={e => setStockInForm({...stockInForm, product_id: e.target.value})}>
+                      <option value="">Select product...</option>
+                      {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Select Target Location / Branch *</label>
+                    <select required className="input bg-white text-sm" value={stockInForm.location_id} onChange={e => setStockInForm({...stockInForm, location_id: e.target.value})}>
+                      <option value="">Select branch location...</option>
+                      {locations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Quantity Incoming *</label>
+                    <input required type="number" min={1} className="input font-bold text-lg text-emerald-700" value={stockInForm.quantity} onChange={e => setStockInForm({...stockInForm, quantity: Number(e.target.value)})} />
+                  </div>
+                  <div>
+                    <label className="label">Notes / Reference (Optional)</label>
+                    <input type="text" className="input text-xs" placeholder="e.g. Shipment Waybill #402" value={stockInForm.notes} onChange={e => setStockInForm({...stockInForm, notes: e.target.value})} />
+                  </div>
+                  <div className="pt-4 flex justify-end gap-3 border-t border-surface-100">
+                    <button type="button" onClick={() => setIsStockInModalOpen(false)} className="btn-outline">Cancel</button>
+                    <button type="submit" disabled={submitting} className="btn-primary bg-emerald-600 hover:bg-emerald-700">{submitting ? 'Saving...' : 'Add Stock'}</button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          )}
+
+          {/* STOCK TRANSFER MODAL */}
+          {isTransferModalOpen && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm" onClick={() => setIsTransferModalOpen(false)} />
+              <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="bg-white w-full max-w-md relative z-10 rounded-2xl shadow-card-xl overflow-hidden">
+                <div className="px-6 py-4 border-b border-surface-100 flex items-center justify-between bg-brand-50 text-brand-900">
+                  <h2 className="text-lg font-bold flex items-center gap-2">🔄 Inter-Branch Stock Transfer</h2>
+                  <button onClick={() => setIsTransferModalOpen(false)} className="text-brand-700 hover:text-brand-950"><X className="w-5 h-5" /></button>
+                </div>
+                <form onSubmit={handleStockTransfer} className="p-6 space-y-4">
+                  <div>
+                    <label className="label">Select Camera Product *</label>
+                    <select required className="input bg-white text-sm" value={transferForm.product_id} onChange={e => setTransferForm({...transferForm, product_id: e.target.value})}>
+                      <option value="">Select product...</option>
+                      {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="label text-xs">From Branch *</label>
+                      <select required className="input bg-white text-xs" value={transferForm.from_location_id} onChange={e => setTransferForm({...transferForm, from_location_id: e.target.value})}>
+                        <option value="">Source branch...</option>
+                        {locations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="label text-xs">To Branch *</label>
+                      <select required className="input bg-white text-xs" value={transferForm.to_location_id} onChange={e => setTransferForm({...transferForm, to_location_id: e.target.value})}>
+                        <option value="">Destination...</option>
+                        {locations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="label">Quantity to Transfer *</label>
+                    <input required type="number" min={1} className="input font-bold text-lg text-brand-700" value={transferForm.quantity} onChange={e => setTransferForm({...transferForm, quantity: Number(e.target.value)})} />
+                  </div>
+                  <div>
+                    <label className="label">Transfer Notes / Reason (Optional)</label>
+                    <input type="text" className="input text-xs" placeholder="e.g. Restocking Abuja branch demand" value={transferForm.notes} onChange={e => setTransferForm({...transferForm, notes: e.target.value})} />
+                  </div>
+                  <div className="pt-4 flex justify-end gap-3 border-t border-surface-100">
+                    <button type="button" onClick={() => setIsTransferModalOpen(false)} className="btn-outline">Cancel</button>
+                    <button type="submit" disabled={submitting} className="btn-primary">{submitting ? 'Transferring...' : 'Execute Stock Transfer'}</button>
                   </div>
                 </form>
               </motion.div>

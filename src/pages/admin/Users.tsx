@@ -16,6 +16,7 @@ interface SystemUser {
   role: string
   status: 'active' | 'suspended'
   created_at: string
+  probation_approval_status?: 'none' | 'pending_confirmation' | 'confirmed_probation' | 'waived'
 }
 
 export function AdminUsers() {
@@ -41,7 +42,7 @@ export function AdminUsers() {
     try {
       const { data, error } = await supabase
         .from('users')
-        .select('id, email, full_name, phone, role, status, created_at')
+        .select('id, email, full_name, phone, role, status, created_at, probation_approval_status')
         .order('created_at', { ascending: false })
 
       if (error) throw error
@@ -92,6 +93,21 @@ export function AdminUsers() {
     }
   }
 
+  const handleUpdateProbation = async (userId: string, status: 'confirmed_probation' | 'waived') => {
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({ probation_approval_status: status, updated_at: new Date().toISOString() })
+        .eq('id', userId)
+
+      if (error) throw error
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, probation_approval_status: status } : u))
+    } catch (err) {
+      console.error('Failed to update probation approval:', err)
+      alert('Failed to update probation status')
+    }
+  }
+
   const getRoleColor = (role: string) => {
     switch (role) {
       case 'super_admin': return 'bg-purple-100 text-purple-800 border-purple-300'
@@ -112,7 +128,7 @@ export function AdminUsers() {
     let matchesStatus = true
     if (statusFilter === 'active') matchesStatus = u.status === 'active'
     if (statusFilter === 'suspended') matchesStatus = u.status === 'suspended'
-    if (statusFilter === 'probation') matchesStatus = u.role === 'dsa' && probationMap[u.id] === true
+    if (statusFilter === 'probation') matchesStatus = u.role === 'dsa' && (probationMap[u.id] === true || u.probation_approval_status === 'confirmed_probation')
 
     return matchesSearch && matchesRole && matchesStatus
   })
@@ -222,12 +238,36 @@ export function AdminUsers() {
                       {u.role.replace('_', ' ')}
                     </span>
 
-                    {/* Probation Badge for DSA */}
+                    {/* Probation Badge & Admin Approval for DSA */}
                     {u.role === 'dsa' && (
-                      probationMap[u.id] ? (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3 text-amber-600" /> On Probation
+                      u.probation_approval_status === 'confirmed_probation' ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1">
+                          <AlertTriangle className="w-3 h-3 text-rose-600" /> Confirmed Probation
                         </span>
+                      ) : u.probation_approval_status === 'waived' ? (
+                        <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-cyan-100 text-cyan-800 border border-cyan-300 flex items-center gap-1">
+                          <CheckCircle2 className="w-3 h-3 text-cyan-600" /> Probation Waived
+                        </span>
+                      ) : probationMap[u.id] ? (
+                        <div className="flex items-center gap-1">
+                          <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
+                            <AlertTriangle className="w-3 h-3 text-amber-600" /> Pending Admin Review
+                          </span>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleUpdateProbation(u.id, 'confirmed_probation'); }}
+                            className="text-[10px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 px-1.5 py-0.5 rounded border border-rose-200"
+                            title="Confirm Probation"
+                          >
+                            Confirm
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); handleUpdateProbation(u.id, 'waived'); }}
+                            className="text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-200"
+                            title="Waive Probation"
+                          >
+                            Waive
+                          </button>
+                        </div>
                       ) : (
                         <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
                           <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Off Probation

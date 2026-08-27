@@ -482,19 +482,21 @@ export function AdminExpenses() {
                     </select>
                   </div>
 
-                  <div>
-                    <label className="label text-brand-900 text-xs">Attributed DSA</label>
-                    <select
-                      className="input bg-white text-xs"
-                      value={form.dsa_id}
-                      onChange={e => setForm({ ...form, dsa_id: e.target.value })}
-                    >
-                      <option value="">Select DSA agent...</option>
-                      {dsas.map(dsa => (
-                        <option key={dsa.id} value={dsa.id}>{dsa.full_name}</option>
-                      ))}
-                    </select>
-                  </div>
+              {/* Assigned DSA (Optional) */}
+              <div>
+                <label className="label">Assigned DSA / Sales Agent (Optional)</label>
+                <select
+                  className="input bg-white text-xs"
+                  value={form.dsa_id}
+                  onChange={e => setForm({ ...form, dsa_id: e.target.value })}
+                >
+                  <option value="">No specific DSA assigned (General expense)</option>
+                  {dsas.map(dsa => (
+                    <option key={dsa.id} value={dsa.id}>{dsa.full_name}</option>
+                  ))}
+                </select>
+                <p className="text-[10px] text-surface-400 mt-1">Assigning a DSA tracks ad spend & cost allocation on their user report.</p>
+              </div>
                 </div>
               )}
 

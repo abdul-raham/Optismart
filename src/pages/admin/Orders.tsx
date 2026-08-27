@@ -258,6 +258,38 @@ export function AdminOrders() {
         }).catch(console.error);
       }
 
+      // Auto-deduct inventory stock from location on DELIVERED
+      if (newStatus === 'delivered' && updatedOrder?.product_id) {
+        try {
+          const { data: defaultLoc } = await supabase.from('inventory_locations').select('id').eq('is_active', true).limit(1).single()
+          if (defaultLoc) {
+            await supabase.from('stock_movements').insert({
+              movement_type: 'stock_out',
+              product_id: updatedOrder.product_id,
+              from_location_id: defaultLoc.id,
+              quantity: updatedOrder.quantity || 1,
+              reference_order_id: updatedOrder.id,
+              notes: `Fulfillment stock-out for Order #${updatedOrder.order_number}`,
+            })
+
+            // Decrement inventory at location
+            const { data: invItem } = await supabase
+              .from('product_inventory')
+              .select('quantity')
+              .eq('product_id', updatedOrder.product_id)
+              .eq('location_id', defaultLoc.id)
+              .single()
+
+            if (invItem) {
+              const newQty = Math.max(0, (invItem.quantity || 0) - (updatedOrder.quantity || 1))
+              await supabase.from('product_inventory').update({ quantity: newQty }).eq('product_id', updatedOrder.product_id).eq('location_id', defaultLoc.id)
+            }
+          }
+        } catch (invErr) {
+          console.warn('Inventory deduction skipped:', invErr)
+        }
+      }
+
       // Auto-create commission for DSA when order status is marked DELIVERED
       if (newStatus === 'delivered' && updatedOrder?.dsa_id) {
         try {
