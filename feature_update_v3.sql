@@ -48,9 +48,12 @@ CREATE TABLE IF NOT EXISTS public.stock_movements (
   to_location_id UUID REFERENCES public.inventory_locations(id),
   reference_order_id UUID REFERENCES public.orders(id) ON DELETE RESTRICT,
   notes TEXT,
-  created_by_auth_id UUID REFERENCES public.users(id),
+  created_by_auth_id UUID,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- Drop restrictive FK if it exists to allow seamless logging across auth.users and public.users
+ALTER TABLE public.stock_movements DROP CONSTRAINT IF EXISTS stock_movements_created_by_auth_id_fkey;
 
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS fulfillment_location_id UUID REFERENCES public.inventory_locations(id);
 
@@ -140,6 +143,14 @@ BEGIN
   END IF;
   IF p_quantity <= 0 THEN
     RAISE EXCEPTION 'Quantity must be greater than zero';
+  END IF;
+
+  -- Auto-sync admin user to public.users if not present
+  IF auth.uid() IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid()) THEN
+    INSERT INTO public.users (id, email, full_name, role, status)
+    SELECT id, email, COALESCE(raw_user_meta_data->>'full_name', email), 'super_admin', 'active'
+    FROM auth.users WHERE id = auth.uid()
+    ON CONFLICT (id) DO NOTHING;
   END IF;
 
   INSERT INTO public.product_inventory(product_id, location_id, quantity)
