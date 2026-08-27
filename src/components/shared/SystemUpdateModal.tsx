@@ -1,28 +1,129 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Sparkles, CheckCircle2, Sliders, Clock, ShoppingBag, Calendar, BarChart3, ShieldCheck, X, ArrowRight, Package, TrendingUp, DollarSign } from 'lucide-react'
+import { Sparkles, CheckCircle2, Sliders, Clock, ShoppingBag, ShieldCheck, X, ArrowRight, Package, DollarSign } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
+import { supabase } from '@/lib/supabase'
 
-const CURRENT_RELEASE_VERSION = 'v3.1_aug_2026'
+const ICON_MAP: Record<string, any> = {
+  Package,
+  ShieldCheck,
+  Clock,
+  DollarSign,
+  Sliders,
+  ShoppingBag,
+}
+
+const STATIC_RELEASE_VERSION = 'v3.1_aug_2026'
+
+const STATIC_FEATURES = [
+  {
+    icon: Package,
+    color: 'text-brand-600 bg-brand-50 border-brand-200',
+    title: '🏬 Multi-Branch Inventory & Stock Control',
+    description: 'Track camera stock across multiple locations (Lagos HQ, Abuja Branch, PH Depot). Log Stock In, perform inter-branch Stock Transfers, and view stock movement audit logs.',
+    route: '/app/admin/products'
+  },
+  {
+    icon: ShieldCheck,
+    color: 'text-emerald-600 bg-emerald-50 border-emerald-200',
+    title: '🛡️ Dedicated Admin Probation Review Panel',
+    description: 'Clean admin review card on DSA profiles for agents under the 20-order target. Confirm probation or waive targets with distinct, clear buttons.',
+    route: '/app/admin/users?highlight=probation'
+  },
+  {
+    icon: Clock,
+    color: 'text-amber-500 bg-amber-50 border-amber-200',
+    title: '⏳ Day 7 Eviction Action Prompt & Clock Pausing',
+    description: 'Automated Day 7 safety suspension with an unmissable Eviction Action Banner for admins to either Reset Window or Delete Account. Suspended accounts are automatically excluded from clock countdowns.',
+    route: '/app/admin/users?highlight=performance'
+  },
+  {
+    icon: DollarSign,
+    color: 'text-cyan-600 bg-cyan-50 border-cyan-200',
+    title: '📢 Ad Spend Allocation & Per-DSA Tracking',
+    description: 'Assign specific Sales Agents (DSAs) to Advertising & Marketing expenses. View Total Ad Spend Allocation (₦) and Ad Spend Per Delivered Order on DSA profiles.',
+    route: '/app/admin/expenses'
+  },
+  {
+    icon: Sliders,
+    color: 'text-indigo-500 bg-indigo-50 border-indigo-200',
+    title: '📱 Clean Products Toolbar & Mobile Responsiveness',
+    description: 'Redesigned Products header with segmented tab bar, prominent search bar, and clean responsive toolbar across all admin pages.',
+    route: '/app/admin/products'
+  },
+  {
+    icon: ShoppingBag,
+    color: 'text-rose-500 bg-rose-50 border-rose-200',
+    title: '📦 Order Fulfillment Stock-Out Integration',
+    description: 'Filter orders by Sales Agent. Marking orders DELIVERED automatically deducts camera inventory from selected branch locations.',
+    route: '/app/admin/orders'
+  }
+]
 
 export function SystemUpdateModal() {
   const { user } = useAuthStore()
   const navigate = useNavigate()
   const [isOpen, setIsOpen] = useState(false)
+  const [activeVersion, setActiveVersion] = useState(STATIC_RELEASE_VERSION)
+  const [updateTitle, setUpdateTitle] = useState("What's New in OptiSmart Portal")
+  const [updateSubtitle, setUpdateSubtitle] = useState("We've deployed major performance tracking, probation automation, and analytics tools. Here's a breakdown of the new features:")
+  const [featuresList, setFeaturesList] = useState<any[]>(STATIC_FEATURES)
 
   useEffect(() => {
     if (!user) return
     const isAdmin = user.role === 'admin' || user.role === 'super_admin'
-    const seenVersion = localStorage.getItem('optismart_release_version')
+    if (!isAdmin) return
 
-    if (isAdmin && seenVersion !== CURRENT_RELEASE_VERSION) {
-      setIsOpen(true)
-    }
+    checkForUpdates()
   }, [user])
 
+  const checkForUpdates = async () => {
+    try {
+      // 1. Try to fetch the latest active release update from Supabase public.system_updates table
+      const { data, error } = await supabase
+        .from('system_updates')
+        .select('*')
+        .eq('is_active', true)
+        .order('created_at', { ascending: false })
+        .limit(1)
+
+      if (!error && data && data.length > 0) {
+        const latestDbUpdate = data[0]
+        const dbVersion = latestDbUpdate.version_tag
+        const seenVersion = localStorage.getItem('optismart_release_version')
+
+        if (seenVersion !== dbVersion) {
+          setActiveVersion(dbVersion)
+          if (latestDbUpdate.title) setUpdateTitle(latestDbUpdate.title)
+          if (latestDbUpdate.subtitle) setUpdateSubtitle(latestDbUpdate.subtitle)
+
+          if (Array.isArray(latestDbUpdate.features)) {
+            const mapped = latestDbUpdate.features.map((f: any) => ({
+              ...f,
+              icon: ICON_MAP[f.icon] || Package
+            }))
+            setFeaturesList(mapped)
+          }
+          setIsOpen(true)
+          return
+        }
+      }
+    } catch (err) {
+      console.warn('Could not query dynamic system_updates table, using static fallback:', err)
+    }
+
+    // Fallback to static release check
+    const seenVersion = localStorage.getItem('optismart_release_version')
+    if (seenVersion !== STATIC_RELEASE_VERSION) {
+      setActiveVersion(STATIC_RELEASE_VERSION)
+      setFeaturesList(STATIC_FEATURES)
+      setIsOpen(true)
+    }
+  }
+
   const handleDismiss = () => {
-    localStorage.setItem('optismart_release_version', CURRENT_RELEASE_VERSION)
+    localStorage.setItem('optismart_release_version', activeVersion)
     setIsOpen(false)
   }
 
@@ -32,51 +133,6 @@ export function SystemUpdateModal() {
   }
 
   if (!isOpen) return null
-
-  const newFeatures = [
-    {
-      icon: Package,
-      color: 'text-brand-600 bg-brand-50 border-brand-200',
-      title: '🏬 Multi-Branch Inventory & Stock Control',
-      description: 'Track camera stock across multiple locations (Lagos HQ, Abuja Branch, PH Depot). Log Stock In, perform inter-branch Stock Transfers, and view stock movement audit logs.',
-      route: '/app/admin/products'
-    },
-    {
-      icon: ShieldCheck,
-      color: 'text-emerald-600 bg-emerald-50 border-emerald-200',
-      title: '🛡️ Dedicated Admin Probation Review Panel',
-      description: 'Clean admin review card on DSA profiles for agents under the 20-order target. Confirm probation or waive targets with distinct, clear buttons.',
-      route: '/app/admin/users?highlight=probation'
-    },
-    {
-      icon: Clock,
-      color: 'text-amber-500 bg-amber-50 border-amber-200',
-      title: '⏳ Day 7 Eviction Action Prompt & Clock Pausing',
-      description: 'Automated Day 7 safety suspension with an unmissable Eviction Action Banner for admins to either Reset Window or Delete Account. Suspended accounts are automatically excluded from clock countdowns.',
-      route: '/app/admin/users?highlight=performance'
-    },
-    {
-      icon: DollarSign,
-      color: 'text-cyan-600 bg-cyan-50 border-cyan-200',
-      title: '📢 Ad Spend Allocation & Per-DSA Tracking',
-      description: 'Assign specific Sales Agents (DSAs) to Advertising & Marketing expenses. View Total Ad Spend Allocation (₦) and Ad Spend Per Delivered Order on DSA profiles.',
-      route: '/app/admin/expenses'
-    },
-    {
-      icon: Sliders,
-      color: 'text-indigo-500 bg-indigo-50 border-indigo-200',
-      title: '📱 Clean Products Toolbar & Mobile Responsiveness',
-      description: 'Redesigned Products header with segmented tab bar, prominent search bar, and clean responsive toolbar across all admin pages.',
-      route: '/app/admin/products'
-    },
-    {
-      icon: ShoppingBag,
-      color: 'text-rose-500 bg-rose-50 border-rose-200',
-      title: '📦 Order Fulfillment Stock-Out Integration',
-      description: 'Filter orders by Sales Agent. Marking orders DELIVERED automatically deducts camera inventory from selected branch locations.',
-      route: '/app/admin/orders'
-    }
-  ]
 
   return (
     <AnimatePresence>
@@ -97,27 +153,27 @@ export function SystemUpdateModal() {
             </button>
 
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 text-white text-xs font-black uppercase tracking-wider mb-3">
-              <Sparkles className="w-4 h-4 text-amber-300" /> Platform Release Update V3.0
+              <Sparkles className="w-4 h-4 text-amber-300" /> Platform Release {activeVersion}
             </div>
 
-            <h2 className="text-2xl font-bold tracking-tight">What's New in OptiSmart Portal</h2>
-            <p className="text-xs text-white/80 mt-1 font-medium">
-              We've deployed major performance tracking, probation automation, and analytics tools. Here's a breakdown of the new features:
+            <h2 className="text-2xl font-bold tracking-tight">{updateTitle}</h2>
+            <p className="text-xs text-white/80 mt-1 font-medium leading-relaxed">
+              {updateSubtitle}
             </p>
           </div>
 
           {/* Feature List */}
           <div className="p-6 overflow-y-auto space-y-3 flex-1">
-            {newFeatures.map((feat, idx) => {
-              const Icon = feat.icon
+            {featuresList.map((feat, idx) => {
+              const Icon = typeof feat.icon === 'function' ? feat.icon : Package
               return (
                 <div
                   key={idx}
-                  onClick={() => handleNavigateToFeature(feat.route)}
+                  onClick={() => handleNavigateToFeature(feat.route || '/app/admin')}
                   className="p-3.5 rounded-2xl border border-surface-200/80 bg-white hover:bg-brand-50/40 hover:border-brand-300 transition-all cursor-pointer group flex items-center justify-between gap-4 shadow-2xs"
                 >
                   <div className="flex items-start gap-3.5">
-                    <div className={`p-2.5 rounded-xl border ${feat.color} shrink-0 mt-0.5`}>
+                    <div className={`p-2.5 rounded-xl border ${feat.color || 'text-brand-600 bg-brand-50 border-brand-200'} shrink-0 mt-0.5`}>
                       <Icon className="w-5 h-5" />
                     </div>
                     <div>
@@ -140,7 +196,7 @@ export function SystemUpdateModal() {
 
           {/* Footer Action */}
           <div className="p-4 border-t border-surface-100 bg-surface-50 flex items-center justify-between">
-            <span className="text-xs font-semibold text-surface-500">OptiSmart Portal • System Update</span>
+            <span className="text-xs font-semibold text-surface-500">OptiSmart Portal • Automated Updates</span>
             <button
               onClick={handleDismiss}
               className="btn-primary px-6 py-2.5 text-xs font-bold flex items-center gap-2 shadow-brand"
