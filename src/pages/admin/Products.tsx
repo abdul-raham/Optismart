@@ -336,75 +336,128 @@ export function AdminProducts() {
 
   return (
     <div className="space-y-6 relative">
+      {/* Top Header Title & Global Sync */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-surface-900 tracking-tight">Product & Promo Catalog</h1>
-          <p className="text-sm text-surface-500 mt-1">Manage cameras, acquisition costs, and promo bundle packages.</p>
+          <h1 className="text-2xl font-bold text-surface-900 tracking-tight">Products & Inventory</h1>
+          <p className="text-sm text-surface-500 mt-1">Manage cameras, acquisition costs, branch stock, and promo packages.</p>
         </div>
-        <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
-          <div className="relative min-w-0 flex-1 sm:flex-none">
-            <Search className="w-4 h-4 text-surface-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input 
-              type="text" 
-              placeholder="Search..." 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 pr-4 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none w-full sm:w-64 transition-all"
-            />
-          </div>
-          {activeTab === 'products' ? (
-            <button onClick={() => { setEditingId(null); setForm({ name: '', description: '', retail_price: 0, wholesale_price: 0, cost_price: 0, stock_quantity: 0, min_stock_level: 5, source_url: '', image_url: '' }); setIsModalOpen(true); }} className="btn-primary h-10 px-4 text-sm font-semibold flex items-center gap-2">
-              <Plus className="w-4 h-4" /> Add Product
-            </button>
-          ) : activeTab === 'promos' ? (
-            <button onClick={() => { setEditingPromo(null); setPromoForm({ title: '', description: '', bonus_item_name: '', promo_price: 0, cost_price: 0, is_active: true }); setIsPromoModalOpen(true); }} className="btn-primary h-10 px-4 text-sm font-semibold flex items-center gap-2">
-              <Plus className="w-4 h-4" /> Create Promo Package
-            </button>
-          ) : (
-            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-              <button onClick={() => setIsLocationModalOpen(true)} className="btn-outline h-10 px-4 text-sm font-semibold flex items-center gap-1.5">
-                <MapPin className="w-4 h-4" /> Add Location
-              </button>
-              <button onClick={() => setIsStockInModalOpen(true)} className="btn-primary h-10 px-4 text-sm font-semibold flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700">
-                <Plus className="w-4 h-4" /> Stock In
-              </button>
-              <button onClick={() => setIsTransferModalOpen(true)} className="btn-outline h-10 px-4 text-sm font-semibold flex items-center gap-1.5 border-brand-300 text-brand-700 bg-brand-50 hover:bg-brand-100">
-                <RefreshCw className="w-4 h-4 text-brand-600" /> Stock Transfer
-              </button>
-            </div>
-          )}
-          <button onClick={syncOptismartCatalog} disabled={syncing} className="btn-outline h-10 px-4 text-sm font-semibold flex items-center gap-2">
-            <RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} /> Sync OptiSmart
-          </button>
-        </div>
+        <button
+          onClick={syncOptismartCatalog}
+          disabled={syncing}
+          className="btn-outline h-9 px-3.5 text-xs font-bold flex items-center gap-2 self-start sm:self-auto rounded-xl border-surface-200 hover:bg-surface-50"
+        >
+          <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin text-brand-600' : 'text-surface-400'}`} />
+          {syncing ? 'Syncing...' : 'Sync Catalog'}
+        </button>
       </div>
 
-      {/* Header Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto border-b border-surface-200 pb-3">
+      {/* Modern Underline Tab Bar */}
+      <div className="flex items-center gap-2 border-b border-surface-200 overflow-x-auto hide-scrollbar">
         <button
           onClick={() => setActiveTab('products')}
-          className={`shrink-0 px-4 py-2 text-xs font-bold rounded-xl transition-all ${
-            activeTab === 'products' ? 'bg-brand-600 text-white shadow-sm' : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold border-b-2 transition-all whitespace-nowrap -mb-px ${
+            activeTab === 'products'
+              ? 'border-brand-600 text-brand-600'
+              : 'border-transparent text-surface-500 hover:text-surface-800'
           }`}
         >
-          Camera Catalog ({products.length})
+          <span>Camera Catalog</span>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+            activeTab === 'products' ? 'bg-brand-100 text-brand-700' : 'bg-surface-100 text-surface-600'
+          }`}>
+            {products.length}
+          </span>
         </button>
+
         <button
           onClick={() => setActiveTab('promos')}
-          className={`shrink-0 px-4 py-2 text-xs font-bold rounded-xl transition-all ${
-            activeTab === 'promos' ? 'bg-brand-600 text-white shadow-sm' : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold border-b-2 transition-all whitespace-nowrap -mb-px ${
+            activeTab === 'promos'
+              ? 'border-brand-600 text-brand-600'
+              : 'border-transparent text-surface-500 hover:text-surface-800'
           }`}
         >
-          Promo Packages ({promoPackages.length})
+          <span>Promo Packages</span>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+            activeTab === 'promos' ? 'bg-brand-100 text-brand-700' : 'bg-surface-100 text-surface-600'
+          }`}>
+            {promoPackages.length}
+          </span>
         </button>
+
         <button
           onClick={() => setActiveTab('inventory')}
-          className={`shrink-0 px-4 py-2 text-xs font-bold rounded-xl transition-all ${
-            activeTab === 'inventory' ? 'bg-brand-600 text-white shadow-sm' : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
+          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold border-b-2 transition-all whitespace-nowrap -mb-px ${
+            activeTab === 'inventory'
+              ? 'border-brand-600 text-brand-600'
+              : 'border-transparent text-surface-500 hover:text-surface-800'
           }`}
         >
-          Multi-Branch Inventory ({locations.length} Locations)
+          <span>Branch Stock</span>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+            activeTab === 'inventory' ? 'bg-brand-100 text-brand-700' : 'bg-surface-100 text-surface-600'
+          }`}>
+            {locations.length} Locations
+          </span>
         </button>
+      </div>
+
+      {/* Contextual Toolbar (Search + Actions) */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-surface-50/70 p-3 rounded-2xl border border-surface-100">
+        <div className="relative flex-1 min-w-0">
+          <Search className="w-4 h-4 text-surface-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+          <input
+            type="text"
+            placeholder={activeTab === 'products' ? "Search cameras by name..." : activeTab === 'promos' ? "Filter promos..." : "Search stock items..."}
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-surface-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none bg-white transition-all shadow-2xs"
+          />
+        </div>
+
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+          {activeTab === 'products' && (
+            <button
+              onClick={() => { setEditingId(null); setForm({ name: '', description: '', retail_price: 0, wholesale_price: 0, cost_price: 0, stock_quantity: 0, min_stock_level: 5, source_url: '', image_url: '' }); setIsModalOpen(true); }}
+              className="btn-primary h-9 px-4 text-xs font-bold flex items-center gap-1.5 rounded-xl shadow-brand"
+            >
+              <Plus className="w-4 h-4" /> Add Product
+            </button>
+          )}
+
+          {activeTab === 'promos' && (
+            <button
+              onClick={() => { setEditingPromo(null); setPromoForm({ title: '', description: '', bonus_item_name: '', promo_price: 0, cost_price: 0, is_active: true }); setIsPromoModalOpen(true); }}
+              className="btn-primary h-9 px-4 text-xs font-bold flex items-center gap-1.5 rounded-xl shadow-brand"
+            >
+              <Plus className="w-4 h-4" /> Create Promo Package
+            </button>
+          )}
+
+          {activeTab === 'inventory' && (
+            <>
+              <button
+                onClick={() => setIsLocationModalOpen(true)}
+                className="btn-outline h-9 px-3 text-xs font-bold flex items-center gap-1.5 bg-white border-surface-200 text-surface-700 hover:bg-surface-50 rounded-xl"
+              >
+                <MapPin className="w-3.5 h-3.5 text-surface-500" /> Add Location
+              </button>
+              <button
+                onClick={() => setIsStockInModalOpen(true)}
+                className="btn-primary h-9 px-3 text-xs font-bold flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs"
+              >
+                <Plus className="w-3.5 h-3.5" /> Stock In
+              </button>
+              <button
+                onClick={() => setIsTransferModalOpen(true)}
+                className="btn-outline h-9 px-3 text-xs font-bold flex items-center gap-1.5 border-brand-300 text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-xl"
+              >
+                <RefreshCw className="w-3.5 h-3.5 text-brand-600" /> Stock Transfer
+              </button>
+            </>
+          )}
+        </div>
       </div>
 
       {activeTab === 'products' ? (

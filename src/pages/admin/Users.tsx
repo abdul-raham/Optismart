@@ -206,115 +206,85 @@ export function AdminUsers() {
       ) : (
         <div className={`grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 ${searchParams.get('highlight') ? 'animate-feature-glow p-2 rounded-2xl border border-brand-500' : ''}`}>
           <AnimatePresence>
-            {filteredUsers.map(u => (
-              <motion.div
-                key={u.id} layout
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className={`glass-card p-5 relative overflow-hidden transition-all flex flex-col justify-between ${
-                  u.status === 'suspended' ? 'opacity-70 bg-surface-50' : 'hover:border-brand-300 hover:shadow-md'
-                }`}
-              >
-                <div>
-                  {/* Card Header Profile */}
-                  <div
-                    onClick={() => navigate(`/app/admin/users/${u.id}`)}
-                    className="flex items-start justify-between mb-4 cursor-pointer group"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className={`w-12 h-12 rounded-2xl flex items-center justify-center text-lg font-bold text-white shadow-sm shrink-0 ${
+            {filteredUsers.map(u => {
+              const isOnProbation = u.role === 'dsa' && probationMap[u.id] && u.probation_approval_status !== 'waived'
+              const isConfirmedProbation = u.probation_approval_status === 'confirmed_probation'
+              const isProbationWaived = u.probation_approval_status === 'waived'
+
+              return (
+                <motion.div
+                  key={u.id} layout
+                  initial={{ opacity: 0, scale: 0.97 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.97 }}
+                  onClick={() => navigate(`/app/admin/users/${u.id}`)}
+                  className={`glass-card relative overflow-hidden cursor-pointer transition-all group ${
+                    u.status === 'suspended' ? 'opacity-60' : 'hover:shadow-md hover:border-brand-300'
+                  }`}
+                >
+                  {/* Probation warning stripe at top */}
+                  {isConfirmedProbation && (
+                    <div className="bg-rose-500 px-4 py-1 text-[10px] font-black uppercase tracking-wider text-white flex items-center gap-1.5">
+                      <AlertTriangle className="w-3 h-3" /> On Confirmed Probation — Low Sales
+                    </div>
+                  )}
+                  {isOnProbation && !isConfirmedProbation && (
+                    <div className="bg-amber-400 px-4 py-1 text-[10px] font-black uppercase tracking-wider text-amber-950 flex items-center gap-1.5">
+                      <AlertTriangle className="w-3 h-3" /> Low sales this month — Needs review
+                    </div>
+                  )}
+
+                  <div className="p-5">
+                    {/* Avatar + Identity */}
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className={`w-11 h-11 rounded-xl flex items-center justify-center text-base font-bold text-white shrink-0 ${
                         u.status === 'suspended' ? 'bg-surface-400' : 'bg-gradient-to-br from-brand-500 to-cyan-500'
                       }`}>
                         {u.full_name?.charAt(0) || u.email?.charAt(0).toUpperCase()}
                       </div>
-                      <div>
-                        <h3 className="font-bold text-surface-900 group-hover:text-brand-600 transition-colors flex items-center gap-1.5 text-base">
-                          {u.full_name || 'No Name'} <ExternalLink className="w-4 h-4 opacity-0 group-hover:opacity-100 transition-opacity text-brand-600" />
+                      <div className="min-w-0">
+                        <h3 className="font-bold text-surface-900 group-hover:text-brand-600 transition-colors text-sm leading-tight truncate flex items-center gap-1">
+                          {u.full_name || 'No Name'}
+                          <ExternalLink className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity text-brand-500 shrink-0" />
                         </h3>
-                        <p className="text-xs text-surface-500 flex items-center gap-1 mt-0.5 font-medium">
-                          <Mail className="w-3.5 h-3.5" /> {u.email}
-                        </p>
+                        <p className="text-xs text-surface-400 truncate mt-0.5">{u.email}</p>
                       </div>
                     </div>
-                  </div>
 
-                  {u.role === 'dsa' && (
-                    <div className="mb-4 rounded-xl border border-cyan-100 bg-cyan-50/70 px-3 py-2">
-                      <p className="text-[10px] font-bold uppercase tracking-wider text-cyan-700">Total attributed ad spend</p>
-                      <p className="mt-0.5 text-base font-black text-surface-900">{formatCurrency(adSpendMap[u.id] || 0)}</p>
-                    </div>
-                  )}
-
-                  {/* Status Badges */}
-                  <div className="flex items-center gap-2 mb-4 flex-wrap">
-                    <span className={`px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider border ${getRoleColor(u.role)}`}>
-                      {u.role.replace('_', ' ')}
-                    </span>
-
-                    {/* Probation Badge & Admin Approval for DSA */}
-                    {u.role === 'dsa' && (
-                      u.probation_approval_status === 'confirmed_probation' ? (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1">
-                          <AlertTriangle className="w-3 h-3 text-rose-600" /> Confirmed Probation
+                    {/* Role + Status row */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${getRoleColor(u.role)}`}>
+                          {u.role.replace('_', ' ')}
                         </span>
-                      ) : u.probation_approval_status === 'waived' ? (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-cyan-100 text-cyan-800 border border-cyan-300 flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3 text-cyan-600" /> Probation Waived
-                        </span>
-                      ) : probationMap[u.id] ? (
-                        <div className="flex items-center gap-1">
-                          <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
-                            <AlertTriangle className="w-3 h-3 text-amber-600" /> Pending Admin Review
+                        {isProbationWaived && (
+                          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-cyan-50 text-cyan-700 border border-cyan-200">
+                            Waived
                           </span>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleUpdateProbation(u.id, 'confirmed_probation'); }}
-                            className="text-[10px] font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 px-1.5 py-0.5 rounded border border-rose-200"
-                            title="Confirm Probation"
-                          >
-                            Confirm
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); handleUpdateProbation(u.id, 'waived'); }}
-                            className="text-[10px] font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.5 rounded border border-emerald-200"
-                            title="Waive Probation"
-                          >
-                            Waive
-                          </button>
-                        </div>
-                      ) : (
-                        <span className="px-2 py-0.5 rounded text-[10px] font-black uppercase bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Off Probation
+                        )}
+                      </div>
+                      {/* Status dot */}
+                      <span className={`flex items-center gap-1 text-[10px] font-bold uppercase ${
+                        u.status === 'active' ? 'text-emerald-600' : 'text-rose-500'
+                      }`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${u.status === 'active' ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                        {u.status}
+                      </span>
+                    </div>
+
+                    {/* Footer: join date + phone */}
+                    <div className="mt-4 pt-3 border-t border-surface-100 flex items-center justify-between text-xs text-surface-400">
+                      <span>Joined {formatDate(u.created_at)}</span>
+                      {u.phone && (
+                        <span className="flex items-center gap-1 font-medium text-surface-500">
+                          <Phone className="w-3 h-3" /> {u.phone}
                         </span>
-                      )
-                    )}
-
-                    {u.status === 'active' ? (
-                      <span className="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center gap-1">
-                        <CheckCircle2 className="w-3 h-3 text-emerald-600" /> Active
-                      </span>
-                    ) : (
-                      <span className="px-2.5 py-1 rounded-md text-[10px] font-bold uppercase tracking-wider bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1">
-                        <Ban className="w-3 h-3 text-rose-600" /> Suspended
-                      </span>
-                    )}
+                      )}
+                    </div>
                   </div>
-                </div>
-
-                {/* Footer Action Button */}
-                <div className="mt-2 flex flex-col gap-3 border-t border-surface-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
-                  <span className="text-xs text-surface-400 font-medium">Joined {formatDate(u.created_at)}</span>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => navigate(`/app/admin/users/${u.id}`)}
-                      className="text-xs font-bold px-3 py-2 rounded-xl bg-brand-600 hover:bg-brand-700 text-white transition-all shadow-brand flex items-center gap-1.5"
-                    >
-                      <User className="w-3.5 h-3.5" /> View Profile & Report
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
+                </motion.div>
+              )
+            })}
           </AnimatePresence>
         </div>
       )}
