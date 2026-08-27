@@ -195,8 +195,8 @@ export function DSALeads() {
           <h1 className="text-2xl font-bold text-surface-900 tracking-tight">Lead Management</h1>
           <p className="text-sm text-surface-500 mt-1">Track and convert your prospects into paying customers.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="relative">
+        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+          <div className="relative min-w-0 flex-1 sm:flex-none">
             <Search className="w-4 h-4 text-surface-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input 
               type="text" 
@@ -447,7 +447,7 @@ export function DSALeads() {
                   <input required type="text" className="input" placeholder="e.g. John Smith" value={form.customer_name} onChange={e => setForm({...form, customer_name: e.target.value})} />
                 </div>
                 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="label">Phone Number *</label>
                     <input required type="tel" className="input" placeholder="080..." value={form.phone} onChange={e => setForm({...form, phone: e.target.value.replace(/[^\d+]/g, '')})} />
@@ -478,7 +478,7 @@ export function DSALeads() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="label">Next Follow-up Date</label>
                     <input type="date" className="input" value={form.follow_up_date} onChange={e => setForm({...form, follow_up_date: e.target.value})} />

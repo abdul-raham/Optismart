@@ -1,7 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
-import { Search, MapPin, Phone, Mail, Wrench, List, Map as MapIcon, Wifi, WifiOff } from 'lucide-react'
+import { Search, MapPin, Phone, Mail, Wrench, List, Map as MapIcon, Wifi, WifiOff, X } from 'lucide-react'
 import { MapContainer, TileLayer, Marker, Popup, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
@@ -225,8 +225,8 @@ export function AdminInstallers() {
                   <p className="text-xs font-bold text-surface-500 uppercase tracking-wider">
                     {withLocation.length} on map · click to locate
                   </p>
-                  <button onClick={() => setPanelOpen(false)} className="text-surface-400 hover:text-surface-700 sm:hidden">
-                    ✕
+                  <button onClick={() => setPanelOpen(false)} className="flex h-11 w-11 items-center justify-center text-surface-400 hover:text-surface-700 sm:hidden" aria-label="Close installer list">
+                    <X className="h-5 w-5" />
                   </button>
                 </div>
                 <div className="divide-y divide-surface-50 overflow-y-auto" style={{ maxHeight: 'calc(100% - 44px)' }}>
@@ -303,8 +303,8 @@ export function AdminInstallers() {
                           </div>
                           <p className="font-bold text-sm">{installer.full_name}</p>
                         </div>
-                        {installer.phone && <p className="text-xs text-gray-500 mb-1">📞 {installer.phone}</p>}
-                        {installer.location && <p className="text-xs text-gray-500 mb-2">📍 {installer.location}</p>}
+                        {installer.phone && <p className="mb-1 flex items-center gap-1 text-xs text-gray-500"><Phone className="h-3 w-3" /> {installer.phone}</p>}
+                        {installer.location && <p className="mb-2 flex items-center gap-1 text-xs text-gray-500"><MapPin className="h-3 w-3" /> {installer.location}</p>}
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${installer.is_available ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
                           {installer.is_available ? '● Available' : '○ Offline'}
                         </span>

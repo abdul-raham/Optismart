@@ -303,6 +303,17 @@
     animation: feature-glow-pulse 1.2s ease-in-out 3;
     z-index: 30;
   }
+
+  /* ---- SCROLLBAR UTILITIES ---- */
+  .scrollbar-hide,
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar,
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 /* Print Styles for Executive Reports */

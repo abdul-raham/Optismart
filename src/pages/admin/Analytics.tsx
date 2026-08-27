@@ -76,7 +76,7 @@ export function AdminAnalytics() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         
         {/* Revenue Trend Chart */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="lg:col-span-2 glass-card p-6">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="min-w-0 overflow-hidden p-4 sm:p-6 lg:col-span-2 glass-card">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-base font-bold text-surface-900 flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-brand-600" /> 7-Day Revenue Trend
@@ -112,7 +112,7 @@ export function AdminAnalytics() {
         </motion.div>
 
         {/* DSA Rankings */}
-        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="lg:col-span-1 glass-card p-6 flex flex-col">
+        <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }} className="min-w-0 p-4 sm:p-6 lg:col-span-1 glass-card flex flex-col">
           <h2 className="text-base font-bold text-surface-900 mb-6 flex items-center gap-2">
             <Target className="w-5 h-5 text-orange-500" /> Top Sales Agents
           </h2>

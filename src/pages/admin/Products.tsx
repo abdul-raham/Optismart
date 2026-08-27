@@ -341,8 +341,8 @@ export function AdminProducts() {
           <h1 className="text-2xl font-bold text-surface-900 tracking-tight">Product & Promo Catalog</h1>
           <p className="text-sm text-surface-500 mt-1">Manage cameras, acquisition costs, and promo bundle packages.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="relative">
+        <div className="flex w-full flex-wrap items-center gap-3 sm:w-auto">
+          <div className="relative min-w-0 flex-1 sm:flex-none">
             <Search className="w-4 h-4 text-surface-400 absolute left-3 top-1/2 -translate-y-1/2" />
             <input 
               type="text" 
@@ -361,7 +361,7 @@ export function AdminProducts() {
               <Plus className="w-4 h-4" /> Create Promo Package
             </button>
           ) : (
-            <div className="flex items-center gap-2">
+            <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
               <button onClick={() => setIsLocationModalOpen(true)} className="btn-outline h-10 px-4 text-sm font-semibold flex items-center gap-1.5">
                 <MapPin className="w-4 h-4" /> Add Location
               </button>
@@ -380,10 +380,10 @@ export function AdminProducts() {
       </div>
 
       {/* Header Tabs */}
-      <div className="flex items-center gap-2 border-b border-surface-200 pb-3">
+      <div className="flex items-center gap-2 overflow-x-auto border-b border-surface-200 pb-3">
         <button
           onClick={() => setActiveTab('products')}
-          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${
+          className={`shrink-0 px-4 py-2 text-xs font-bold rounded-xl transition-all ${
             activeTab === 'products' ? 'bg-brand-600 text-white shadow-sm' : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
           }`}
         >
@@ -391,7 +391,7 @@ export function AdminProducts() {
         </button>
         <button
           onClick={() => setActiveTab('promos')}
-          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${
+          className={`shrink-0 px-4 py-2 text-xs font-bold rounded-xl transition-all ${
             activeTab === 'promos' ? 'bg-brand-600 text-white shadow-sm' : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
           }`}
         >
@@ -399,7 +399,7 @@ export function AdminProducts() {
         </button>
         <button
           onClick={() => setActiveTab('inventory')}
-          className={`px-4 py-2 text-xs font-bold rounded-xl transition-all ${
+          className={`shrink-0 px-4 py-2 text-xs font-bold rounded-xl transition-all ${
             activeTab === 'inventory' ? 'bg-brand-600 text-white shadow-sm' : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
           }`}
         >
@@ -485,7 +485,7 @@ export function AdminProducts() {
                   </a>
                 )}
 
-                <div className="grid grid-cols-3 gap-2 mb-4">
+                <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
                   <div className="bg-danger-50 p-2 rounded-lg border border-danger-100">
                     <span className="text-[10px] uppercase font-bold text-danger-400 block mb-0.5">Cost</span>
                     <span className="text-sm font-bold text-danger-700">{formatCurrency(product.cost_price || 0)}</span>
@@ -581,7 +581,7 @@ export function AdminProducts() {
                 .filter(i => i.location_id === loc.id)
                 .reduce((sum, i) => sum + (i.quantity || 0), 0)
               return (
-                <div key={loc.id} className="glass-card p-5 border-l-4 border-l-brand-600 relative">
+                <div key={loc.id} className="glass-card relative border border-brand-100 bg-brand-50/30 p-5">
                   <span className="text-[10px] font-extrabold uppercase tracking-wider text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full border border-brand-200">
                     {loc.name}
                   </span>
@@ -594,7 +594,7 @@ export function AdminProducts() {
 
           {/* Product Stock Level Breakdown Table */}
           <div className="glass-card overflow-hidden">
-            <div className="px-6 py-4 border-b border-surface-100 flex items-center justify-between">
+            <div className="flex flex-col gap-3 border-b border-surface-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
               <h3 className="text-base font-bold text-surface-900 flex items-center gap-2">
                 <Package className="w-5 h-5 text-brand-600" /> Multi-Branch Stock Availability
               </h3>
@@ -609,7 +609,7 @@ export function AdminProducts() {
             </div>
 
             <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+              <table className="w-full min-w-[760px] text-left border-collapse">
                 <thead>
                   <tr className="bg-surface-50/50 border-b border-surface-100 text-xs font-bold text-surface-500 uppercase tracking-wider">
                     <th className="py-3.5 px-6">Product / Camera</th>
@@ -670,7 +670,7 @@ export function AdminProducts() {
             </h3>
             <div className="space-y-3 max-h-80 overflow-y-auto">
               {movementsList.map(m => (
-                <div key={m.id} className="p-3 rounded-xl border border-surface-200 bg-white flex items-center justify-between text-xs">
+                <div key={m.id} className="flex flex-col gap-3 rounded-xl border border-surface-200 bg-white p-3 text-xs sm:flex-row sm:items-center sm:justify-between">
                   <div className="flex items-center gap-3">
                     <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
                       m.movement_type === 'stock_in' ? 'bg-emerald-100 text-emerald-800' :
@@ -775,7 +775,7 @@ export function AdminProducts() {
                     />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                       <label className="label">Promo Retail Price (₦) *</label>
                       <input
@@ -836,7 +836,7 @@ export function AdminProducts() {
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm" onClick={() => setIsStockInModalOpen(false)} />
               <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="bg-white w-full max-w-md relative z-10 rounded-2xl shadow-card-xl overflow-hidden">
                 <div className="px-6 py-4 border-b border-surface-100 flex items-center justify-between bg-emerald-50 text-emerald-900">
-                  <h2 className="text-lg font-bold flex items-center gap-2">📥 Log Stock In (New Stock)</h2>
+                  <h2 className="text-lg font-bold flex items-center gap-2"><Package className="h-5 w-5" /> Log Stock In (New Stock)</h2>
                   <button onClick={() => setIsStockInModalOpen(false)} className="text-emerald-700 hover:text-emerald-950"><X className="w-5 h-5" /></button>
                 </div>
                 <form onSubmit={handleStockIn} className="p-6 space-y-4">
@@ -888,7 +888,7 @@ export function AdminProducts() {
                       {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
                   </div>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <div>
                       <label className="label text-xs">From Branch *</label>
                       <select required className="input bg-white text-xs" value={transferForm.from_location_id} onChange={e => setTransferForm({...transferForm, from_location_id: e.target.value})}>
@@ -994,7 +994,7 @@ export function AdminProducts() {
                       )}
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <div>
                         <label className="label">Retail Price (₦) *</label>
                         <input required type="number" min={0} className="input" value={form.retail_price} onChange={e => setForm({...form, retail_price: Number(e.target.value)})} />
@@ -1013,7 +1013,7 @@ export function AdminProducts() {
                       </div>
                     )}
 
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                       <div>
                         <label className="label">Total Stock</label>
                         <input readOnly type="number" className="input bg-surface-100 text-surface-500" value={editingId ? form.stock_quantity : 0} />

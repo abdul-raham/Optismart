@@ -166,7 +166,7 @@ export function AdminUsers() {
           ))}
         </div>
 
-        <div className="flex items-center gap-3 w-full lg:w-auto">
+        <div className="flex w-full flex-col gap-3 sm:flex-row sm:items-center lg:w-auto">
           {/* Status Filter Dropdown */}
           <select
             value={statusFilter}
@@ -302,7 +302,7 @@ export function AdminUsers() {
                 </div>
 
                 {/* Footer Action Button */}
-                <div className="pt-4 border-t border-surface-100 flex items-center justify-between mt-2">
+                <div className="mt-2 flex flex-col gap-3 border-t border-surface-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
                   <span className="text-xs text-surface-400 font-medium">Joined {formatDate(u.created_at)}</span>
                   <div className="flex items-center gap-2">
                     <button

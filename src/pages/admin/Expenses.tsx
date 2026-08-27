@@ -267,7 +267,7 @@ export function AdminExpenses() {
 
       {/* Expense Category Summary Breakdown Grid */}
       <div className={`grid grid-cols-2 lg:grid-cols-4 gap-4 ${searchParams.get('highlight') === 'breakdown' ? 'animate-feature-glow p-2 rounded-2xl border border-brand-500' : ''}`}>
-        <div className="glass-card p-4 border-l-4 border-l-cyan-500">
+        <div className="glass-card border border-cyan-100 bg-cyan-50/30 p-4">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-surface-500 uppercase tracking-wider">Ads &amp; Marketing</span>
             <span className="text-[10px] font-extrabold text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded-full border border-cyan-200">
@@ -277,9 +277,9 @@ export function AdminExpenses() {
           <p className="text-xl font-black text-surface-900">{formatCurrency(adExpenses)}</p>
         </div>
 
-        <div className="glass-card p-4 border-l-4 border-l-emerald-500">
+        <div className="glass-card border border-emerald-100 bg-emerald-50/30 p-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-surface-500 uppercase tracking-wider">💸 DSA Remittance</span>
+            <span className="text-xs font-bold text-surface-500 uppercase tracking-wider">DSA Remittance</span>
             <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
               {totalAmount > 0 ? `${Math.round((remittanceExpenses / totalAmount) * 100)}%` : '0%'}
             </span>
@@ -287,9 +287,9 @@ export function AdminExpenses() {
           <p className="text-xl font-black text-surface-900">{formatCurrency(remittanceExpenses)}</p>
         </div>
 
-        <div className="glass-card p-4 border-l-4 border-l-amber-500">
+        <div className="glass-card border border-amber-100 bg-amber-50/30 p-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-surface-500 uppercase tracking-wider">🚚 Delivery & Waybill</span>
+            <span className="text-xs font-bold text-surface-500 uppercase tracking-wider">Delivery &amp; Waybill</span>
             <span className="text-[10px] font-extrabold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
               {totalAmount > 0 ? `${Math.round((deliveryExpenses / totalAmount) * 100)}%` : '0%'}
             </span>
@@ -297,9 +297,9 @@ export function AdminExpenses() {
           <p className="text-xl font-black text-surface-900">{formatCurrency(deliveryExpenses)}</p>
         </div>
 
-        <div className="glass-card p-4 border-l-4 border-l-indigo-500">
+        <div className="glass-card border border-indigo-100 bg-indigo-50/30 p-4">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-surface-500 uppercase tracking-wider">🏢 Operational & Other</span>
+            <span className="text-xs font-bold text-surface-500 uppercase tracking-wider">Operational &amp; Other</span>
             <span className="text-[10px] font-extrabold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-full border border-indigo-200">
               {totalAmount > 0 ? `${Math.round((operationalExpenses / totalAmount) * 100)}%` : '0%'}
             </span>
@@ -422,7 +422,7 @@ export function AdminExpenses() {
                 <input required type="text" className="input" placeholder="e.g. Facebook Ads" value={form.description} onChange={e => setForm({...form, description: e.target.value})} />
               </div>
               
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                   <label className="label">Category *</label>
                   <select required className="input" value={form.category} onChange={e => setForm({...form, category: e.target.value as any})}>

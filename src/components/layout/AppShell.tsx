@@ -25,7 +25,7 @@ export function AppShell() {
 
       {/* Main content */}
       <motion.div
-        className="flex-1 flex flex-col overflow-hidden md:ml-[calc(var(--sidebar-width)+24px)] transition-all duration-300"
+        className="min-w-0 flex-1 flex flex-col overflow-hidden md:ml-[calc(var(--sidebar-width)+24px)] transition-all duration-300"
         style={{
           '--sidebar-width': sidebarCollapsed ? '72px' : '260px'
         } as any}
@@ -33,9 +33,9 @@ export function AppShell() {
         <Topbar />
 
         {/* Page content */}
-        <main className="flex-1 overflow-y-auto">
+        <main className="min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
           <motion.div
-            className="p-4 pb-28 md:p-8 max-w-[1600px] mx-auto"
+            className="mx-auto w-full min-w-0 max-w-[1600px] p-3 pb-28 sm:p-4 sm:pb-28 md:p-8"
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.25 }}

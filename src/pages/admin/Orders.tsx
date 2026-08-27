@@ -769,7 +769,7 @@ export function AdminOrders() {
                     <input required type="text" className="input" value={editForm.customer_name} onChange={e => setEditForm({...editForm, customer_name: e.target.value})} />
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                       <label className="label">Customer Phone *</label>
                       <input required type="tel" className="input" value={editForm.customer_phone} onChange={e => setEditForm({...editForm, customer_phone: e.target.value.replace(/[^\d+]/g, '')})} />
@@ -804,7 +804,7 @@ export function AdminOrders() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                       <label className="label">Quantity *</label>
                       <input required type="number" min={1} className="input" value={editForm.quantity} onChange={e => {
@@ -966,7 +966,7 @@ export function AdminOrders() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="label">Quantity *</label>
                     <input required type="number" min={1} className="input" value={form.quantity} onChange={e => {

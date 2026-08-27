@@ -270,35 +270,35 @@ export function UserDetail() {
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-full scrollbar-hide">
           {/* DSA-Specific Action: Nullify & Reset 7-Day Performance Countdown */}
           {user.role === 'dsa' && (
             <button
               onClick={handleResetWindow}
               disabled={resettingWindow}
-              className="btn-outline text-xs font-bold flex items-center gap-1.5 h-10 px-3.5 bg-amber-50 border-amber-200 text-amber-900 hover:bg-amber-100 transition-colors"
+              className="btn-outline text-xs font-bold flex items-center gap-1.5 h-9 px-3 whitespace-nowrap bg-amber-50 border-amber-200 text-amber-900 hover:bg-amber-100 transition-colors shrink-0"
               title="Nullify underperformance warning and reset 7-day countdown"
             >
-              <RefreshCw className="w-4 h-4 text-amber-700" /> Nullify & Reset 7-Day Window
+              <RefreshCw className="w-3.5 h-3.5 text-amber-700" /> Nullify & Reset
             </button>
           )}
 
           <button
             onClick={handleToggleStatus}
-            className={`text-xs font-bold h-10 px-3.5 rounded-xl border transition-colors flex items-center gap-1.5 ${
+            className={`text-xs font-bold h-9 px-3 rounded-xl border transition-colors flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
               user.status === 'active'
                 ? 'bg-white border-surface-200 text-danger-600 hover:bg-danger-50'
                 : 'bg-white border-surface-200 text-emerald-600 hover:bg-emerald-50'
             }`}
           >
-            {user.status === 'active' ? <><Ban className="w-4 h-4" /> Suspend Account</> : <><CheckCircle2 className="w-4 h-4" /> Reactivate Account</>}
+            {user.status === 'active' ? <><Ban className="w-3.5 h-3.5" /> Suspend</> : <><CheckCircle2 className="w-3.5 h-3.5" /> Reactivate</>}
           </button>
 
           <button
             onClick={() => setIsDeleteModalOpen(true)}
-            className="text-xs font-bold h-10 px-3.5 rounded-xl bg-rose-600 text-white hover:bg-rose-700 transition-colors flex items-center gap-1.5 shadow-xs"
+            className="text-xs font-bold h-9 px-3 rounded-xl bg-rose-600 text-white hover:bg-rose-700 transition-colors flex items-center gap-1.5 whitespace-nowrap shadow-xs shrink-0"
           >
-            <Trash2 className="w-4 h-4" /> Delete Account
+            <Trash2 className="w-3.5 h-3.5" /> Delete
           </button>
         </div>
       </div>
@@ -438,7 +438,7 @@ export function UserDetail() {
       )}
 
       {/* Role-Specific Activity KPI Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="glass-card p-4">
           <span className="text-xs font-bold text-surface-500 uppercase tracking-wider flex items-center gap-1">
             <ShoppingBag className="w-4 h-4 text-brand-600" /> {user.role === 'admin' || user.role === 'super_admin' ? 'Orders Processed' : 'Total Orders'}
@@ -501,7 +501,7 @@ export function UserDetail() {
 
       {/* DSA Ad Spend KPI Card (DSA ONLY) */}
       {user.role === 'dsa' && (
-        <div className="glass-card p-5 border-l-4 border-l-cyan-500 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="glass-card flex flex-col items-start justify-between gap-4 p-5 md:flex-row md:items-center">
           <div>
             <span className="text-xs font-extrabold uppercase tracking-wider text-cyan-800 bg-cyan-50 px-2.5 py-1 rounded-full border border-cyan-200">
               Total Ad Spend Allocation
@@ -563,7 +563,7 @@ export function UserDetail() {
           </h3>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
+          <table className="w-full min-w-[720px] text-left text-xs">
             <thead>
               <tr className="bg-surface-50/50 border-b border-surface-100 font-bold uppercase tracking-wider text-surface-500">
                 <th className="py-3 px-5">Order #</th>
@@ -610,10 +610,10 @@ export function UserDetail() {
             </h3>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
+            <table className="w-full min-w-[620px] text-left text-xs">
               <thead>
                 <tr className="bg-surface-50/50 border-b border-surface-100 font-bold uppercase tracking-wider text-surface-500">
-                  <th className="py-3 px-5">Lead Name</th>
+                  <th className="py-3 px-5">Lead / Phone</th>
                   <th className="py-3 px-5">Phone</th>
                   <th className="py-3 px-5">Date Logged</th>
                   <th className="py-3 px-5 text-center">Status</th>
@@ -622,8 +622,13 @@ export function UserDetail() {
               <tbody className="divide-y divide-surface-100 font-medium">
                 {userLeads.map(l => (
                   <tr key={l.id} className="hover:bg-surface-50">
-                    <td className="py-3 px-5 font-bold text-surface-900">{l.name}</td>
-                    <td className="py-3 px-5 text-surface-600">{l.phone || 'N/A'}</td>
+                    <td className="py-3 px-5 font-bold text-surface-900">
+                      {l.customer_name || l.name
+                        ? <span>{l.customer_name || l.name}</span>
+                        : <span className="text-surface-400 italic text-xs">No name recorded</span>
+                      }
+                    </td>
+                    <td className="py-3 px-5 text-surface-600">{l.phone || l.customer_phone || '—'}</td>
                     <td className="py-3 px-5 text-surface-500">{formatDate(l.created_at)}</td>
                     <td className="py-3 px-5 text-center">
                       <span className={`px-2.5 py-0.5 rounded text-[10px] font-extrabold uppercase ${

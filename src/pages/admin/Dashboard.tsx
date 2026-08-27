@@ -121,7 +121,7 @@ export function AdminDashboard() {
           <h1 className="text-2xl font-bold text-surface-900 tracking-tight">System Overview</h1>
           <p className="text-sm text-surface-500 mt-1">Real-time metrics and operations control.</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           <button onClick={handleExportExcel} className="btn-primary h-10 px-4 text-sm font-semibold flex items-center gap-2">
             <FileSpreadsheet className="w-4 h-4" /> Export Excel
           </button>
@@ -186,7 +186,7 @@ export function AdminDashboard() {
         animate={{ opacity: 1, y: 0 }}
         className="glass-card overflow-hidden border-2 border-amber-300/80 shadow-md"
       >
-        <div className="p-4 bg-amber-50/80 border-b border-amber-200/80 flex items-center justify-between">
+        <div className="flex flex-col gap-3 border-b border-amber-200/80 bg-amber-50/80 p-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2.5">
             <div className="w-8 h-8 rounded-full bg-amber-500 text-white flex items-center justify-center font-bold">
               <AlertTriangle className="w-4 h-4" />
@@ -204,7 +204,7 @@ export function AdminDashboard() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-sm">
+          <table className="w-full min-w-[640px] text-left border-collapse text-sm">
             <thead>
               <tr className="bg-surface-50/60 text-surface-500 text-xs uppercase tracking-wider font-semibold border-b border-surface-100">
                 <th className="py-3 px-5">Order #</th>
@@ -222,7 +222,7 @@ export function AdminDashboard() {
               ) : outstandingOrders.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="py-6 text-center text-emerald-700 bg-emerald-50/50 font-semibold">
-                    ✓ All caught up! No pending or unassigned orders.
+                    All caught up. No pending or unassigned orders.
                   </td>
                 </tr>
               ) : (
@@ -256,7 +256,7 @@ export function AdminDashboard() {
         </div>
         
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full min-w-[640px] text-left border-collapse">
             <thead>
               <tr className="bg-surface-50/50">
                 <th className="py-3 px-5 text-xs font-semibold text-surface-500 uppercase tracking-wider">Order ID</th>

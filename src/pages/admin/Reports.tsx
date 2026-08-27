@@ -631,7 +631,7 @@ export function AdminReports() {
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[860px] text-sm">
             <thead>
               <tr className="bg-surface-50 text-left">
                 {['DSA Name', 'Email', 'Cameras', 'Orders', 'Pending', 'Revenue', 'Commission', 'Paid'].map(h => (
@@ -732,7 +732,7 @@ export function AdminReports() {
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[760px] text-sm">
             <thead>
               <tr className="bg-surface-50 text-left">
                 {['Month', 'Cameras Sold', 'Orders', 'Active DSAs', 'Top DSA', 'Revenue', 'Commissions'].map(h => (
@@ -813,7 +813,7 @@ export function AdminReports() {
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[760px] text-sm">
             <thead>
               <tr className="bg-surface-50 text-left">
                 {['DSA Name', 'Email', 'Collected from Customers', 'Commission Owed to DSA', 'Net Balance', 'Status'].map(h => (
@@ -912,7 +912,7 @@ export function AdminReports() {
           </div>
         </div>
         <div className="overflow-x-auto flex-1">
-          <table className="w-full text-sm">
+          <table className="w-full min-w-[900px] text-sm">
             <thead>
               <tr className="bg-surface-50 text-left">
                 {['Order #', 'Customer', 'Product', 'Qty', 'Amount', 'Expected Delivery', 'DSA', 'Status'].map(h => (
