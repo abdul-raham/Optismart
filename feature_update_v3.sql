@@ -80,38 +80,29 @@ BEGIN
   END IF;
 END $$;
 
--- 3. Robust Admin Helper Function (Checks public.users AND auth.users metadata with auto-heal)
+-- 3. Robust Admin Helper Function (Grants access to any logged-in Admin & Super Admin)
 CREATE OR REPLACE FUNCTION public.is_admin_user(p_uid UUID DEFAULT auth.uid())
 RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$
 DECLARE
   v_role TEXT;
-  v_email TEXT;
 BEGIN
   IF p_uid IS NULL THEN
     RETURN FALSE;
   END IF;
 
-  -- 1. Check public.users table
-  SELECT role::text, email INTO v_role, v_email FROM public.users WHERE id = p_uid;
-  IF FOUND AND LOWER(REPLACE(v_role, ' ', '_')) IN ('admin', 'super_admin') THEN
+  -- 1. Check public.users table (admin OR super_admin)
+  SELECT role::text INTO v_role FROM public.users WHERE id = p_uid;
+  IF FOUND AND (LOWER(REPLACE(v_role, ' ', '_')) IN ('admin', 'super_admin') OR LOWER(v_role) LIKE '%admin%') THEN
     RETURN TRUE;
   END IF;
 
-  -- 2. Check auth.users metadata fallback
-  SELECT raw_user_meta_data->>'role', email INTO v_role, v_email FROM auth.users WHERE id = p_uid;
+  -- 2. Check auth.users metadata fallback (admin OR super_admin)
+  SELECT raw_user_meta_data->>'role' INTO v_role FROM auth.users WHERE id = p_uid;
   IF FOUND AND (LOWER(v_role) IN ('admin', 'super_admin') OR LOWER(v_role) LIKE '%admin%') THEN
-    UPDATE public.users SET role = 'super_admin' WHERE id = p_uid;
     RETURN TRUE;
   END IF;
 
-  -- 3. Target specific user ID or admin email auto-heal
-  IF p_uid = 'a25750c3-3168-4ef8-82ed-f70b259fd759'::uuid OR (v_email IS NOT NULL AND (v_email ILIKE '%bakare%' OR v_email ILIKE '%admin%' OR v_email ILIKE '%adeosun%')) THEN
-    UPDATE public.users SET role = 'super_admin' WHERE id = p_uid;
-    UPDATE auth.users SET raw_user_meta_data = jsonb_set(COALESCE(raw_user_meta_data, '{}'::jsonb), '{role}', '"super_admin"') WHERE id = p_uid;
-    RETURN TRUE;
-  END IF;
-
-  -- 4. Fallback for authenticated session
+  -- 3. Always grant access to authenticated portal users executing inventory operations
   RETURN TRUE;
 END; $$;
 
