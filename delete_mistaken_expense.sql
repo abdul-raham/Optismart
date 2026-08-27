@@ -1,21 +1,9 @@
--- SQL script to remove mistakenly added expense record (₦97,500 Facebook ads)
+-- SQL script to delete the exact mistaken Facebook Ads expense under "delivery" category
 
--- 1. Optional: Preview matching expense(s) before deleting
-SELECT * FROM public.expenses 
-WHERE amount = 97500 
-  AND (
-    LOWER(COALESCE(description, '')) LIKE '%facebook%' 
-    OR LOWER(COALESCE(title, '')) LIKE '%facebook%'
-    OR LOWER(COALESCE(category, '')) = 'delivery'
-  );
+-- Exact Record ID: 1168be4e-7e7e-4dc6-8b0a-23c26a586a3a
+-- Description: Facebook ads | Category: delivery | Amount: 97500.00 | Date: 2026-08-26
 
--- 2. Delete the record from public.expenses
 DELETE FROM public.expenses 
-WHERE amount = 97500 
-  AND (
-    LOWER(COALESCE(description, '')) LIKE '%facebook%' 
-    OR LOWER(COALESCE(title, '')) LIKE '%facebook%'
-    OR LOWER(COALESCE(category, '')) = 'delivery'
-  );
+WHERE id = '1168be4e-7e7e-4dc6-8b0a-23c26a586a3a';
 
 NOTIFY pgrst, 'reload schema';
