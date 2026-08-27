@@ -303,6 +303,40 @@ export function UserDetail() {
         </div>
       </div>
 
+      {/* 🚨 Day 7 Eviction Action Banner for Admin 🚨 */}
+      {user.role === 'dsa' && (dayNumber >= 7 || user.probation_status === 'evicted') && windowSales === 0 && (
+        <div className="rounded-2xl border-2 border-rose-300 bg-rose-50 p-5 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-rose-600 text-white flex items-center justify-center font-bold shrink-0 shadow-sm">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-rose-950 flex items-center gap-2">
+                7-Day Window Expired (0 Sales Delivered) — Account Suspended
+              </h3>
+              <p className="text-xs text-rose-700 mt-0.5 font-medium">
+                This DSA reached Day 7 with 0 sales and was automatically suspended. Choose an administrative action:
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2.5 shrink-0 w-full md:w-auto">
+            <button
+              onClick={handleResetWindow}
+              disabled={resettingWindow}
+              className="btn-outline text-xs font-bold h-9 px-4 bg-white border-rose-300 text-rose-900 hover:bg-rose-100 flex-1 md:flex-none transition-colors"
+            >
+              <RefreshCw className="w-3.5 h-3.5 text-rose-600" /> Reset Window & Reactivate
+            </button>
+            <button
+              onClick={() => setIsDeleteModalOpen(true)}
+              className="text-xs font-bold h-9 px-4 rounded-xl bg-rose-600 text-white hover:bg-rose-700 flex-1 md:flex-none shadow-xs flex items-center justify-center gap-1.5 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" /> Evict & Delete Account
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Profile Header Banner */}
       <div className="glass-card p-6 relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
         <div className="flex items-center gap-5">
@@ -320,16 +354,16 @@ export function UserDetail() {
               {user.role === 'dsa' && (
                 user.probation_approval_status === 'confirmed_probation' ? (
                   <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1">
-                    <AlertTriangle className="w-3.5 h-3.5 text-rose-600" /> Confirmed Probation ({deliveredThisMonth}/20)
+                    <AlertTriangle className="w-3.5 h-3.5 text-rose-600" /> On Confirmed Probation ({deliveredThisMonth} of 20 Delivered)
                   </span>
                 ) : user.probation_approval_status === 'waived' ? (
                   <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-cyan-100 text-cyan-800 border border-cyan-300 flex items-center gap-1">
                     <CheckCircle2 className="w-3.5 h-3.5 text-cyan-600" /> Probation Waived ({deliveredThisMonth} Delivered)
                   </span>
                 ) : isOnProbation ? (
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center gap-1.5 flex-wrap">
                     <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600" /> Pending Admin Review ({deliveredThisMonth}/20)
+                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600" /> Pending Review — {deliveredThisMonth} of 20 Target Orders Delivered
                     </span>
                     {(currentRole === 'admin' || currentRole === 'super_admin') && (
                       <>
@@ -338,7 +372,7 @@ export function UserDetail() {
                             await supabase.from('users').update({ probation_approval_status: 'confirmed_probation' }).eq('id', user.id)
                             setUser(prev => prev ? { ...prev, probation_approval_status: 'confirmed_probation' } : null)
                           }}
-                          className="text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 px-2 py-1 rounded-lg border border-rose-200"
+                          className="text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 px-2 py-1 rounded-lg border border-rose-200 transition-colors"
                         >
                           Confirm Probation
                         </button>
@@ -347,16 +381,16 @@ export function UserDetail() {
                             await supabase.from('users').update({ probation_approval_status: 'waived' }).eq('id', user.id)
                             setUser(prev => prev ? { ...prev, probation_approval_status: 'waived' } : null)
                           }}
-                          className="text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded-lg border border-emerald-200"
+                          className="text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded-lg border border-emerald-200 transition-colors"
                         >
-                          Waive Probation
+                          Waive Target
                         </button>
                       </>
                     )}
                   </div>
                 ) : (
                   <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Off Probation ({deliveredThisMonth} Delivered)
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Target Met ({deliveredThisMonth} Delivered)
                   </span>
                 )
               )}
