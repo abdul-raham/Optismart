@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
-import { Package, Plus, Search, Edit2, Trash2, X, RefreshCw, ExternalLink, Upload, Loader2 } from 'lucide-react'
+import { Package, Plus, Search, Edit2, Trash2, X, RefreshCw, ExternalLink, Upload, Loader2, MapPin } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import type { Product } from '@/types'
 import { CardGridSkeleton } from '@/components/shared/Skeletons'
@@ -41,6 +41,8 @@ export function AdminProducts() {
 
   // Stock Transfer Modal State
   const [isTransferModalOpen, setIsTransferModalOpen] = useState(false)
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false)
+  const [locationForm, setLocationForm] = useState({ name: '', address: '', phone: '' })
   const [transferForm, setTransferForm] = useState({
     product_id: '',
     from_location_id: '',
@@ -121,33 +123,13 @@ export function AdminProducts() {
 
     setSubmitting(true)
     try {
-      // 1. Log Stock Movement
-      await supabase.from('stock_movements').insert({
-        movement_type: 'stock_in',
-        product_id: stockInForm.product_id,
-        to_location_id: stockInForm.location_id,
-        quantity: stockInForm.quantity,
-        notes: stockInForm.notes || 'Incoming stock addition',
-        created_by_auth_id: user?.id,
+      const { error } = await supabase.rpc('inventory_stock_in', {
+        p_product_id: stockInForm.product_id,
+        p_location_id: stockInForm.location_id,
+        p_quantity: Number(stockInForm.quantity),
+        p_notes: stockInForm.notes || 'Incoming stock addition',
       })
-
-      // 2. Update/Upsert product_inventory
-      const existing = inventoryList.find(i => i.product_id === stockInForm.product_id && i.location_id === stockInForm.location_id)
-      const newQty = (existing?.quantity || 0) + Number(stockInForm.quantity)
-
-      await supabase.from('product_inventory').upsert({
-        product_id: stockInForm.product_id,
-        location_id: stockInForm.location_id,
-        quantity: newQty,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'product_id,location_id' })
-
-      // 3. Update total product stock_quantity in products table
-      const totalProductQty = inventoryList
-        .filter(i => i.product_id === stockInForm.product_id && i.location_id !== stockInForm.location_id)
-        .reduce((sum, i) => sum + i.quantity, 0) + newQty
-
-      await supabase.from('products').update({ stock_quantity: totalProductQty }).eq('id', stockInForm.product_id)
+      if (error) throw error
 
       alert('Stock successfully added!')
       setIsStockInModalOpen(false)
@@ -176,45 +158,14 @@ export function AdminProducts() {
 
     setSubmitting(true)
     try {
-      // Check available stock at source location
-      const sourceInv = inventoryList.find(i => i.product_id === product_id && i.location_id === from_location_id)
-      const available = sourceInv?.quantity || 0
-
-      if (available < quantity) {
-        alert(`Insufficient stock at source location! (Available: ${available}, Requested: ${quantity})`)
-        setSubmitting(false)
-        return
-      }
-
-      // 1. Log Stock Transfer movement
-      await supabase.from('stock_movements').insert({
-        movement_type: 'transfer',
-        product_id,
-        from_location_id,
-        to_location_id,
-        quantity,
-        notes: notes || 'Inter-branch stock transfer',
-        created_by_auth_id: user?.id,
+      const { error } = await supabase.rpc('inventory_transfer', {
+        p_product_id: product_id,
+        p_from_location_id: from_location_id,
+        p_to_location_id: to_location_id,
+        p_quantity: Number(quantity),
+        p_notes: notes || 'Inter-branch stock transfer',
       })
-
-      // 2. Deduct from source branch
-      await supabase.from('product_inventory').upsert({
-        product_id,
-        location_id: from_location_id,
-        quantity: available - Number(quantity),
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'product_id,location_id' })
-
-      // 3. Add to target branch
-      const destInv = inventoryList.find(i => i.product_id === product_id && i.location_id === to_location_id)
-      const destAvailable = destInv?.quantity || 0
-
-      await supabase.from('product_inventory').upsert({
-        product_id,
-        location_id: to_location_id,
-        quantity: destAvailable + Number(quantity),
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'product_id,location_id' })
+      if (error) throw error
 
       alert('Stock transfer completed successfully!')
       setIsTransferModalOpen(false)
@@ -223,6 +174,26 @@ export function AdminProducts() {
     } catch (err: any) {
       console.error('Stock Transfer failed:', err)
       alert(`Transfer failed: ${err?.message || err}`)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleCreateLocation = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSubmitting(true)
+    try {
+      const { error } = await supabase.rpc('inventory_create_location', {
+        p_name: locationForm.name,
+        p_address: locationForm.address || null,
+        p_phone: locationForm.phone || null,
+      })
+      if (error) throw error
+      setLocationForm({ name: '', address: '', phone: '' })
+      setIsLocationModalOpen(false)
+      await fetchInventoryData()
+    } catch (err: any) {
+      alert(`Failed to create location: ${err?.message || err}`)
     } finally {
       setSubmitting(false)
     }
@@ -391,6 +362,9 @@ export function AdminProducts() {
             </button>
           ) : (
             <div className="flex items-center gap-2">
+              <button onClick={() => setIsLocationModalOpen(true)} className="btn-outline h-10 px-4 text-sm font-semibold flex items-center gap-1.5">
+                <MapPin className="w-4 h-4" /> Add Location
+              </button>
               <button onClick={() => setIsStockInModalOpen(true)} className="btn-primary h-10 px-4 text-sm font-semibold flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700">
                 <Plus className="w-4 h-4" /> Stock In
               </button>
@@ -413,7 +387,7 @@ export function AdminProducts() {
             activeTab === 'products' ? 'bg-brand-600 text-white shadow-sm' : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
           }`}
         >
-          📦 Camera Catalog ({products.length})
+          Camera Catalog ({products.length})
         </button>
         <button
           onClick={() => setActiveTab('promos')}
@@ -421,7 +395,7 @@ export function AdminProducts() {
             activeTab === 'promos' ? 'bg-brand-600 text-white shadow-sm' : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
           }`}
         >
-          🎁 Promo Packages ({promoPackages.length})
+          Promo Packages ({promoPackages.length})
         </button>
         <button
           onClick={() => setActiveTab('inventory')}
@@ -429,7 +403,7 @@ export function AdminProducts() {
             activeTab === 'inventory' ? 'bg-brand-600 text-white shadow-sm' : 'bg-surface-100 text-surface-600 hover:bg-surface-200'
           }`}
         >
-          🏬 Multi-Branch Inventory ({locations.length} Locations)
+          Multi-Branch Inventory ({locations.length} Locations)
         </button>
       </div>
 
@@ -545,7 +519,7 @@ export function AdminProducts() {
             <div key={promo.id} className="glass-card p-5 border border-brand-100/80 bg-gradient-to-br from-white to-brand-50/20 relative overflow-hidden">
               <div className="flex items-start justify-between mb-3">
                 <span className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider bg-brand-100 text-brand-700">
-                  🎁 Promo Package
+                  Promo Package
                 </span>
                 <div className="flex items-center gap-1">
                   <button
@@ -581,7 +555,7 @@ export function AdminProducts() {
               <div className="p-3 bg-white rounded-xl border border-surface-100 space-y-2 mb-4">
                 <div className="flex justify-between items-center text-xs">
                   <span className="text-surface-500 font-semibold">Included Free Gift:</span>
-                  <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">✨ {promo.bonus_item_name}</span>
+                  <span className="font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full">{promo.bonus_item_name}</span>
                 </div>
                 <div className="flex justify-between items-center text-xs pt-1 border-t border-surface-100">
                   <span className="text-surface-500 font-semibold">Promo Package Price:</span>
@@ -609,7 +583,7 @@ export function AdminProducts() {
               return (
                 <div key={loc.id} className="glass-card p-5 border-l-4 border-l-brand-600 relative">
                   <span className="text-[10px] font-extrabold uppercase tracking-wider text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full border border-brand-200">
-                    🏬 {loc.name}
+                    {loc.name}
                   </span>
                   <h3 className="text-2xl font-black text-surface-900 mt-2">{locTotalStock} Cameras</h3>
                   <p className="text-xs text-surface-500 mt-0.5">{loc.address || 'Regional Stock Hub'}</p>
@@ -629,7 +603,7 @@ export function AdminProducts() {
                   + Stock In
                 </button>
                 <button onClick={() => setIsTransferModalOpen(true)} className="btn-outline text-xs h-9 px-3 border-brand-300 text-brand-700 bg-brand-50">
-                  🔄 Stock Transfer
+                  Stock Transfer
                 </button>
               </div>
             </div>
@@ -656,7 +630,7 @@ export function AdminProducts() {
                       <tr key={p.id} className="hover:bg-surface-50/50 transition-colors">
                         <td className="py-3.5 px-6 font-bold text-surface-900 flex items-center gap-3">
                           <div className="w-8 h-8 rounded-lg bg-surface-100 flex items-center justify-center font-bold text-brand-600 shrink-0">
-                            📷
+                            <Package className="h-4 w-4" />
                           </div>
                           <div>
                             <p>{p.name}</p>
@@ -708,7 +682,7 @@ export function AdminProducts() {
                       <p className="font-bold text-surface-900">{m.product?.name || 'Camera'}</p>
                       <p className="text-surface-500 mt-0.5">
                         {m.movement_type === 'transfer'
-                          ? `Transferred from ${m.from_loc?.name || 'HQ'} ➔ ${m.to_loc?.name || 'Branch'}`
+                          ? `Transferred from ${m.from_loc?.name || 'HQ'} to ${m.to_loc?.name || 'Branch'}`
                           : m.movement_type === 'stock_in'
                           ? `Stock In added to ${m.to_loc?.name || 'Branch'}`
                           : `Fulfillment Stock Out from ${m.from_loc?.name || 'Branch'}`}
@@ -841,6 +815,21 @@ export function AdminProducts() {
             </div>
           )}
 
+          {isLocationModalOpen && (
+            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm" onClick={() => setIsLocationModalOpen(false)} />
+              <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-card-xl">
+                <div className="flex items-center justify-between border-b border-surface-100 px-6 py-4"><h2 className="flex items-center gap-2 text-lg font-bold"><MapPin className="h-5 w-5 text-brand-600" /> Add Inventory Location</h2><button onClick={() => setIsLocationModalOpen(false)}><X className="h-5 w-5" /></button></div>
+                <form onSubmit={handleCreateLocation} className="space-y-4 p-6">
+                  <div><label className="label">Location name *</label><input required className="input" value={locationForm.name} onChange={e => setLocationForm(previous => ({ ...previous, name: e.target.value }))} placeholder="e.g. Ibadan Branch" /></div>
+                  <div><label className="label">Address</label><input className="input" value={locationForm.address} onChange={e => setLocationForm(previous => ({ ...previous, address: e.target.value }))} /></div>
+                  <div><label className="label">Phone</label><input className="input" value={locationForm.phone} onChange={e => setLocationForm(previous => ({ ...previous, phone: e.target.value }))} /></div>
+                  <div className="flex justify-end gap-3 border-t border-surface-100 pt-4"><button type="button" className="btn-outline" onClick={() => setIsLocationModalOpen(false)}>Cancel</button><button className="btn-primary" disabled={submitting}>{submitting ? 'Saving...' : 'Add Location'}</button></div>
+                </form>
+              </motion.div>
+            </div>
+          )}
+
           {/* STOCK IN MODAL */}
           {isStockInModalOpen && (
             <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
@@ -888,7 +877,7 @@ export function AdminProducts() {
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm" onClick={() => setIsTransferModalOpen(false)} />
               <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="bg-white w-full max-w-md relative z-10 rounded-2xl shadow-card-xl overflow-hidden">
                 <div className="px-6 py-4 border-b border-surface-100 flex items-center justify-between bg-brand-50 text-brand-900">
-                  <h2 className="text-lg font-bold flex items-center gap-2">🔄 Inter-Branch Stock Transfer</h2>
+                  <h2 className="text-lg font-bold flex items-center gap-2">Inter-Branch Stock Transfer</h2>
                   <button onClick={() => setIsTransferModalOpen(false)} className="text-brand-700 hover:text-brand-950"><X className="w-5 h-5" /></button>
                 </div>
                 <form onSubmit={handleStockTransfer} className="p-6 space-y-4">
@@ -1026,8 +1015,9 @@ export function AdminProducts() {
 
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="label">Stock Quantity *</label>
-                        <input required type="number" min={0} className="input" value={form.stock_quantity} onChange={e => setForm({...form, stock_quantity: Number(e.target.value)})} />
+                        <label className="label">Total Stock</label>
+                        <input readOnly type="number" className="input bg-surface-100 text-surface-500" value={editingId ? form.stock_quantity : 0} />
+                        <p className="mt-1 text-[10px] text-surface-400">Use Stock In to capture quantities per location.</p>
                       </div>
                       <div>
                         <label className="label">Low Stock Alert *</label>

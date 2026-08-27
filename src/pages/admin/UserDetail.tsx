@@ -229,6 +229,10 @@ export function UserDetail() {
   const rawDiffDays = Math.floor((now.getTime() - windowStart.getTime()) / (1000 * 60 * 60 * 24))
   const dayNumber = Math.min(7, Math.max(1, rawDiffDays + 1))
   const windowSales = userOrders.filter(o => o.status === 'delivered' && new Date(o.created_at) >= windowStart).length
+  const advertisingExpenses = userExpenses.filter(expense =>
+    ['advertising', 'ad_cost', 'marketing'].includes(String(expense.category).toLowerCase())
+  )
+  const totalAdSpend = advertisingExpenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0)
 
   if (loading) {
     return (
@@ -380,7 +384,7 @@ export function UserDetail() {
             </p>
             <p className="text-2xl font-black text-surface-900 mt-1">Day {dayNumber} <span className="text-sm font-semibold text-surface-400">/ 7</span></p>
             <p className="text-xs font-bold text-surface-600 mt-0.5">
-              {windowSales > 0 ? `${windowSales} Sales Delivered` : '⚠️ 0 Sales (Eviction Risk)'}
+              {windowSales > 0 ? `${windowSales} Sales Delivered` : '0 Sales (Eviction Risk)'}
             </p>
           </div>
         )}
@@ -500,10 +504,10 @@ export function UserDetail() {
         <div className="glass-card p-5 border-l-4 border-l-cyan-500 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
             <span className="text-xs font-extrabold uppercase tracking-wider text-cyan-800 bg-cyan-50 px-2.5 py-1 rounded-full border border-cyan-200">
-              📢 Total Ad Spend Allocation
+              Total Ad Spend Allocation
             </span>
             <h3 className="text-2xl font-black text-surface-900 mt-2">
-              {formatCurrency(userExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0))}
+              {formatCurrency(totalAdSpend)}
             </h3>
             <p className="text-xs text-surface-500 mt-1 font-medium">
               Total advertising & marketing expenditure allocated to generate leads/orders for {user.full_name || 'this DSA'}.
@@ -514,7 +518,7 @@ export function UserDetail() {
             <span className="text-[10px] font-bold uppercase tracking-wider text-surface-400">Ad Spend Per Delivered Order</span>
             <p className="text-lg font-black text-surface-900 mt-0.5">
               {userOrders.filter(o => o.status === 'delivered').length > 0
-                ? formatCurrency(userExpenses.reduce((sum, e) => sum + Number(e.amount || 0), 0) / userOrders.filter(o => o.status === 'delivered').length)
+                ? formatCurrency(totalAdSpend / userOrders.filter(o => o.status === 'delivered').length)
                 : '₦0'}
             </p>
           </div>

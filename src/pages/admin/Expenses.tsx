@@ -269,7 +269,7 @@ export function AdminExpenses() {
       <div className={`grid grid-cols-2 lg:grid-cols-4 gap-4 ${searchParams.get('highlight') === 'breakdown' ? 'animate-feature-glow p-2 rounded-2xl border border-brand-500' : ''}`}>
         <div className="glass-card p-4 border-l-4 border-l-cyan-500">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-bold text-surface-500 uppercase tracking-wider">📢 Ads & Marketing</span>
+            <span className="text-xs font-bold text-surface-500 uppercase tracking-wider">Ads &amp; Marketing</span>
             <span className="text-[10px] font-extrabold text-cyan-700 bg-cyan-50 px-2 py-0.5 rounded-full border border-cyan-200">
               {totalAmount > 0 ? `${Math.round((adExpenses / totalAmount) * 100)}%` : '0%'}
             </span>
@@ -446,7 +446,7 @@ export function AdminExpenses() {
                       form.expense_scope === 'daily' ? 'bg-white text-surface-900 shadow-sm' : 'text-surface-600 hover:text-surface-900'
                     }`}
                   >
-                    📅 Daily / General Order
+                    Daily / General Expense
                   </button>
                   <button
                     type="button"
@@ -455,7 +455,7 @@ export function AdminExpenses() {
                       form.expense_scope === 'order_specific' ? 'bg-white text-brand-700 shadow-sm' : 'text-surface-600 hover:text-surface-900'
                     }`}
                   >
-                    📦 Single DSA Order
+                    Single DSA Order
                   </button>
                 </div>
               </div>

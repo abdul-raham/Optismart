@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { Users, Search, Mail, Ban, CheckCircle2, User, Phone, ExternalLink, AlertTriangle } from 'lucide-react'
-import { formatDate } from '@/lib/utils'
+import { formatCurrency, formatDate } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { TableSkeleton } from '@/components/shared/Skeletons'
 import { checkDSAPerformanceWindows } from '@/lib/performanceWatcher'
@@ -31,6 +31,7 @@ export function AdminUsers() {
     searchParams.get('highlight') === 'probation' ? 'probation' : 'all'
   )
   const [probationMap, setProbationMap] = useState<Record<string, boolean>>({})
+  const [adSpendMap, setAdSpendMap] = useState<Record<string, number>>({})
 
   useEffect(() => {
     fetchUsers()
@@ -55,12 +56,10 @@ export function AdminUsers() {
         const dsaIds = data.filter(u => u.role === 'dsa').map(u => u.id)
 
         if (dsaIds.length > 0) {
-          const { data: dsaOrders } = await supabase
-            .from('orders')
-            .select('dsa_id, status, created_at')
-            .in('dsa_id', dsaIds)
-            .eq('status', 'delivered')
-            .gte('created_at', `${currentMonthStr}-01T00:00:00.000Z`)
+          const [{ data: dsaOrders }, { data: adExpenses }] = await Promise.all([
+            supabase.from('orders').select('dsa_id, status, created_at').in('dsa_id', dsaIds).eq('status', 'delivered').gte('created_at', `${currentMonthStr}-01T00:00:00.000Z`),
+            supabase.from('expenses').select('dsa_id, amount, category').in('dsa_id', dsaIds),
+          ])
 
           const pMap: Record<string, boolean> = {}
           dsaIds.forEach(id => {
@@ -68,6 +67,14 @@ export function AdminUsers() {
             pMap[id] = deliveredCount < 20
           })
           setProbationMap(pMap)
+          const spendMap: Record<string, number> = {}
+          dsaIds.forEach(id => { spendMap[id] = 0 })
+          adExpenses?.forEach(expense => {
+            if (expense.dsa_id && ['advertising', 'ad_cost', 'marketing'].includes(String(expense.category).toLowerCase())) {
+              spendMap[expense.dsa_id] = (spendMap[expense.dsa_id] || 0) + Number(expense.amount || 0)
+            }
+          })
+          setAdSpendMap(spendMap)
         }
       }
     } catch (err) {
@@ -168,8 +175,8 @@ export function AdminUsers() {
           >
             <option value="all">All Statuses</option>
             <option value="active">Active Only</option>
-            <option value="probation">⚠️ On Probation Only</option>
-            <option value="suspended">🔴 Suspended Only</option>
+            <option value="probation">On Probation Only</option>
+            <option value="suspended">Suspended Only</option>
           </select>
 
           <div className="relative flex-1 sm:w-64">
@@ -231,6 +238,13 @@ export function AdminUsers() {
                       </div>
                     </div>
                   </div>
+
+                  {u.role === 'dsa' && (
+                    <div className="mb-4 rounded-xl border border-cyan-100 bg-cyan-50/70 px-3 py-2">
+                      <p className="text-[10px] font-bold uppercase tracking-wider text-cyan-700">Total attributed ad spend</p>
+                      <p className="mt-0.5 text-base font-black text-surface-900">{formatCurrency(adSpendMap[u.id] || 0)}</p>
+                    </div>
+                  )}
 
                   {/* Status Badges */}
                   <div className="flex items-center gap-2 mb-4 flex-wrap">

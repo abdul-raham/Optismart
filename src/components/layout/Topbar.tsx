@@ -48,7 +48,7 @@ export function Topbar() {
         <input 
           type="text" 
           placeholder="Search orders, leads, or products..." 
-          className="w-full bg-white/70 border border-surface-200/80 rounded-full py-1.5 pl-9 pr-4 text-sm focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all backdrop-blur-md"
+          className="w-full bg-white border border-surface-200/80 rounded-full py-1.5 pl-9 pr-4 text-sm text-surface-900 placeholder:text-surface-400 focus:outline-none focus:ring-2 focus:ring-brand-500/20 focus:border-brand-400 transition-all"
         />
         <div className="absolute right-3 flex items-center gap-1">
           <kbd className="hidden lg:inline-block text-[10px] font-mono text-surface-400 bg-white/90 border border-surface-200 px-1.5 py-0.5 rounded shadow-xs">Ctrl</kbd>

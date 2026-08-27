@@ -55,6 +55,10 @@ export function AdminOrders() {
   const [editingOrder, setEditingOrder] = useState<Order | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [createError, setCreateError] = useState('')
+  const [inventoryLocations, setInventoryLocations] = useState<any[]>([])
+  const [locationInventory, setLocationInventory] = useState<any[]>([])
+  const [deliveryOrder, setDeliveryOrder] = useState<Order | null>(null)
+  const [deliveryLocationId, setDeliveryLocationId] = useState('')
   const fetchSequence = useRef(0)
 
   const [editForm, setEditForm] = useState({
@@ -97,11 +101,13 @@ export function AdminOrders() {
   const fetchData = async () => {
     const sequence = ++fetchSequence.current
     try {
-      const [ordersRes, productsRes, dsasRes, jobsRes] = await Promise.all([
+      const [ordersRes, productsRes, dsasRes, jobsRes, locationsRes, inventoryRes] = await Promise.all([
         supabase.from('orders').select('*, dsa:users!orders_dsa_id_fkey(email, full_name)').order('created_at', { ascending: false }),
         supabase.from('products').select('*').eq('is_active', true),
         supabase.from('users').select('*').eq('role', 'dsa'),
-        supabase.from('installer_jobs').select('order_id')
+        supabase.from('installer_jobs').select('order_id'),
+        supabase.from('inventory_locations').select('id, name, address').eq('is_active', true).order('name'),
+        supabase.from('product_inventory').select('product_id, location_id, quantity')
       ])
       
       if (ordersRes.error) throw ordersRes.error
@@ -114,6 +120,8 @@ export function AdminOrders() {
       setProducts(productsRes.data ?? [])
       setDsas(dsasRes.data ?? [])
       setAssignedOrderIds(new Set((jobsRes.data ?? []).map(j => j.order_id)))
+      setInventoryLocations(locationsRes.data ?? [])
+      setLocationInventory(inventoryRes.data ?? [])
     } catch (err) {
       console.error('Error fetching admin orders:', err)
     } finally {
@@ -215,19 +223,23 @@ export function AdminOrders() {
     }
   }
 
-  const handleUpdateStatus = async (orderId: string, newStatus: OrderStatus) => {
+  const handleUpdateStatus = async (orderId: string, newStatus: OrderStatus, fulfillmentLocationId?: string) => {
+    const selectedOrder = orders.find(order => order.id === orderId)
+    if (newStatus === 'delivered' && !fulfillmentLocationId) {
+      setDeliveryOrder(selectedOrder ?? null)
+      setDeliveryLocationId('')
+      setOpenDropdownId(null)
+      return
+    }
     setUpdating(orderId)
     try {
-      const updatePayload: any = { status: newStatus, updated_at: new Date().toISOString() }
-      if (newStatus === 'delivered') updatePayload.delivered_at = new Date().toISOString()
-      const { error } = await supabase
-        .from('orders')
-        .update(updatePayload)
-        .eq('id', orderId)
+      const { error } = newStatus === 'delivered'
+        ? await supabase.rpc('fulfill_order_from_location', { p_order_id: orderId, p_location_id: fulfillmentLocationId })
+        : await supabase.from('orders').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', orderId)
 
       if (error) throw error
       
-      const updatedOrder = orders.find(o => o.id === orderId)
+      const updatedOrder = selectedOrder
       
       // Send Notifications to DSA
       if (updatedOrder?.dsa_id) {
@@ -258,38 +270,6 @@ export function AdminOrders() {
         }).catch(console.error);
       }
 
-      // Auto-deduct inventory stock from location on DELIVERED
-      if (newStatus === 'delivered' && updatedOrder?.product_id) {
-        try {
-          const { data: defaultLoc } = await supabase.from('inventory_locations').select('id').eq('is_active', true).limit(1).single()
-          if (defaultLoc) {
-            await supabase.from('stock_movements').insert({
-              movement_type: 'stock_out',
-              product_id: updatedOrder.product_id,
-              from_location_id: defaultLoc.id,
-              quantity: updatedOrder.quantity || 1,
-              reference_order_id: updatedOrder.id,
-              notes: `Fulfillment stock-out for Order #${updatedOrder.order_number}`,
-            })
-
-            // Decrement inventory at location
-            const { data: invItem } = await supabase
-              .from('product_inventory')
-              .select('quantity')
-              .eq('product_id', updatedOrder.product_id)
-              .eq('location_id', defaultLoc.id)
-              .single()
-
-            if (invItem) {
-              const newQty = Math.max(0, (invItem.quantity || 0) - (updatedOrder.quantity || 1))
-              await supabase.from('product_inventory').update({ quantity: newQty }).eq('product_id', updatedOrder.product_id).eq('location_id', defaultLoc.id)
-            }
-          }
-        } catch (invErr) {
-          console.warn('Inventory deduction skipped:', invErr)
-        }
-      }
-
       // Auto-create commission for DSA when order status is marked DELIVERED
       if (newStatus === 'delivered' && updatedOrder?.dsa_id) {
         try {
@@ -317,6 +297,11 @@ export function AdminOrders() {
 
       // Update local state
       setOrders(orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o))
+      if (newStatus === 'delivered') {
+        setDeliveryOrder(null)
+        setDeliveryLocationId('')
+        fetchData()
+      }
     } catch (err) {
       console.error('Failed to update status:', err)
       alert('Failed to update order status')
@@ -519,7 +504,7 @@ export function AdminOrders() {
                         </p>
                         {order.installation_needed && (
                           <span className="inline-flex items-center gap-1 text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full mt-1 border border-orange-200">
-                            🔧 Needs Installer
+                            Needs Installer
                           </span>
                         )}
                       </td>
@@ -623,7 +608,7 @@ export function AdminOrders() {
                                             }}
                                             className="w-full px-3.5 py-2 text-xs font-semibold text-orange-700 hover:bg-orange-50 flex items-center gap-2 transition-colors cursor-pointer"
                                           >
-                                            🔧 Assign Installer
+                                            Assign Installer
                                           </button>
                                         )}
                                         {order.status === 'cancelled' && (
@@ -719,7 +704,7 @@ export function AdminOrders() {
                         onClick={() => setAssigningOrderId(order.id)}
                         className="text-xs font-bold px-3 py-1.5 rounded-lg border bg-orange-50 border-orange-200 text-orange-700 hover:bg-orange-100 transition-colors flex items-center gap-1"
                       >
-                        🔧 Assign Installer
+                        Assign Installer
                       </button>
                     )}
                     {order.status === 'cancelled' && !updating && (
@@ -1044,6 +1029,51 @@ export function AdminOrders() {
           </div>
         )}
       </AnimatePresence>
+
+      {createPortal(
+        <AnimatePresence>
+          {deliveryOrder && (
+            <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+              <motion.button
+                type="button"
+                aria-label="Close fulfillment dialog"
+                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-surface-900/50 backdrop-blur-sm"
+                onClick={() => !updating && setDeliveryOrder(null)}
+              />
+              <motion.div initial={{ opacity: 0, y: 16, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.97 }} className="relative z-10 w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <h2 className="text-lg font-bold text-surface-900">Choose fulfillment location</h2>
+                    <p className="mt-1 text-sm text-surface-500">Order {deliveryOrder.order_number} needs {deliveryOrder.quantity || 1} unit(s). Stock is deducted only after this succeeds.</p>
+                  </div>
+                  <button type="button" onClick={() => setDeliveryOrder(null)} className="rounded-lg p-1 text-surface-400 hover:bg-surface-100 hover:text-surface-700"><X className="h-5 w-5" /></button>
+                </div>
+                <div className="mt-5 space-y-2">
+                  {inventoryLocations.map(location => {
+                    const available = Number(locationInventory.find(item => item.location_id === location.id && item.product_id === deliveryOrder.product_id)?.quantity || 0)
+                    const enough = available >= (deliveryOrder.quantity || 1)
+                    return (
+                      <label key={location.id} className={`flex items-center justify-between rounded-xl border p-3 ${enough ? 'cursor-pointer border-surface-200 hover:border-brand-300' : 'cursor-not-allowed border-surface-100 bg-surface-50 opacity-60'}`}>
+                        <span className="flex items-center gap-3"><input type="radio" name="fulfillment-location" disabled={!enough} checked={deliveryLocationId === location.id} onChange={() => setDeliveryLocationId(location.id)} /><span><span className="block text-sm font-bold text-surface-900">{location.name}</span><span className="block text-xs text-surface-500">{location.address || 'No address set'}</span></span></span>
+                        <span className={`text-xs font-bold ${enough ? 'text-success-700' : 'text-danger-600'}`}>{available} available</span>
+                      </label>
+                    )
+                  })}
+                  {inventoryLocations.length === 0 && <p className="rounded-xl bg-warning-50 p-3 text-sm text-warning-800">No inventory location is configured. Run the V3 database migration, then capture stock on the Products page.</p>}
+                </div>
+                <div className="mt-6 flex justify-end gap-3 border-t border-surface-100 pt-4">
+                  <button type="button" className="btn-outline" onClick={() => setDeliveryOrder(null)} disabled={Boolean(updating)}>Cancel</button>
+                  <button type="button" className="btn-primary" disabled={!deliveryLocationId || Boolean(updating)} onClick={() => handleUpdateStatus(deliveryOrder.id, 'delivered', deliveryLocationId)}>
+                    {updating ? 'Completing...' : 'Confirm delivery'}
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          )}
+        </AnimatePresence>,
+        document.body
+      )}
     </div>
   )
 }

@@ -176,7 +176,7 @@ export function DSADashboard() {
               <h3 className="font-bold text-lg">Monthly Sales Target</h3>
               {commissionStatus.camerasDelivered < 20 ? (
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-black uppercase bg-rose-200 text-rose-900 border border-rose-300">
-                  ⚠️ On Probation (&lt;20 Delivered)
+                  On Probation (&lt;20 Delivered)
                 </span>
               ) : (
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-black uppercase bg-emerald-200 text-emerald-900 border border-emerald-300">

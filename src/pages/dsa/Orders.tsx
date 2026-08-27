@@ -287,7 +287,7 @@ export function DSAOrders() {
                           )}
                           {order.installation_needed && (
                             <span className="inline-flex items-center gap-1 text-xs font-bold text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full">
-                              🔧 Installer Needed
+                              Installer Needed
                             </span>
                           )}
                         </div>
@@ -347,7 +347,7 @@ export function DSAOrders() {
                   {order.installation_needed && (
                     <div className="flex justify-end pt-2">
                       <span className="inline-flex items-center gap-1 text-xs font-bold text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full">
-                        🔧 Installer Needed
+                        Installer Needed
                       </span>
                     </div>
                   )}

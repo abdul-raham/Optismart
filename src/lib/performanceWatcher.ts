@@ -41,7 +41,7 @@ export async function checkDSAPerformanceWindows() {
         }
         sendWebPush(
           dsa.id,
-          '⚠️ Performance Warning: 0 Sales in 4 Days',
+          'Performance Warning: 0 Sales in 4 Days',
           'Urgent: You have 0 sales in the last 4 days. Please buckle up to meet your target and avoid account suspension!',
           '/app/dsa'
         ).catch(console.error)
@@ -75,7 +75,7 @@ export async function checkDSAPerformanceWindows() {
             }
             sendWebPush(
               admin.id,
-              '⚠️ Underperformance Alert: DSA Sales Warning',
+              'Underperformance Alert: DSA Sales Warning',
               `DSA ${dsa.full_name || dsa.email} has 0 sales on Day 5 (Leads: ${leadsCount}). Check User Details.`,
               `/app/admin/users/${dsa.id}`
             ).catch(console.error)
@@ -113,7 +113,7 @@ export async function checkDSAPerformanceWindows() {
             }
             sendWebPush(
               admin.id,
-              '🔴 DSA Suspended: Eviction & Delete Prompt',
+              'DSA Suspended: Eviction & Delete Prompt',
               `DSA ${dsa.full_name || dsa.email} was automatically suspended due to 0 sales in 7 days. Would you like to delete this account?`,
               `/app/admin/users/${dsa.id}`
             ).catch(console.error)
