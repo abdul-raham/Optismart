@@ -378,14 +378,25 @@ export function UserDetail() {
 
         {/* 7-Day Performance Clock Widget (DSA ONLY) */}
         {user.role === 'dsa' && (
-          <div className="w-full md:w-auto p-4 rounded-2xl bg-surface-50 border border-surface-200 text-right shrink-0">
+          <div className={`w-full md:w-auto p-4 rounded-2xl border text-right shrink-0 ${
+            user.status === 'suspended' ? 'bg-surface-100/70 border-surface-200' : 'bg-surface-50 border-surface-200'
+          }`}>
             <p className="text-[11px] font-extrabold uppercase tracking-wider text-surface-500 flex items-center justify-end gap-1">
               <Clock className="w-3.5 h-3.5 text-brand-600" /> 7-Day Performance Clock
             </p>
-            <p className="text-2xl font-black text-surface-900 mt-1">Day {dayNumber} <span className="text-sm font-semibold text-surface-400">/ 7</span></p>
-            <p className="text-xs font-bold text-surface-600 mt-0.5">
-              {windowSales > 0 ? `${windowSales} Sales Delivered` : '0 Sales (Eviction Risk)'}
-            </p>
+            {user.status === 'suspended' ? (
+              <>
+                <p className="text-base font-black text-rose-600 mt-1">Clock Paused</p>
+                <p className="text-xs font-semibold text-surface-500 mt-0.5">Account is Suspended</p>
+              </>
+            ) : (
+              <>
+                <p className="text-2xl font-black text-surface-900 mt-1">Day {dayNumber} <span className="text-sm font-semibold text-surface-400">/ 7</span></p>
+                <p className="text-xs font-bold text-surface-600 mt-0.5">
+                  {windowSales > 0 ? `${windowSales} Sales Delivered` : '0 Sales (Eviction Risk)'}
+                </p>
+              </>
+            )}
           </div>
         )}
       </div>

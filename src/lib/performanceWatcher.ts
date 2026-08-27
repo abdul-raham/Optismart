@@ -4,11 +4,12 @@ import { sendWebPush } from '@/lib/push'
 
 export async function checkDSAPerformanceWindows() {
   try {
-    // 1. Fetch active DSAs
+    // 1. Fetch active DSAs (skip suspended accounts)
     const { data: dsas, error } = await supabase
       .from('users')
       .select('*')
       .eq('role', 'dsa')
+      .eq('status', 'active')
 
     if (error || !dsas) return
 

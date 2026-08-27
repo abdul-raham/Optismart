@@ -135,7 +135,7 @@ export function AdminUsers() {
     let matchesStatus = true
     if (statusFilter === 'active') matchesStatus = u.status === 'active'
     if (statusFilter === 'suspended') matchesStatus = u.status === 'suspended'
-    if (statusFilter === 'probation') matchesStatus = u.role === 'dsa' && (probationMap[u.id] === true || u.probation_approval_status === 'confirmed_probation')
+    if (statusFilter === 'probation') matchesStatus = u.role === 'dsa' && u.status === 'active' && (probationMap[u.id] === true || u.probation_approval_status === 'confirmed_probation')
 
     return matchesSearch && matchesRole && matchesStatus
   })
@@ -207,9 +207,10 @@ export function AdminUsers() {
         <div className={`grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 ${searchParams.get('highlight') ? 'animate-feature-glow p-2 rounded-2xl border border-brand-500' : ''}`}>
           <AnimatePresence>
             {filteredUsers.map(u => {
-              const isOnProbation = u.role === 'dsa' && probationMap[u.id] && u.probation_approval_status !== 'waived'
-              const isConfirmedProbation = u.probation_approval_status === 'confirmed_probation'
-              const isProbationWaived = u.probation_approval_status === 'waived'
+              const isActiveDSA = u.role === 'dsa' && u.status === 'active'
+              const isOnProbation = isActiveDSA && probationMap[u.id] && u.probation_approval_status !== 'waived'
+              const isConfirmedProbation = isActiveDSA && u.probation_approval_status === 'confirmed_probation'
+              const isProbationWaived = isActiveDSA && u.probation_approval_status === 'waived'
 
               return (
                 <motion.div
