@@ -350,47 +350,23 @@ export function UserDetail() {
                 {user.role.replace('_', ' ')}
               </span>
 
-              {/* DSA-Specific Probation Badges & Admin Controls */}
+              {/* DSA-Specific Probation Status Pill */}
               {user.role === 'dsa' && (
                 user.probation_approval_status === 'confirmed_probation' ? (
                   <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-rose-100 text-rose-800 border border-rose-300 flex items-center gap-1">
-                    <AlertTriangle className="w-3.5 h-3.5 text-rose-600" /> On Confirmed Probation ({deliveredThisMonth} of 20 Delivered)
+                    <AlertTriangle className="w-3.5 h-3.5 text-rose-600" /> Confirmed Probation
                   </span>
                 ) : user.probation_approval_status === 'waived' ? (
                   <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-cyan-100 text-cyan-800 border border-cyan-300 flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-cyan-600" /> Probation Waived ({deliveredThisMonth} Delivered)
+                    <CheckCircle2 className="w-3.5 h-3.5 text-cyan-600" /> Target Waived
                   </span>
                 ) : isOnProbation ? (
-                  <div className="flex items-center gap-1.5 flex-wrap">
-                    <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
-                      <AlertTriangle className="w-3.5 h-3.5 text-amber-600" /> Pending Review — {deliveredThisMonth} of 20 Target Orders Delivered
-                    </span>
-                    {(currentRole === 'admin' || currentRole === 'super_admin') && (
-                      <>
-                        <button
-                          onClick={async () => {
-                            await supabase.from('users').update({ probation_approval_status: 'confirmed_probation' }).eq('id', user.id)
-                            setUser(prev => prev ? { ...prev, probation_approval_status: 'confirmed_probation' } : null)
-                          }}
-                          className="text-xs font-bold text-rose-700 bg-rose-50 hover:bg-rose-100 px-2 py-1 rounded-lg border border-rose-200 transition-colors"
-                        >
-                          Confirm Probation
-                        </button>
-                        <button
-                          onClick={async () => {
-                            await supabase.from('users').update({ probation_approval_status: 'waived' }).eq('id', user.id)
-                            setUser(prev => prev ? { ...prev, probation_approval_status: 'waived' } : null)
-                          }}
-                          className="text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 rounded-lg border border-emerald-200 transition-colors"
-                        >
-                          Waive Target
-                        </button>
-                      </>
-                    )}
-                  </div>
+                  <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-amber-100 text-amber-800 border border-amber-300 flex items-center gap-1">
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-600" /> Under Target ({deliveredThisMonth}/20 Sales)
+                  </span>
                 ) : (
                   <span className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
-                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Target Met ({deliveredThisMonth} Delivered)
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" /> Target Achieved ({deliveredThisMonth} Delivered)
                   </span>
                 )
               )}
@@ -434,6 +410,46 @@ export function UserDetail() {
           </div>
         )}
       </div>
+
+      {/* 🛡️ Dedicated Admin Probation Decision Panel 🛡️ */}
+      {user.role === 'dsa' && user.status === 'active' && isOnProbation && (currentRole === 'admin' || currentRole === 'super_admin') && (
+        <div className="glass-card p-5 border-2 border-amber-300/90 bg-amber-50/60 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
+          <div className="flex items-start gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold shrink-0 shadow-xs">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-amber-950">
+                Monthly Target Review ({deliveredThisMonth} of 20 Delivered Orders)
+              </h3>
+              <p className="text-xs text-amber-800 mt-0.5 font-medium">
+                This agent has delivered {deliveredThisMonth} orders this month. As an admin, select an action below:
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0 w-full md:w-auto">
+            <button
+              onClick={async () => {
+                await supabase.from('users').update({ probation_approval_status: 'confirmed_probation' }).eq('id', user.id)
+                setUser(prev => prev ? { ...prev, probation_approval_status: 'confirmed_probation' } : null)
+              }}
+              className="h-10 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 flex-1 md:flex-none"
+            >
+              <AlertTriangle className="w-4 h-4" /> Confirm Probation
+            </button>
+            <button
+              onClick={async () => {
+                await supabase.from('users').update({ probation_approval_status: 'waived' }).eq('id', user.id)
+                setUser(prev => prev ? { ...prev, probation_approval_status: 'waived' } : null)
+              }}
+              className="h-10 px-4 rounded-xl border border-emerald-300 bg-white hover:bg-emerald-50 text-emerald-800 text-xs font-bold transition-all flex items-center justify-center gap-1.5 flex-1 md:flex-none shadow-2xs"
+            >
+              <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Waive Target Threshold
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* DSA Targets & Commission Config Form (DSA ONLY) */}
       {user.role === 'dsa' && (
