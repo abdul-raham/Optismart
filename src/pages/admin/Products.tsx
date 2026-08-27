@@ -1,4 +1,8 @@
+import { useState, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
+import { motion, AnimatePresence } from 'framer-motion'
+import { supabase } from '@/lib/supabase'
 import { Package, Plus, Search, Edit2, Trash2, X, RefreshCw, ExternalLink, Upload, Loader2, MapPin, AlertTriangle } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import type { Product } from '@/types'
@@ -6,7 +10,6 @@ import { CardGridSkeleton } from '@/components/shared/Skeletons'
 import { optismartCatalogProducts } from '@/data/optismartProducts'
 import { getProductImage } from '@/lib/productImages'
 import { optimizeImage, uploadProductImage } from '@/utils/imageUpload'
-
 import { useAuthStore } from '@/stores/authStore'
 
 export function AdminProducts() {
