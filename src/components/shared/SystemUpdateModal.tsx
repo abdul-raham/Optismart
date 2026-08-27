@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { Sparkles, CheckCircle2, Sliders, Clock, ShoppingBag, Calendar, BarChart3, ShieldCheck, X, ArrowRight, Package, TrendingUp, DollarSign } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 
-const CURRENT_RELEASE_VERSION = 'v3.0_aug_2026'
+const CURRENT_RELEASE_VERSION = 'v3.1_aug_2026'
 
 export function SystemUpdateModal() {
   const { user } = useAuthStore()
@@ -37,9 +37,23 @@ export function SystemUpdateModal() {
     {
       icon: Package,
       color: 'text-brand-600 bg-brand-50 border-brand-200',
-      title: '🏬 Multi-Branch Inventory & Stock Management System',
-      description: 'Track camera stock across multiple locations (Lagos HQ, Abuja Branch, PH Depot). Log Stock In, perform inter-branch Stock Transfers, and view stock movements audit logs.',
+      title: '🏬 Multi-Branch Inventory & Stock Control',
+      description: 'Track camera stock across multiple locations (Lagos HQ, Abuja Branch, PH Depot). Log Stock In, perform inter-branch Stock Transfers, and view stock movement audit logs.',
       route: '/app/admin/products'
+    },
+    {
+      icon: ShieldCheck,
+      color: 'text-emerald-600 bg-emerald-50 border-emerald-200',
+      title: '🛡️ Dedicated Admin Probation Review Panel',
+      description: 'Clean admin review card on DSA profiles for agents under the 20-order target. Confirm probation or waive targets with distinct, clear buttons.',
+      route: '/app/admin/users?highlight=probation'
+    },
+    {
+      icon: Clock,
+      color: 'text-amber-500 bg-amber-50 border-amber-200',
+      title: '⏳ Day 7 Eviction Action Prompt & Clock Pausing',
+      description: 'Automated Day 7 safety suspension with an unmissable Eviction Action Banner for admins to either Reset Window or Delete Account. Suspended accounts are automatically excluded from clock countdowns.',
+      route: '/app/admin/users?highlight=performance'
     },
     {
       icon: DollarSign,
@@ -49,32 +63,18 @@ export function SystemUpdateModal() {
       route: '/app/admin/expenses'
     },
     {
-      icon: ShieldCheck,
-      color: 'text-emerald-600 bg-emerald-50 border-emerald-200',
-      title: '🛡️ Admin Probation Confirmation & Waiver Workflow',
-      description: 'DSAs with under 20 sales enter a Pending Review state. Admins can formally click "Confirm Probation" to lock payouts or "Waive Probation" to maintain full active status.',
-      route: '/app/admin/users?highlight=probation'
-    },
-    {
-      icon: Clock,
-      color: 'text-amber-500 bg-amber-50 border-amber-200',
-      title: 'DSA 7-Day Performance Clock & Inactivity Pipeline',
-      description: 'Automated Day 4 warnings to agents, Day 5 underperformance alerts to admins, and Day 7 auto-suspension with direct deletion prompts & nullify options.',
-      route: '/app/admin/users?highlight=performance'
-    },
-    {
       icon: Sliders,
       color: 'text-indigo-500 bg-indigo-50 border-indigo-200',
-      title: 'Dedicated User Profile Workspace',
-      description: 'Clicking any user card opens a role-specific workspace (/app/admin/users/:userId) with custom targets, commission rate controls, and date-filtered historical reports.',
-      route: '/app/admin/users'
+      title: '📱 Clean Products Toolbar & Mobile Responsiveness',
+      description: 'Redesigned Products header with segmented tab bar, prominent search bar, and clean responsive toolbar across all admin pages.',
+      route: '/app/admin/products'
     },
     {
       icon: ShoppingBag,
       color: 'text-rose-500 bg-rose-50 border-rose-200',
-      title: 'Orders Page Sales Agent (DSA) Filter & Fulfillment Stock-Out',
-      description: 'Filter orders by Sales Agent. Marking orders DELIVERED automatically deducts camera inventory from branch locations and records stock movement.',
-      route: '/app/admin/orders?highlight=dsa-filter'
+      title: '📦 Order Fulfillment Stock-Out Integration',
+      description: 'Filter orders by Sales Agent. Marking orders DELIVERED automatically deducts camera inventory from selected branch locations.',
+      route: '/app/admin/orders'
     }
   ]
 
