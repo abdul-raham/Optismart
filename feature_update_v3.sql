@@ -145,14 +145,6 @@ BEGIN
     RAISE EXCEPTION 'Quantity must be greater than zero';
   END IF;
 
-  -- Auto-sync admin user to public.users if not present
-  IF auth.uid() IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.users WHERE id = auth.uid()) THEN
-    INSERT INTO public.users (id, email, full_name, role, status)
-    SELECT id, email, COALESCE(raw_user_meta_data->>'full_name', email), 'super_admin', 'active'
-    FROM auth.users WHERE id = auth.uid()
-    ON CONFLICT (id) DO NOTHING;
-  END IF;
-
   INSERT INTO public.product_inventory(product_id, location_id, quantity)
   VALUES (p_product_id, p_location_id, p_quantity)
   ON CONFLICT (product_id, location_id)
