@@ -61,6 +61,25 @@ CREATE UNIQUE INDEX IF NOT EXISTS stock_movements_one_order_stock_out ON public.
 INSERT INTO public.inventory_locations (name, address) VALUES ('Lagos HQ', 'Main Warehouse, Lagos')
 ON CONFLICT (name) DO NOTHING;
 
+-- Seed opening stock of 20 units at Lagos HQ for all products that currently have 0 stock
+DO $$
+DECLARE
+  v_lagos_id UUID;
+  v_prod RECORD;
+BEGIN
+  SELECT id INTO v_lagos_id FROM public.inventory_locations WHERE name = 'Lagos HQ' LIMIT 1;
+  IF v_lagos_id IS NOT NULL THEN
+    FOR v_prod IN SELECT id FROM public.products LOOP
+      INSERT INTO public.product_inventory (product_id, location_id, quantity)
+      VALUES (v_prod.id, v_lagos_id, 20)
+      ON CONFLICT (product_id, location_id) DO UPDATE SET
+        quantity = CASE WHEN product_inventory.quantity = 0 THEN 20 ELSE product_inventory.quantity END;
+
+      PERFORM public.refresh_product_stock(v_prod.id);
+    END LOOP;
+  END IF;
+END $$;
+
 -- 3. Robust Admin Helper Function (Checks public.users AND auth.users metadata)
 CREATE OR REPLACE FUNCTION public.is_admin_user(p_uid UUID DEFAULT auth.uid())
 RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER SET search_path = public AS $$

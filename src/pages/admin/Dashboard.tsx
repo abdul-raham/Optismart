@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { StatCard } from '@/components/shared/StatCard'
 import { OrderStatusBadge } from '@/components/shared/Badges'
 import { StatCardSkeleton, TableSkeleton } from '@/components/shared/Skeletons'
-import { ShoppingBag, Users, Banknote, Wrench, ArrowUpRight, Download, FileSpreadsheet, AlertTriangle, Clock } from 'lucide-react'
+import { ShoppingBag, Users, Banknote, Wrench, ArrowUpRight, Download, FileSpreadsheet, AlertTriangle, Clock, Plus } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { MobileDashboardNav } from '@/components/layout/MobileDashboardNav'
 import { exportToExcel, exportToCSV } from '@/utils/exportUtils'
@@ -13,6 +14,7 @@ import type { Order } from '@/types'
 
 export function AdminDashboard() {
   const { user } = useAuthStore()
+  const navigate = useNavigate()
   const isSuperAdmin = user?.role === 'super_admin'
 
   const [stats, setStats] = useState({
@@ -25,6 +27,7 @@ export function AdminDashboard() {
   })
   const [recentOrders, setRecentOrders] = useState<Order[]>([])
   const [outstandingOrders, setOutstandingOrders] = useState<Order[]>([])
+  const [lowStockProducts, setLowStockProducts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   const [allOrders, setAllOrders] = useState<Order[]>([])
@@ -37,6 +40,10 @@ export function AdminDashboard() {
       
       // Fetch Users for counts
       const { data: users } = await supabase.from('users').select('role, status')
+
+      // Fetch Low Stock Products (stock <= 5)
+      const { data: lowStock } = await supabase.from('products').select('id, name, stock_quantity').lte('stock_quantity', 5)
+      if (lowStock) setLowStockProducts(lowStock)
 
       if (orders) {
         const activeOrders = orders.filter(o => o.status !== 'cancelled')
@@ -130,6 +137,31 @@ export function AdminDashboard() {
           </button>
         </div>
       </div>
+
+      {/* 🚨 Low Stock Warning Alert Banner for Admin 🚨 */}
+      {lowStockProducts.length > 0 && (
+        <div className="rounded-2xl border-2 border-amber-300 bg-amber-50/90 p-4 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold shrink-0 shadow-xs">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="text-sm font-bold text-amber-950">
+                Low Inventory Warning ({lowStockProducts.length} Camera{lowStockProducts.length > 1 ? 's' : ''} at or below 5 units)
+              </h3>
+              <p className="text-xs text-amber-800 font-medium mt-0.5">
+                {lowStockProducts.map(p => `${p.name} (${p.stock_quantity} left)`).join(', ')}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => navigate(`/app/admin/products?action=stock_in&product_id=${lowStockProducts[0]?.id}`)}
+            className="btn-primary h-9 px-4 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shrink-0 flex items-center gap-1.5 shadow-xs transition-all"
+          >
+            <Plus className="w-3.5 h-3.5" /> Top Up Stock Now
+          </button>
+        </div>
+      )}
 
       {loading ? (
         <StatCardSkeleton count={4} />

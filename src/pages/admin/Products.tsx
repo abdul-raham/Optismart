@@ -1,8 +1,5 @@
-import { useState, useEffect } from 'react'
-import { createPortal } from 'react-dom'
-import { motion, AnimatePresence } from 'framer-motion'
-import { supabase } from '@/lib/supabase'
-import { Package, Plus, Search, Edit2, Trash2, X, RefreshCw, ExternalLink, Upload, Loader2, MapPin } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { Package, Plus, Search, Edit2, Trash2, X, RefreshCw, ExternalLink, Upload, Loader2, MapPin, AlertTriangle } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import type { Product } from '@/types'
 import { CardGridSkeleton } from '@/components/shared/Skeletons'
@@ -15,6 +12,7 @@ import { useAuthStore } from '@/stores/authStore'
 export function AdminProducts() {
   const { user } = useAuthStore()
   const isSuperAdmin = user?.role === 'super_admin'
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
@@ -35,7 +33,7 @@ export function AdminProducts() {
   const [stockInForm, setStockInForm] = useState({
     product_id: '',
     location_id: '',
-    quantity: 10,
+    quantity: 20,
     notes: '',
   })
 
@@ -93,10 +91,37 @@ export function AdminProducts() {
     image_url: '',
   })
 
+  const openStockInForProduct = (productId: string, locationId: string = '') => {
+    const defaultLocId = locationId || (locations.length > 0 ? locations[0].id : '')
+    setStockInForm({
+      product_id: productId,
+      location_id: defaultLocId,
+      quantity: 20,
+      notes: 'Low stock top-up addition',
+    })
+    setIsStockInModalOpen(true)
+  }
+
   useEffect(() => {
     fetchProducts()
     fetchInventoryData()
   }, [])
+
+  useEffect(() => {
+    const action = searchParams.get('action')
+    const productId = searchParams.get('product_id')
+    const locationId = searchParams.get('location_id')
+
+    if (action === 'stock_in' && productId) {
+      openStockInForProduct(productId, locationId || '')
+      searchParams.delete('action')
+      searchParams.delete('product_id')
+      searchParams.delete('location_id')
+      setSearchParams(searchParams, { replace: true })
+    }
+  }, [searchParams, locations])
+
+  const lowStockProducts = products.filter(p => p.stock_quantity <= (p.min_stock_level || 5))
 
   const fetchInventoryData = async () => {
     try {
@@ -460,6 +485,31 @@ export function AdminProducts() {
         </div>
       </div>
 
+      {/* 🚨 Low Stock Warning Banner for Admin 🚨 */}
+      {lowStockProducts.length > 0 && (
+        <div className="rounded-2xl border-2 border-amber-300 bg-amber-50/90 p-4 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold shrink-0 shadow-xs">
+              <AlertTriangle className="w-4 h-4" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-amber-950 flex items-center gap-2">
+                Low Stock Warning ({lowStockProducts.length} Product{lowStockProducts.length > 1 ? 's' : ''} at or below 5 units)
+              </h4>
+              <p className="text-xs text-amber-800 font-medium mt-0.5">
+                {lowStockProducts.map(p => `${p.name} (${p.stock_quantity} left)`).join(', ')}
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => openStockInForProduct(lowStockProducts[0].id)}
+            className="btn-primary h-9 px-4 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shrink-0 flex items-center gap-1.5 shadow-xs"
+          >
+            <Plus className="w-3.5 h-3.5" /> Top Up Low Stock Now
+          </button>
+        </div>
+      )}
+
       {activeTab === 'products' ? (
         loading ? (
           <CardGridSkeleton count={6} />
@@ -555,11 +605,20 @@ export function AdminProducts() {
 
                 <div className="pt-3 border-t border-surface-100 flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${product.stock_quantity <= product.min_stock_level ? 'bg-danger-500 animate-pulse' : 'bg-success-500'}`} />
-                    <span className={`text-xs font-semibold ${product.stock_quantity <= product.min_stock_level ? 'text-danger-600' : 'text-surface-600'}`}>
+                    <span className={`w-2 h-2 rounded-full ${product.stock_quantity <= (product.min_stock_level || 5) ? 'bg-danger-500 animate-pulse' : 'bg-success-500'}`} />
+                    <span className={`text-xs font-semibold ${product.stock_quantity <= (product.min_stock_level || 5) ? 'text-danger-600 font-bold' : 'text-surface-600'}`}>
                       {product.stock_quantity} in stock
                     </span>
                   </div>
+                  {product.stock_quantity <= (product.min_stock_level || 5) && (
+                    <button
+                      onClick={() => openStockInForProduct(product.id)}
+                      className="btn-outline text-[11px] font-bold h-7 px-2.5 bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100 flex items-center gap-1 transition-all rounded-lg"
+                      title="Click to open Stock In top-up modal for this product"
+                    >
+                      <Plus className="w-3 h-3 text-rose-600" /> Top Up Stock
+                    </button>
+                  )}
                 </div>
               </motion.div>
             ))}
@@ -695,11 +754,22 @@ export function AdminProducts() {
                           const qty = item?.quantity || 0
                           return (
                             <td key={loc.id} className="py-3.5 px-6 text-center">
-                              <span className={`px-2.5 py-1 rounded-lg text-xs font-extrabold ${
-                                qty <= 2 ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-surface-100 text-surface-800'
-                              }`}>
-                                {qty} units
-                              </span>
+                              <div className="flex items-center justify-center gap-1.5">
+                                <span className={`px-2.5 py-1 rounded-lg text-xs font-extrabold ${
+                                  qty <= 5 ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-surface-100 text-surface-800'
+                                }`}>
+                                  {qty} units
+                                </span>
+                                {qty <= 5 && (
+                                  <button
+                                    onClick={() => openStockInForProduct(p.id, loc.id)}
+                                    className="p-1 rounded-lg text-rose-600 hover:bg-rose-100 transition-colors"
+                                    title={`Top Up ${p.name} at ${loc.name}`}
+                                  >
+                                    <Plus className="w-3.5 h-3.5 text-rose-600" />
+                                  </button>
+                                )}
+                              </div>
                             </td>
                           )
                         })}
