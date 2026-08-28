@@ -14,6 +14,7 @@ import { resetDSAPerformanceWindow } from '@/lib/performanceWatcher'
 
 interface SystemUser {
   id: string
+  auth_id?: string | null
   email: string
   full_name: string
   phone?: string
@@ -29,6 +30,11 @@ interface SystemUser {
   eviction_alert_day5_sent?: boolean
   probation_status?: string
   probation_approval_status?: 'none' | 'pending_confirmation' | 'confirmed_probation' | 'waived'
+  can_manage_inventory?: boolean
+  can_manage_users?: boolean
+  can_manage_expenses?: boolean
+  can_view_reports?: boolean
+  can_delete_records?: boolean
 }
 
 export function UserDetail() {
@@ -47,6 +53,18 @@ export function UserDetail() {
   const [targetOrders, setTargetOrders] = useState(30)
   const [targetLeads, setTargetLeads] = useState(10)
   const [commissionRate, setCommissionRate] = useState(0)
+
+  // Admin Granular Permissions State
+  const [canManageInventory, setCanManageInventory] = useState(true)
+  const [canManageUsers, setCanManageUsers] = useState(true)
+  const [canManageExpenses, setCanManageExpenses] = useState(true)
+  const [canViewReports, setCanViewReports] = useState(true)
+  const [canDeleteRecords, setCanDeleteRecords] = useState(false)
+  const [savingPermissions, setSavingPermissions] = useState(false)
+
+  // Admin Activity State
+  const [adminStockMovements, setAdminStockMovements] = useState<any[]>([])
+  const [adminExpenses, setAdminExpenses] = useState<any[]>([])
 
   // User Activity State & Filters
   const [startDate, setStartDate] = useState('')
@@ -78,6 +96,12 @@ export function UserDetail() {
       setTargetLeads(userData.expected_leads_target ?? 10)
       setCommissionRate(userData.commission_per_camera ?? 0)
 
+      setCanManageInventory(userData.can_manage_inventory ?? true)
+      setCanManageUsers(userData.can_manage_users ?? true)
+      setCanManageExpenses(userData.can_manage_expenses ?? true)
+      setCanViewReports(userData.can_view_reports ?? true)
+      setCanDeleteRecords(userData.can_delete_records ?? false)
+
       // Fetch Orders
       let ordersQuery = supabase
         .from('orders')
@@ -90,6 +114,38 @@ export function UserDetail() {
 
       const { data: orders } = await ordersQuery
       if (orders) setUserOrders(orders)
+
+      // Fetch Admin Activity Logs
+      if (userData.role === 'admin' || userData.role === 'super_admin') {
+        const authId = userData.auth_id || userData.id
+        try {
+          let movementsQuery = supabase
+            .from('stock_movements')
+            .select('*, product:products(name), from_location:inventory_locations!from_location_id(name), to_location:inventory_locations!to_location_id(name)')
+            .or(`created_by_auth_id.eq.${authId},created_by_auth_id.eq.${userData.id}`)
+            .order('created_at', { ascending: false })
+
+          if (startDate) movementsQuery = movementsQuery.gte('created_at', `${startDate}T00:00:00.000Z`)
+          if (endDate) movementsQuery = movementsQuery.lte('created_at', `${endDate}T23:59:59.999Z`)
+
+          const { data: movements } = await movementsQuery
+          if (movements) setAdminStockMovements(movements)
+        } catch (_) {}
+
+        try {
+          let expQuery = supabase
+            .from('expenses')
+            .select('*')
+            .or(`posted_by.eq.${authId},posted_by.eq.${userData.id}`)
+            .order('created_at', { ascending: false })
+
+          if (startDate) expQuery = expQuery.gte('expense_date', startDate)
+          if (endDate) expQuery = expQuery.lte('expense_date', endDate)
+
+          const { data: exps } = await expQuery
+          if (exps) setAdminExpenses(exps)
+        } catch (_) {}
+      }
 
       // Fetch DSA Leads & Commissions
       if (userData.role === 'dsa') {
@@ -141,6 +197,41 @@ export function UserDetail() {
       console.error('Error fetching user detail:', err)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleSavePermissions = async () => {
+    if (!user) return
+    setSavingPermissions(true)
+    try {
+      const { error } = await supabase
+        .from('users')
+        .update({
+          can_manage_inventory: canManageInventory,
+          can_manage_users: canManageUsers,
+          can_manage_expenses: canManageExpenses,
+          can_view_reports: canViewReports,
+          can_delete_records: canDeleteRecords
+        })
+        .eq('id', user.id)
+
+      if (error) throw error
+
+      setUser(prev => prev ? {
+        ...prev,
+        can_manage_inventory: canManageInventory,
+        can_manage_users: canManageUsers,
+        can_manage_expenses: canManageExpenses,
+        can_view_reports: canViewReports,
+        can_delete_records: canDeleteRecords
+      } : null)
+
+      alert('Admin access permissions updated successfully!')
+    } catch (err: any) {
+      console.error('Error saving permissions:', err)
+      alert(err.message || 'Failed to update admin permissions')
+    } finally {
+      setSavingPermissions(false)
     }
   }
 
@@ -411,42 +502,106 @@ export function UserDetail() {
         )}
       </div>
 
-      {/* 🛡️ Dedicated Admin Probation Decision Panel 🛡️ */}
-      {user.role === 'dsa' && user.status === 'active' && isOnProbation && (currentRole === 'admin' || currentRole === 'super_admin') && (
-        <div className="glass-card p-5 border-2 border-amber-300/90 bg-amber-50/60 rounded-2xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4 shadow-sm">
-          <div className="flex items-start gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold shrink-0 shadow-xs">
-              <AlertTriangle className="w-5 h-5" />
-            </div>
+      {/* Super Admin Access Control Panel (Admin & Super Admin Users) */}
+      {(user.role === 'admin' || user.role === 'super_admin') && (
+        <div className="glass-card p-6 border border-brand-200/80 bg-brand-50/20">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
             <div>
-              <h3 className="text-sm font-bold text-amber-950">
-                Monthly Target Review ({deliveredThisMonth} of 20 Delivered Orders)
+              <h3 className="text-base font-bold text-surface-900 flex items-center gap-2">
+                <Shield className="w-5 h-5 text-brand-600" /> Administrative Access & Granular Permissions
               </h3>
-              <p className="text-xs text-amber-800 mt-0.5 font-medium">
-                This agent has delivered {deliveredThisMonth} orders this month. As an admin, select an action below:
+              <p className="text-xs text-surface-500 mt-1 font-medium">
+                {currentRole === 'super_admin'
+                  ? 'As Super Admin, configure feature module access and operation rights for this administrator.'
+                  : 'View active portal management permissions assigned to this administrator.'}
               </p>
             </div>
+            {currentRole === 'super_admin' && (
+              <button
+                onClick={handleSavePermissions}
+                disabled={savingPermissions}
+                className="btn-primary h-10 px-5 text-xs font-bold flex items-center gap-2 shrink-0 shadow-brand"
+              >
+                <Save className="w-4 h-4" /> {savingPermissions ? 'Saving...' : 'Save Access Permissions'}
+              </button>
+            )}
           </div>
 
-          <div className="flex items-center gap-2 shrink-0 w-full md:w-auto">
-            <button
-              onClick={async () => {
-                await supabase.from('users').update({ probation_approval_status: 'confirmed_probation' }).eq('id', user.id)
-                setUser(prev => prev ? { ...prev, probation_approval_status: 'confirmed_probation' } : null)
-              }}
-              className="h-10 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold transition-all shadow-xs flex items-center justify-center gap-1.5 flex-1 md:flex-none"
-            >
-              <AlertTriangle className="w-4 h-4" /> Confirm Probation
-            </button>
-            <button
-              onClick={async () => {
-                await supabase.from('users').update({ probation_approval_status: 'waived' }).eq('id', user.id)
-                setUser(prev => prev ? { ...prev, probation_approval_status: 'waived' } : null)
-              }}
-              className="h-10 px-4 rounded-xl border border-emerald-300 bg-white hover:bg-emerald-50 text-emerald-800 text-xs font-bold transition-all flex items-center justify-center gap-1.5 flex-1 md:flex-none shadow-2xs"
-            >
-              <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Waive Target Threshold
-            </button>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Permission 1: Inventory */}
+            <div className="p-4 rounded-xl border border-surface-200 bg-white shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-surface-900 block">Inventory & Stock Control</span>
+                <span className="text-[11px] text-surface-500 block mt-0.5">Stock In, Transfers, & Locations</span>
+              </div>
+              <input
+                type="checkbox"
+                disabled={currentRole !== 'super_admin'}
+                checked={canManageInventory}
+                onChange={e => setCanManageInventory(e.target.checked)}
+                className="w-5 h-5 rounded text-brand-600 focus:ring-brand-500 border-surface-300 cursor-pointer disabled:cursor-not-allowed"
+              />
+            </div>
+
+            {/* Permission 2: Users */}
+            <div className="p-4 rounded-xl border border-surface-200 bg-white shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-surface-900 block">User & Team Management</span>
+                <span className="text-[11px] text-surface-500 block mt-0.5">Roles, Probation, Reset Window</span>
+              </div>
+              <input
+                type="checkbox"
+                disabled={currentRole !== 'super_admin'}
+                checked={canManageUsers}
+                onChange={e => setCanManageUsers(e.target.checked)}
+                className="w-5 h-5 rounded text-brand-600 focus:ring-brand-500 border-surface-300 cursor-pointer disabled:cursor-not-allowed"
+              />
+            </div>
+
+            {/* Permission 3: Expenses */}
+            <div className="p-4 rounded-xl border border-surface-200 bg-white shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-surface-900 block">Expenses & Ad Spend</span>
+                <span className="text-[11px] text-surface-500 block mt-0.5">Log Expenses & DSA Spend</span>
+              </div>
+              <input
+                type="checkbox"
+                disabled={currentRole !== 'super_admin'}
+                checked={canManageExpenses}
+                onChange={e => setCanManageExpenses(e.target.checked)}
+                className="w-5 h-5 rounded text-brand-600 focus:ring-brand-500 border-surface-300 cursor-pointer disabled:cursor-not-allowed"
+              />
+            </div>
+
+            {/* Permission 4: Financial Reports */}
+            <div className="p-4 rounded-xl border border-surface-200 bg-white shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-surface-900 block">Reports & Financials Access</span>
+                <span className="text-[11px] text-surface-500 block mt-0.5">Revenue, P&L, & Analytics</span>
+              </div>
+              <input
+                type="checkbox"
+                disabled={currentRole !== 'super_admin'}
+                checked={canViewReports}
+                onChange={e => setCanViewReports(e.target.checked)}
+                className="w-5 h-5 rounded text-brand-600 focus:ring-brand-500 border-surface-300 cursor-pointer disabled:cursor-not-allowed"
+              />
+            </div>
+
+            {/* Permission 5: Delete Records */}
+            <div className="p-4 rounded-xl border border-surface-200 bg-white shadow-xs flex items-center justify-between">
+              <div>
+                <span className="text-xs font-bold text-rose-900 block">Delete System Records</span>
+                <span className="text-[11px] text-rose-600/80 block mt-0.5">Orders, Users, & Products</span>
+              </div>
+              <input
+                type="checkbox"
+                disabled={currentRole !== 'super_admin'}
+                checked={canDeleteRecords}
+                onChange={e => setCanDeleteRecords(e.target.checked)}
+                className="w-5 h-5 rounded text-rose-600 focus:ring-rose-500 border-surface-300 cursor-pointer disabled:cursor-not-allowed"
+              />
+            </div>
           </div>
         </div>
       )}
@@ -500,64 +655,105 @@ export function UserDetail() {
 
       {/* Role-Specific Activity KPI Summary Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="glass-card p-4">
-          <span className="text-xs font-bold text-surface-500 uppercase tracking-wider flex items-center gap-1">
-            <ShoppingBag className="w-4 h-4 text-brand-600" /> {user.role === 'admin' || user.role === 'super_admin' ? 'Orders Processed' : 'Total Orders'}
-          </span>
-          <p className="text-2xl font-black text-surface-900 mt-2">{userOrders.length}</p>
-        </div>
+        {user.role === 'admin' || user.role === 'super_admin' ? (
+          <>
+            <div className="glass-card p-4">
+              <span className="text-xs font-bold text-surface-500 uppercase tracking-wider flex items-center gap-1">
+                <Package className="w-4 h-4 text-brand-600" /> Stock Movements Authored
+              </span>
+              <p className="text-2xl font-black text-surface-900 mt-2">{adminStockMovements.length}</p>
+            </div>
 
-        <div className="glass-card p-4">
-          <span className="text-xs font-bold text-surface-500 uppercase tracking-wider flex items-center gap-1">
-            <CheckCircle2 className="w-4 h-4 text-emerald-600" /> {user.role === 'installer' ? 'Completed Jobs' : 'Delivered Orders'}
-          </span>
-          <p className="text-2xl font-black text-surface-900 mt-2">
-            {user.role === 'installer' ? userJobs.filter(j => j.status === 'completed').length : userOrders.filter(o => o.status === 'delivered').length}
-          </p>
-        </div>
+            <div className="glass-card p-4">
+              <span className="text-xs font-bold text-surface-500 uppercase tracking-wider flex items-center gap-1">
+                <Banknote className="w-4 h-4 text-emerald-600" /> Expenses Logged
+              </span>
+              <p className="text-2xl font-black text-surface-900 mt-2">{adminExpenses.length}</p>
+            </div>
 
-        <div className="glass-card p-4">
-          <span className="text-xs font-bold text-surface-500 uppercase tracking-wider flex items-center gap-1">
-            <DollarSign className="w-4 h-4 text-cyan-600" /> Total Sales Value
-          </span>
-          <p className="text-2xl font-black text-surface-900 mt-2">
-            {formatCurrency(userOrders.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + Number(o.total_amount || 0), 0))}
-          </p>
-        </div>
+            <div className="glass-card p-4">
+              <span className="text-xs font-bold text-surface-500 uppercase tracking-wider flex items-center gap-1">
+                <ShoppingBag className="w-4 h-4 text-cyan-600" /> Orders Handled
+              </span>
+              <p className="text-2xl font-black text-surface-900 mt-2">{userOrders.length}</p>
+            </div>
 
-        {/* Role-Specific Fourth Card */}
-        <div className="glass-card p-4">
-          {user.role === 'dsa' && (
-            <>
+            <div className="glass-card p-4">
+              <span className="text-xs font-bold text-surface-500 uppercase tracking-wider flex items-center gap-1">
+                <Shield className="w-4 h-4 text-indigo-600" /> Privilege Level
+              </span>
+              <p className="text-sm font-bold text-surface-900 mt-2">
+                {user.role === 'super_admin' ? 'Super Admin (Full)' : 'Admin (Configured)'}
+              </p>
+            </div>
+          </>
+        ) : user.role === 'installer' ? (
+          <>
+            <div className="glass-card p-4">
+              <span className="text-xs font-bold text-surface-500 uppercase tracking-wider flex items-center gap-1">
+                <Wrench className="w-4 h-4 text-brand-600" /> Total Jobs Assigned
+              </span>
+              <p className="text-2xl font-black text-surface-900 mt-2">{userJobs.length}</p>
+            </div>
+
+            <div className="glass-card p-4">
+              <span className="text-xs font-bold text-surface-500 uppercase tracking-wider flex items-center gap-1">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Completed Jobs
+              </span>
+              <p className="text-2xl font-black text-surface-900 mt-2">{userJobs.filter(j => j.status === 'completed').length}</p>
+            </div>
+
+            <div className="glass-card p-4">
+              <span className="text-xs font-bold text-surface-500 uppercase tracking-wider flex items-center gap-1">
+                <DollarSign className="w-4 h-4 text-cyan-600" /> Installation Earnings
+              </span>
+              <p className="text-2xl font-black text-surface-900 mt-2">
+                {formatCurrency(userJobs.filter(j => j.status === 'completed').reduce((sum, j) => sum + Number(j.commission_amount || j.installer_cut || 0), 0))}
+              </p>
+            </div>
+
+            <div className="glass-card p-4">
+              <span className="text-xs font-bold text-surface-500 uppercase tracking-wider flex items-center gap-1">
+                <Users className="w-4 h-4 text-indigo-600" /> Role
+              </span>
+              <p className="text-sm font-bold text-surface-900 mt-2">Certified Installer</p>
+            </div>
+          </>
+        ) : (
+          <>
+            <div className="glass-card p-4">
+              <span className="text-xs font-bold text-surface-500 uppercase tracking-wider flex items-center gap-1">
+                <ShoppingBag className="w-4 h-4 text-brand-600" /> Total Orders
+              </span>
+              <p className="text-2xl font-black text-surface-900 mt-2">{userOrders.length}</p>
+            </div>
+
+            <div className="glass-card p-4">
+              <span className="text-xs font-bold text-surface-500 uppercase tracking-wider flex items-center gap-1">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" /> Delivered Orders
+              </span>
+              <p className="text-2xl font-black text-surface-900 mt-2">{userOrders.filter(o => o.status === 'delivered').length}</p>
+            </div>
+
+            <div className="glass-card p-4">
+              <span className="text-xs font-bold text-surface-500 uppercase tracking-wider flex items-center gap-1">
+                <DollarSign className="w-4 h-4 text-cyan-600" /> Total Sales Value
+              </span>
+              <p className="text-2xl font-black text-surface-900 mt-2">
+                {formatCurrency(userOrders.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + Number(o.total_amount || 0), 0))}
+              </p>
+            </div>
+
+            <div className="glass-card p-4">
               <span className="text-xs font-bold text-surface-500 uppercase tracking-wider flex items-center gap-1">
                 <Banknote className="w-4 h-4 text-amber-600" /> Commissions Earned
               </span>
               <p className="text-2xl font-black text-surface-900 mt-2">
                 {formatCurrency(userCommissions.reduce((sum, c) => sum + Number(c.amount || 0), 0))}
               </p>
-            </>
-          )}
-
-          {user.role === 'installer' && (
-            <>
-              <span className="text-xs font-bold text-surface-500 uppercase tracking-wider flex items-center gap-1">
-                <Wrench className="w-4 h-4 text-amber-600" /> Installer Earnings
-              </span>
-              <p className="text-2xl font-black text-surface-900 mt-2">
-                {formatCurrency(userJobs.filter(j => j.status === 'completed').reduce((sum, j) => sum + Number(j.installer_cut || 0), 0))}
-              </p>
-            </>
-          )}
-
-          {(user.role === 'admin' || user.role === 'super_admin') && (
-            <>
-              <span className="text-xs font-bold text-surface-500 uppercase tracking-wider flex items-center gap-1">
-                <Shield className="w-4 h-4 text-brand-600" /> Administrative Access
-              </span>
-              <p className="text-sm font-bold text-surface-900 mt-2">Full Portal Permissions</p>
-            </>
-          )}
-        </div>
+            </div>
+          </>
+        )}
       </div>
 
       {/* DSA Ad Spend KPI Card (DSA ONLY) */}
@@ -616,51 +812,144 @@ export function UserDetail() {
         </div>
       </div>
 
-      {/* User Orders Table */}
-      <div className="glass-card overflow-hidden">
-        <div className="p-5 border-b border-surface-100 flex items-center justify-between">
-          <h3 className="font-bold text-surface-900 flex items-center gap-2">
-            <ShoppingBag className="w-5 h-5 text-brand-600" /> User Orders ({userOrders.length})
-          </h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[720px] text-left text-xs">
-            <thead>
-              <tr className="bg-surface-50/50 border-b border-surface-100 font-bold uppercase tracking-wider text-surface-500">
-                <th className="py-3 px-5">Order #</th>
-                <th className="py-3 px-5">Customer</th>
-                <th className="py-3 px-5">Date</th>
-                <th className="py-3 px-5">Qty</th>
-                <th className="py-3 px-5 text-right">Total Amount</th>
-                <th className="py-3 px-5 text-center">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-surface-100 font-medium">
-              {userOrders.map(o => (
-                <tr key={o.id} className="hover:bg-surface-50">
-                  <td className="py-3 px-5 font-bold text-brand-600">{o.order_number}</td>
-                  <td className="py-3 px-5">{o.customer_name}</td>
-                  <td className="py-3 px-5 text-surface-500">{formatDate(o.created_at)}</td>
-                  <td className="py-3 px-5">{o.quantity}</td>
-                  <td className="py-3 px-5 text-right font-bold">{formatCurrency(o.total_amount)}</td>
-                  <td className="py-3 px-5 text-center">
-                    <span className={`px-2.5 py-0.5 rounded text-[10px] font-extrabold uppercase ${
-                      o.status === 'delivered' ? 'bg-emerald-100 text-emerald-800' :
-                      o.status === 'cancelled' ? 'bg-rose-100 text-rose-800' :
-                      'bg-amber-100 text-amber-800'
-                    }`}>
-                      {o.status}
-                    </span>
-                  </td>
+      {/* Admin Specific Tables (Admin / Super Admin) */}
+      {(user.role === 'admin' || user.role === 'super_admin') && (
+        <>
+          {/* Stock Movements Logged by Admin */}
+          <div className="glass-card overflow-hidden">
+            <div className="p-5 border-b border-surface-100 flex items-center justify-between">
+              <h3 className="font-bold text-surface-900 flex items-center gap-2">
+                <Package className="w-5 h-5 text-brand-600" /> Inventory Movements Recorded ({adminStockMovements.length})
+              </h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[720px] text-left text-xs">
+                <thead>
+                  <tr className="bg-surface-50/50 border-b border-surface-100 font-bold uppercase tracking-wider text-surface-500">
+                    <th className="py-3 px-5">Date</th>
+                    <th className="py-3 px-5">Type</th>
+                    <th className="py-3 px-5">Product</th>
+                    <th className="py-3 px-5 text-center">Qty</th>
+                    <th className="py-3 px-5">Location(s)</th>
+                    <th className="py-3 px-5">Notes</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-surface-100 font-medium">
+                  {adminStockMovements.map(m => (
+                    <tr key={m.id} className="hover:bg-surface-50">
+                      <td className="py-3 px-5 text-surface-500">{formatDate(m.created_at)}</td>
+                      <td className="py-3 px-5">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold uppercase ${
+                          m.movement_type === 'stock_in' ? 'bg-emerald-100 text-emerald-800' :
+                          m.movement_type === 'transfer' ? 'bg-cyan-100 text-cyan-800' :
+                          'bg-amber-100 text-amber-800'
+                        }`}>
+                          {m.movement_type.replace('_', ' ')}
+                        </span>
+                      </td>
+                      <td className="py-3 px-5 font-bold text-surface-900">{m.product?.name || 'Camera Unit'}</td>
+                      <td className="py-3 px-5 text-center font-bold">{m.quantity}</td>
+                      <td className="py-3 px-5 text-surface-600">
+                        {m.movement_type === 'transfer'
+                          ? `${m.from_location?.name || 'Origin'} ➔ ${m.to_location?.name || 'Destination'}`
+                          : m.to_location?.name || m.from_location?.name || 'Lagos HQ'}
+                      </td>
+                      <td className="py-3 px-5 text-surface-500">{m.notes || '—'}</td>
+                    </tr>
+                  ))}
+                  {adminStockMovements.length === 0 && (
+                    <tr><td colSpan={6} className="py-8 text-center text-surface-400 font-semibold">No stock movements recorded by this admin.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Expenses Posted by Admin */}
+          <div className="glass-card overflow-hidden">
+            <div className="p-5 border-b border-surface-100 flex items-center justify-between">
+              <h3 className="font-bold text-surface-900 flex items-center gap-2">
+                <Banknote className="w-5 h-5 text-emerald-600" /> Operational Expenses Logged ({adminExpenses.length})
+              </h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[650px] text-left text-xs">
+                <thead>
+                  <tr className="bg-surface-50/50 border-b border-surface-100 font-bold uppercase tracking-wider text-surface-500">
+                    <th className="py-3 px-5">Date</th>
+                    <th className="py-3 px-5">Description</th>
+                    <th className="py-3 px-5">Category</th>
+                    <th className="py-3 px-5 text-right">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-surface-100 font-medium">
+                  {adminExpenses.map(e => (
+                    <tr key={e.id} className="hover:bg-surface-50">
+                      <td className="py-3 px-5 text-surface-500">{formatDate(e.expense_date)}</td>
+                      <td className="py-3 px-5 font-bold text-surface-900">{e.description}</td>
+                      <td className="py-3 px-5">
+                        <span className="badge-gray uppercase text-[10px] tracking-wider">{e.category}</span>
+                      </td>
+                      <td className="py-3 px-5 text-right font-bold text-brand-700">{formatCurrency(e.amount)}</td>
+                    </tr>
+                  ))}
+                  {adminExpenses.length === 0 && (
+                    <tr><td colSpan={4} className="py-8 text-center text-surface-400 font-semibold">No expense entries posted by this admin.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* DSA User Orders Table (DSA ONLY) */}
+      {user.role === 'dsa' && (
+        <div className="glass-card overflow-hidden">
+          <div className="p-5 border-b border-surface-100 flex items-center justify-between">
+            <h3 className="font-bold text-surface-900 flex items-center gap-2">
+              <ShoppingBag className="w-5 h-5 text-brand-600" /> User Orders ({userOrders.length})
+            </h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-left text-xs">
+              <thead>
+                <tr className="bg-surface-50/50 border-b border-surface-100 font-bold uppercase tracking-wider text-surface-500">
+                  <th className="py-3 px-5">Order #</th>
+                  <th className="py-3 px-5">Customer</th>
+                  <th className="py-3 px-5">Date</th>
+                  <th className="py-3 px-5">Qty</th>
+                  <th className="py-3 px-5 text-right">Total Amount</th>
+                  <th className="py-3 px-5 text-center">Status</th>
                 </tr>
-              ))}
-              {userOrders.length === 0 && (
-                <tr><td colSpan={6} className="py-8 text-center text-surface-400 font-semibold">No orders recorded for this user.</td></tr>
-              )}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-surface-100 font-medium">
+                {userOrders.map(o => (
+                  <tr key={o.id} className="hover:bg-surface-50">
+                    <td className="py-3 px-5 font-bold text-brand-600">{o.order_number}</td>
+                    <td className="py-3 px-5">{o.customer_name}</td>
+                    <td className="py-3 px-5 text-surface-500">{formatDate(o.created_at)}</td>
+                    <td className="py-3 px-5">{o.quantity}</td>
+                    <td className="py-3 px-5 text-right font-bold">{formatCurrency(o.total_amount)}</td>
+                    <td className="py-3 px-5 text-center">
+                      <span className={`px-2.5 py-0.5 rounded text-[10px] font-extrabold uppercase ${
+                        o.status === 'delivered' ? 'bg-emerald-100 text-emerald-800' :
+                        o.status === 'cancelled' ? 'bg-rose-100 text-rose-800' :
+                        'bg-amber-100 text-amber-800'
+                      }`}>
+                        {o.status}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+                {userOrders.length === 0 && (
+                  <tr><td colSpan={6} className="py-8 text-center text-surface-400 font-semibold">No orders recorded for this DSA.</td></tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* DSA Leads Table (DSA ONLY) */}
       {user.role === 'dsa' && (

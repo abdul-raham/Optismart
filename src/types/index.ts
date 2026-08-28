@@ -15,6 +15,11 @@ export interface User {
   role: UserRole
   status: 'active' | 'inactive' | 'suspended'
   avatar_url: string | null
+  can_manage_inventory?: boolean
+  can_manage_users?: boolean
+  can_manage_expenses?: boolean
+  can_view_reports?: boolean
+  can_delete_records?: boolean
   created_at: string
   updated_at: string
 }
