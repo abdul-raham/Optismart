@@ -6,7 +6,7 @@ import { useAuthStore } from '@/stores/authStore'
 import {
   User, Mail, Phone, Calendar, ArrowLeft, Shield, ShieldAlert, Ban, CheckCircle2,
   Sliders, Save, RefreshCw, AlertTriangle, Trash2, ShoppingBag, Target, Banknote,
-  DollarSign, Wrench, Clock, FileSpreadsheet, Download, Users
+  DollarSign, Wrench, Clock, FileSpreadsheet, Download, Users, Package
 } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
 import { TableSkeleton } from '@/components/shared/Skeletons'
