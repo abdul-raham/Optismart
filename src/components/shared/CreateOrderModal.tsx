@@ -390,9 +390,9 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
                               <option key={p.id} value={p.id}>{p.name} (₦{p.retail_price.toLocaleString()})</option>
                             ))}
                           </optgroup>
-                          <optgroup label="🔥 Promo Packages">
-                            <option value="promo_ptz_bulb">🎁 PROMO: Buy PTZ Camera + Get Smart Bulb FREE (₦45,000)</option>
-                            <option value="promo_solar_kit">🎁 PROMO: Solar PTZ 4G + Free Mounting Bracket (₦75,000)</option>
+                          <optgroup label="Promo Packages">
+                            <option value="promo_ptz_bulb">PROMO: Buy PTZ Camera + Get Smart Bulb FREE (₦45,000)</option>
+                            <option value="promo_solar_kit">PROMO: Solar PTZ 4G + Free Mounting Bracket (₦75,000)</option>
                           </optgroup>
                         </>
                       )}

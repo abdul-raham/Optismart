@@ -39,7 +39,7 @@ export function OutletDashboard() {
         <div className="absolute right-0 top-0 w-40 h-40 rounded-full bg-white/10 -translate-y-10 translate-x-10" />
         <div className="relative z-10">
           <p className="text-white/70 text-sm font-medium mb-1">Store Dashboard,</p>
-          <h1 className="text-2xl font-bold text-white mb-3">{user?.full_name ?? 'Outlet Manager'} 🏪</h1>
+          <h1 className="text-2xl font-bold text-white mb-3">{user?.full_name ?? 'Outlet Manager'}</h1>
           <p className="text-white/70 text-sm">
             You have <span className="text-white font-semibold">{stats.lowStock} items</span> low on stock.
           </p>

@@ -20,42 +20,42 @@ const STATIC_FEATURES = [
   {
     icon: Package,
     color: 'text-brand-600 bg-brand-50 border-brand-200',
-    title: '🏬 Multi-Branch Inventory & Stock Control',
+    title: 'Multi-Branch Inventory & Stock Control',
     description: 'Track camera stock across multiple locations (Lagos HQ, Abuja Branch, PH Depot). Log Stock In, perform inter-branch Stock Transfers, and view stock movement audit logs.',
     route: '/app/admin/products'
   },
   {
     icon: ShieldCheck,
     color: 'text-emerald-600 bg-emerald-50 border-emerald-200',
-    title: '🛡️ Dedicated Admin Probation Review Panel',
+    title: 'Dedicated Admin Probation Review Panel',
     description: 'Clean admin review card on DSA profiles for agents under the 20-order target. Confirm probation or waive targets with distinct, clear buttons.',
     route: '/app/admin/users?highlight=probation'
   },
   {
     icon: Clock,
     color: 'text-amber-500 bg-amber-50 border-amber-200',
-    title: '⏳ Day 7 Eviction Action Prompt & Clock Pausing',
+    title: 'Day 7 Eviction Action Prompt & Clock Pausing',
     description: 'Automated Day 7 safety suspension with an unmissable Eviction Action Banner for admins to either Reset Window or Delete Account. Suspended accounts are automatically excluded from clock countdowns.',
     route: '/app/admin/users?highlight=performance'
   },
   {
     icon: DollarSign,
     color: 'text-cyan-600 bg-cyan-50 border-cyan-200',
-    title: '📢 Ad Spend Allocation & Per-DSA Tracking',
+    title: 'Ad Spend Allocation & Per-DSA Tracking',
     description: 'Assign specific Sales Agents (DSAs) to Advertising & Marketing expenses. View Total Ad Spend Allocation (₦) and Ad Spend Per Delivered Order on DSA profiles.',
     route: '/app/admin/expenses'
   },
   {
     icon: Sliders,
     color: 'text-indigo-500 bg-indigo-50 border-indigo-200',
-    title: '📱 Clean Products Toolbar & Mobile Responsiveness',
+    title: 'Clean Products Toolbar & Mobile Responsiveness',
     description: 'Redesigned Products header with segmented tab bar, prominent search bar, and clean responsive toolbar across all admin pages.',
     route: '/app/admin/products'
   },
   {
     icon: ShoppingBag,
     color: 'text-rose-500 bg-rose-50 border-rose-200',
-    title: '📦 Order Fulfillment Stock-Out Integration',
+    title: 'Order Fulfillment Stock-Out Integration',
     description: 'Filter orders by Sales Agent. Marking orders DELIVERED automatically deducts camera inventory from selected branch locations.',
     route: '/app/admin/orders'
   }
