@@ -219,14 +219,14 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="fixed inset-0 z-50 overflow-y-auto p-4 sm:p-6 flex items-center justify-center">
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm" onClick={handleClose} />
         
         <motion.div 
           initial={{ opacity: 0, scale: 0.95, y: 20 }} 
           animate={{ opacity: 1, scale: 1, y: 0 }} 
           exit={{ opacity: 0, scale: 0.95, y: 20 }}
-          className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col"
+          className="relative w-full max-w-lg bg-white rounded-3xl shadow-2xl overflow-hidden max-h-[calc(100vh-2rem)] sm:max-h-[90vh] my-auto flex flex-col"
         >
           <div className="flex items-center justify-between p-6 border-b border-surface-100 bg-surface-50">
             <h2 className="text-xl font-bold text-surface-900">

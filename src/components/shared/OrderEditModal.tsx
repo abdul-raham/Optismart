@@ -92,10 +92,10 @@ export function OrderEditModal({ order, products, onClose, onSaved }: OrderEditM
   return createPortal(
     <AnimatePresence>
       {order && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[9999] overflow-y-auto p-4 sm:p-6 flex items-center justify-center">
           <motion.div key="order-edit-backdrop" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm" onClick={close} />
-          <motion.div key="order-edit-modal" initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative z-10 flex max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-card-xl">
-            <div className="flex items-center justify-between border-b border-surface-100 bg-surface-50/50 px-6 py-4">
+          <motion.div key="order-edit-modal" initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative z-10 my-auto flex max-h-[calc(100vh-2rem)] sm:max-h-[90vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-card-xl">
+            <div className="flex shrink-0 items-center justify-between border-b border-surface-100 bg-surface-50/50 px-6 py-4">
               <div><h2 className="text-lg font-bold text-surface-900">Edit Order</h2><p className="mt-0.5 text-xs text-surface-500">{order.order_number}</p></div>
               <button type="button" onClick={close} className="rounded-md p-1 text-surface-400 transition-colors hover:bg-surface-100 hover:text-surface-900"><X className="h-5 w-5" /></button>
             </div>

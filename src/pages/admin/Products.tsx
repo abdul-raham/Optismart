@@ -828,7 +828,7 @@ export function AdminProducts() {
       {createPortal(
         <AnimatePresence>
           {isPromoModalOpen && (
-            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-[9999] overflow-y-auto p-4 flex items-center justify-center">
               <motion.div
                 initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                 className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm"
@@ -838,9 +838,9 @@ export function AdminProducts() {
                 initial={{ opacity: 0, scale: 0.95, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                className="bg-white w-full max-w-md relative z-10 rounded-2xl shadow-card-xl overflow-hidden"
+                className="bg-white w-full max-w-md relative z-10 rounded-2xl shadow-card-xl my-auto flex flex-col max-h-[calc(100vh-2rem)] sm:max-h-[90vh] overflow-hidden"
               >
-                <div className="px-6 py-4 border-b border-surface-100 flex items-center justify-between bg-surface-50">
+                <div className="px-6 py-4 border-b border-surface-100 flex items-center justify-between bg-surface-50 shrink-0">
                   <h2 className="text-lg font-bold text-surface-900">
                     {editingPromo ? 'Edit Promo Package' : 'Create Promo Package'}
                   </h2>
@@ -864,7 +864,7 @@ export function AdminProducts() {
                     }
                     setIsPromoModalOpen(false)
                   }}
-                  className="p-6 space-y-4"
+                  className="p-6 space-y-4 overflow-y-auto flex-1 scrollbar-hide"
                 >
                   <div>
                     <label className="label">Promo Title *</label>
@@ -928,11 +928,11 @@ export function AdminProducts() {
                     )}
                   </div>
 
-                  <div className="pt-4 border-t border-surface-100 flex justify-end gap-3">
+                  <div className="pt-4 border-t border-surface-100 flex justify-end gap-3 sticky bottom-0 bg-white pb-1 -mx-6 px-6 pt-3 mt-4 shrink-0 shadow-xs">
                     <button type="button" onClick={() => setIsPromoModalOpen(false)} className="btn-outline">
                       Cancel
                     </button>
-                    <button type="submit" className="btn-primary">
+                    <button type="submit" className="btn-primary shadow-brand">
                       {editingPromo ? 'Save Changes' : 'Create Package'}
                     </button>
                   </div>
@@ -942,15 +942,15 @@ export function AdminProducts() {
           )}
 
           {isLocationModalOpen && (
-            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-[9999] overflow-y-auto p-4 flex items-center justify-center">
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm" onClick={() => setIsLocationModalOpen(false)} />
-              <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative z-10 w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-card-xl">
-                <div className="flex items-center justify-between border-b border-surface-100 px-6 py-4"><h2 className="flex items-center gap-2 text-lg font-bold"><MapPin className="h-5 w-5 text-brand-600" /> Add Inventory Location</h2><button onClick={() => setIsLocationModalOpen(false)}><X className="h-5 w-5" /></button></div>
-                <form onSubmit={handleCreateLocation} className="space-y-4 p-6">
+              <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="relative z-10 w-full max-w-md my-auto flex flex-col max-h-[calc(100vh-2rem)] sm:max-h-[90vh] overflow-hidden rounded-2xl bg-white shadow-card-xl">
+                <div className="flex items-center justify-between border-b border-surface-100 px-6 py-4 shrink-0"><h2 className="flex items-center gap-2 text-lg font-bold"><MapPin className="h-5 w-5 text-brand-600" /> Add Inventory Location</h2><button onClick={() => setIsLocationModalOpen(false)}><X className="h-5 w-5" /></button></div>
+                <form onSubmit={handleCreateLocation} className="space-y-4 p-6 overflow-y-auto flex-1 scrollbar-hide">
                   <div><label className="label">Location name *</label><input required className="input" value={locationForm.name} onChange={e => setLocationForm(previous => ({ ...previous, name: e.target.value }))} placeholder="e.g. Ibadan Branch" /></div>
                   <div><label className="label">Address</label><input className="input" value={locationForm.address} onChange={e => setLocationForm(previous => ({ ...previous, address: e.target.value }))} /></div>
                   <div><label className="label">Phone</label><input className="input" value={locationForm.phone} onChange={e => setLocationForm(previous => ({ ...previous, phone: e.target.value }))} /></div>
-                  <div className="flex justify-end gap-3 border-t border-surface-100 pt-4"><button type="button" className="btn-outline" onClick={() => setIsLocationModalOpen(false)}>Cancel</button><button className="btn-primary" disabled={submitting}>{submitting ? 'Saving...' : 'Add Location'}</button></div>
+                  <div className="flex justify-end gap-3 border-t border-surface-100 pt-4 sticky bottom-0 bg-white pb-1 -mx-6 px-6 pt-3 mt-4 shrink-0 shadow-xs"><button type="button" className="btn-outline" onClick={() => setIsLocationModalOpen(false)}>Cancel</button><button className="btn-primary" disabled={submitting}>{submitting ? 'Saving...' : 'Add Location'}</button></div>
                 </form>
               </motion.div>
             </div>
@@ -958,14 +958,14 @@ export function AdminProducts() {
 
           {/* STOCK IN MODAL */}
           {isStockInModalOpen && (
-            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-[9999] overflow-y-auto p-4 flex items-center justify-center">
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm" onClick={() => setIsStockInModalOpen(false)} />
-              <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="bg-white w-full max-w-md relative z-10 rounded-2xl shadow-card-xl overflow-hidden">
-                <div className="px-6 py-4 border-b border-surface-100 flex items-center justify-between bg-emerald-50 text-emerald-900">
+              <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="bg-white w-full max-w-md relative z-10 rounded-2xl shadow-card-xl my-auto flex flex-col max-h-[calc(100vh-2rem)] sm:max-h-[90vh] overflow-hidden">
+                <div className="px-6 py-4 border-b border-surface-100 flex items-center justify-between bg-emerald-50 text-emerald-900 shrink-0">
                   <h2 className="text-lg font-bold flex items-center gap-2"><Package className="h-5 w-5" /> Log Stock In (New Stock)</h2>
                   <button onClick={() => setIsStockInModalOpen(false)} className="text-emerald-700 hover:text-emerald-950"><X className="w-5 h-5" /></button>
                 </div>
-                <form onSubmit={handleStockIn} className="p-6 space-y-4">
+                <form onSubmit={handleStockIn} className="p-6 space-y-4 overflow-y-auto flex-1 scrollbar-hide">
                   <div>
                     <label className="label">Select Camera Product *</label>
                     <select required className="input bg-white text-sm" value={stockInForm.product_id} onChange={e => setStockInForm({...stockInForm, product_id: e.target.value})}>
@@ -988,7 +988,7 @@ export function AdminProducts() {
                     <label className="label">Notes / Reference (Optional)</label>
                     <input type="text" className="input text-xs" placeholder="e.g. Shipment Waybill #402" value={stockInForm.notes} onChange={e => setStockInForm({...stockInForm, notes: e.target.value})} />
                   </div>
-                  <div className="pt-4 flex justify-end gap-3 border-t border-surface-100">
+                  <div className="pt-4 flex justify-end gap-3 border-t border-surface-100 sticky bottom-0 bg-white pb-1 -mx-6 px-6 pt-3 mt-4 shrink-0 shadow-xs">
                     <button type="button" onClick={() => setIsStockInModalOpen(false)} className="btn-outline">Cancel</button>
                     <button type="submit" disabled={submitting} className="btn-primary bg-emerald-600 hover:bg-emerald-700">{submitting ? 'Saving...' : 'Add Stock'}</button>
                   </div>
@@ -999,14 +999,14 @@ export function AdminProducts() {
 
           {/* STOCK TRANSFER MODAL */}
           {isTransferModalOpen && (
-            <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+            <div className="fixed inset-0 z-[9999] overflow-y-auto p-4 flex items-center justify-center">
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm" onClick={() => setIsTransferModalOpen(false)} />
-              <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="bg-white w-full max-w-md relative z-10 rounded-2xl shadow-card-xl overflow-hidden">
-                <div className="px-6 py-4 border-b border-surface-100 flex items-center justify-between bg-brand-50 text-brand-900">
+              <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="bg-white w-full max-w-md relative z-10 rounded-2xl shadow-card-xl my-auto flex flex-col max-h-[calc(100vh-2rem)] sm:max-h-[90vh] overflow-hidden">
+                <div className="px-6 py-4 border-b border-surface-100 flex items-center justify-between bg-brand-50 text-brand-900 shrink-0">
                   <h2 className="text-lg font-bold flex items-center gap-2">Inter-Branch Stock Transfer</h2>
                   <button onClick={() => setIsTransferModalOpen(false)} className="text-brand-700 hover:text-brand-950"><X className="w-5 h-5" /></button>
                 </div>
-                <form onSubmit={handleStockTransfer} className="p-6 space-y-4">
+                <form onSubmit={handleStockTransfer} className="p-6 space-y-4 overflow-y-auto flex-1 scrollbar-hide">
                   <div>
                     <label className="label">Select Camera Product *</label>
                     <select required className="input bg-white text-sm" value={transferForm.product_id} onChange={e => setTransferForm({...transferForm, product_id: e.target.value})}>
@@ -1038,7 +1038,7 @@ export function AdminProducts() {
                     <label className="label">Transfer Notes / Reason (Optional)</label>
                     <input type="text" className="input text-xs" placeholder="e.g. Restocking Abuja branch demand" value={transferForm.notes} onChange={e => setTransferForm({...transferForm, notes: e.target.value})} />
                   </div>
-                  <div className="pt-4 flex justify-end gap-3 border-t border-surface-100">
+                  <div className="pt-4 flex justify-end gap-3 border-t border-surface-100 sticky bottom-0 bg-white pb-1 -mx-6 px-6 pt-3 mt-4 shrink-0 shadow-xs">
                     <button type="button" onClick={() => setIsTransferModalOpen(false)} className="btn-outline">Cancel</button>
                     <button type="submit" disabled={submitting} className="btn-primary">{submitting ? 'Transferring...' : 'Execute Stock Transfer'}</button>
                   </div>

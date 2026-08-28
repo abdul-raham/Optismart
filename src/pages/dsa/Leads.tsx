@@ -422,7 +422,7 @@ export function DSALeads() {
       {/* CREATE MODAL */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[100] overflow-y-auto p-4 sm:p-6 flex items-center justify-center">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm"
@@ -432,16 +432,16 @@ export function DSALeads() {
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white rounded-2xl shadow-card-xl w-full max-w-lg relative z-10 overflow-hidden"
+              className="bg-white rounded-2xl shadow-card-xl w-full max-w-lg relative z-10 my-auto flex flex-col max-h-[calc(100vh-2rem)] sm:max-h-[90vh] overflow-hidden"
             >
-              <div className="px-6 py-4 border-b border-surface-100 flex items-center justify-between bg-surface-50/50">
+              <div className="px-6 py-4 border-b border-surface-100 flex items-center justify-between bg-surface-50/50 shrink-0">
                 <h2 className="text-lg font-bold text-surface-900">Add New Lead</h2>
                 <button onClick={() => !submitting && setIsModalOpen(false)} className="text-surface-400 hover:text-surface-900 transition-colors p-1 rounded-md hover:bg-surface-100">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
-              <form onSubmit={handleCreateLead} className="p-6 space-y-4">
+              <form onSubmit={handleCreateLead} className="p-6 space-y-4 overflow-y-auto flex-1 scrollbar-hide">
                 <div>
                   <label className="label">Customer Name *</label>
                   <input required type="text" className="input" placeholder="e.g. John Smith" value={form.customer_name} onChange={e => setForm({...form, customer_name: e.target.value})} />
@@ -501,9 +501,9 @@ export function DSALeads() {
                   <textarea rows={3} className="input resize-none" placeholder="Any specific requirements?" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
                 </div>
 
-                <div className="pt-4 flex items-center justify-end gap-3">
+                <div className="pt-4 flex items-center justify-end gap-3 sticky bottom-0 bg-white border-t border-surface-100 pb-2 -mx-6 px-6 pt-3 mt-4 shrink-0 shadow-xs">
                   <button type="button" onClick={() => setIsModalOpen(false)} disabled={submitting} className="btn-outline">Cancel</button>
-                  <button type="submit" disabled={submitting} className="btn-primary w-32 flex items-center justify-center">
+                  <button type="submit" disabled={submitting} className="btn-primary w-32 flex items-center justify-center shadow-brand">
                     {submitting ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Save Lead'}
                   </button>
                 </div>
