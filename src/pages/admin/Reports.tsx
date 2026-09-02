@@ -29,6 +29,7 @@ interface DSASummary {
   dsa_email: string
   cameras_sold: number
   orders_count: number
+  delivered_orders: number
   pending_orders: number
   total_revenue: number
   total_commission: number
@@ -39,6 +40,7 @@ interface MonthlyBreakdown {
   month: string
   cameras: number
   orders: number
+  delivered_orders: number
   revenue: number
   commissions: number
   active_dsas: number
@@ -186,19 +188,21 @@ export function AdminReports() {
       const dsaEmail = o.dsa?.email || '—'
 
       if (!map[dsaId]) {
-        map[dsaId] = { dsa_id: dsaId, dsa_name: dsaName, dsa_email: dsaEmail, cameras_sold: 0, orders_count: 0, pending_orders: 0, total_revenue: 0, total_commission: 0, commission_paid: 0 }
+        map[dsaId] = { dsa_id: dsaId, dsa_name: dsaName, dsa_email: dsaEmail, cameras_sold: 0, orders_count: 0, delivered_orders: 0, pending_orders: 0, total_revenue: 0, total_commission: 0, commission_paid: 0 }
       }
-      map[dsaId].cameras_sold += o.quantity || 0
       map[dsaId].orders_count += 1
-      if (o.status !== 'cancelled') {
+      if (o.status === 'delivered') {
+        map[dsaId].cameras_sold += o.quantity || 0
+        map[dsaId].delivered_orders += 1
         map[dsaId].total_revenue += o.total_amount || 0
         totalRev += o.total_amount || 0
+        totalCam += o.quantity || 0
       }
-      if (o.status === 'pending') map[dsaId].pending_orders += 1
-
-      totalCam += o.quantity || 0
+      if (['pending', 'approved', 'processing', 'dispatched', 'rescheduled'].includes(o.status)) {
+        map[dsaId].pending_orders += 1
+        pendOrd += 1
+      }
       totalOrd += 1
-      if (o.status === 'pending') pendOrd += 1
     });
 
     (comms || []).forEach((c: any) => {
@@ -258,11 +262,12 @@ export function AdminReports() {
 
     orders.forEach((o: any) => {
       const month = o.created_at?.slice(0, 7) || ''
-      if (!monthMap[month]) monthMap[month] = { month, cameras: 0, orders: 0, revenue: 0, commissions: 0, active_dsas: 0, top_dsa: '' }
+      if (!monthMap[month]) monthMap[month] = { month, cameras: 0, orders: 0, delivered_orders: 0, revenue: 0, commissions: 0, active_dsas: 0, top_dsa: '' }
       
-      monthMap[month].cameras += o.quantity || 0
       monthMap[month].orders += 1
-      if (o.status !== 'cancelled') {
+      if (o.status === 'delivered') {
+        monthMap[month].cameras += o.quantity || 0
+        monthMap[month].delivered_orders += 1
         monthMap[month].revenue += o.total_amount || 0
       }
 
@@ -601,12 +606,13 @@ export function AdminReports() {
                 sheetTitle: 'DSA Performance Breakdown',
                 reportSubHeading: selectedMonth ? `Month: ${selectedMonth}` : 'All Time',
                 data: dsaSummaries.map(d => ({
-                  DSA: d.dsa_name,
-                  Email: d.dsa_email,
-                  'Cameras Sold': d.cameras_sold,
-                  'Orders': d.orders_count,
+                  'DSA': d.dsa_name,
+                  'Email': d.dsa_email,
+                  'Delivered Cameras': d.cameras_sold,
+                  'Delivered Orders': d.delivered_orders,
                   'Pending Orders': d.pending_orders,
-                  'Revenue (₦)': d.total_revenue,
+                  'Total Originated Orders': d.orders_count,
+                  'Delivered Revenue (₦)': d.total_revenue,
                   'Commission (₦)': d.total_commission,
                   'Paid (₦)': d.commission_paid,
                 }))
@@ -619,9 +625,13 @@ export function AdminReports() {
             <button
               onClick={() => exportToCSV(dsaSummaries.map(d => ({
                 DSA: d.dsa_name, Email: d.dsa_email,
-                'Cameras Sold': d.cameras_sold, 'Orders': d.orders_count,
-                'Pending Orders': d.pending_orders, 'Revenue (₦)': d.total_revenue,
-                'Commission (₦)': d.total_commission, 'Paid (₦)': d.commission_paid,
+                'Delivered Cameras': d.cameras_sold,
+                'Delivered Orders': d.delivered_orders,
+                'Pending Orders': d.pending_orders,
+                'Total Originated': d.orders_count,
+                'Delivered Revenue (₦)': d.total_revenue,
+                'Commission (₦)': d.total_commission,
+                'Paid (₦)': d.commission_paid,
               })), 'dsa-performance')}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-surface-200 bg-white text-surface-700 text-xs font-bold hover:bg-surface-50 transition-colors shadow-sm"
               title="Download UTF-8 CSV"
@@ -634,7 +644,7 @@ export function AdminReports() {
           <table className="w-full min-w-[860px] text-sm">
             <thead>
               <tr className="bg-surface-50 text-left">
-                {['DSA Name', 'Email', 'Cameras', 'Orders', 'Pending', 'Revenue', 'Commission', 'Paid'].map(h => (
+                {['DSA Name', 'Email', 'Delivered Cameras', 'Delivered Orders', 'Pending', 'Total Originated', 'Delivered Revenue', 'Commission', 'Paid'].map(h => (
                   <th key={h} className="px-4 py-3 text-xs font-bold text-surface-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -656,10 +666,11 @@ export function AdminReports() {
                         <Camera className="w-3.5 h-3.5" /> {d.cameras_sold}
                       </span>
                     </td>
-                    <td className="px-4 py-3 font-semibold">{d.orders_count}</td>
+                    <td className="px-4 py-3 font-bold text-emerald-700">{d.delivered_orders}</td>
                     <td className="px-4 py-3">
                       <span className={`font-bold ${d.pending_orders > 0 ? 'text-amber-600' : 'text-surface-400'}`}>{d.pending_orders}</span>
                     </td>
+                    <td className="px-4 py-3 font-semibold text-surface-600">{d.orders_count}</td>
                     <td className="px-4 py-3 font-semibold">₦{d.total_revenue.toLocaleString()}</td>
                     <td className="px-4 py-3 font-semibold text-emerald-700">₦{d.total_commission.toLocaleString()}</td>
                     <td className="px-4 py-3">
