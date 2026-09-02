@@ -204,23 +204,6 @@ export function AdminOrders() {
           sendEmail('new_order', {
             recipientEmail: form.customer_email,
             orderNumber: data.order_number,
-            customerName: data.customer_name,
-            totalAmount: data.total_amount
-          }).catch(console.error);
-        }
-        
-        const createdOrder = {
-          ...data,
-          dsa: form.dsa_id
-            ? dsas.find(dsa => dsa.id === form.dsa_id)
-            : undefined,
-        } as Order
-        setOrders(current => [createdOrder, ...current])
-        setIsModalOpen(false)
-        setForm({ is_dsa_registered: true, unregistered_dsa_name: '', dsa_id: '', customer_name: '', customer_email: '', customer_phone: '', customer_address: '', product_id: '', quantity: 1, amount: 0, installation_needed: false, installation_price: 0, expected_delivery_date: '', notes: '' })
-      }
-    } catch (err: any) {
-      console.error('Error creating order:', err)
     } catch (err) {
       console.error('Error fetching admin orders:', err)
     } finally {
