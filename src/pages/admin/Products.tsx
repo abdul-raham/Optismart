@@ -51,6 +51,15 @@ export function AdminProducts() {
     quantity: 5,
     notes: '',
   })
+
+  // Physical Count Audit Override State
+  const [isPhysicalCountModalOpen, setIsPhysicalCountModalOpen] = useState(false)
+  const [physicalCountForm, setPhysicalCountForm] = useState({
+    product_id: '',
+    location_id: '',
+    target_quantity: 0,
+    notes: '',
+  })
   const [promoPackages, setPromoPackages] = useState<any[]>([
     {
       id: 'promo_ptz_bulb',
@@ -202,6 +211,47 @@ export function AdminProducts() {
     } catch (err: any) {
       console.error('Stock Transfer failed:', err)
       alert(`Transfer failed: ${err?.message || err}`)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleSetPhysicalCount = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!physicalCountForm.product_id || !physicalCountForm.location_id || physicalCountForm.target_quantity < 0) {
+      alert('Please fill out all physical count fields')
+      return
+    }
+
+    setSubmitting(true)
+    try {
+      const { error } = await supabase.rpc('inventory_set_physical_count', {
+        p_product_id: physicalCountForm.product_id,
+        p_location_id: physicalCountForm.location_id,
+        p_target_quantity: Number(physicalCountForm.target_quantity),
+        p_notes: physicalCountForm.notes || 'Physical Stock Audit Count Override'
+      })
+
+      if (error) {
+        // Fallback to direct table update if RPC function isn't run yet
+        const { error: directErr } = await supabase
+          .from('product_inventory')
+          .upsert({
+            product_id: physicalCountForm.product_id,
+            location_id: physicalCountForm.location_id,
+            quantity: Number(physicalCountForm.target_quantity),
+            updated_at: new Date().toISOString()
+          })
+        if (directErr) throw directErr
+      }
+
+      alert('Physical stock count set successfully!')
+      setIsPhysicalCountModalOpen(false)
+      fetchInventoryData()
+      fetchProducts()
+    } catch (err: any) {
+      console.error('Physical Count update failed:', err)
+      alert(`Failed to update physical count: ${err?.message || err}`)
     } finally {
       setSubmitting(false)
     }
@@ -720,6 +770,17 @@ export function AdminProducts() {
                 <button onClick={() => setIsTransferModalOpen(true)} className="btn-outline text-xs h-9 px-3 border-brand-300 text-brand-700 bg-brand-50">
                   Stock Transfer
                 </button>
+                <button
+                  onClick={() => {
+                    const firstProd = products[0]?.id || ''
+                    const firstLoc = locations[0]?.id || ''
+                    setPhysicalCountForm({ product_id: firstProd, location_id: firstLoc, target_quantity: 0, notes: 'Physical Stock Count Audit' })
+                    setIsPhysicalCountModalOpen(true)
+                  }}
+                  className="btn-outline text-xs h-9 px-3 border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100"
+                >
+                  Set Physical Count
+                </button>
               </div>
             </div>
 
@@ -1041,6 +1102,50 @@ export function AdminProducts() {
                   <div className="pt-4 flex justify-end gap-3 border-t border-surface-100 sticky bottom-0 bg-white pb-1 -mx-6 px-6 pt-3 mt-4 shrink-0 shadow-xs">
                     <button type="button" onClick={() => setIsTransferModalOpen(false)} className="btn-outline">Cancel</button>
                     <button type="submit" disabled={submitting} className="btn-primary">{submitting ? 'Transferring...' : 'Execute Stock Transfer'}</button>
+                  </div>
+                </form>
+              </motion.div>
+            </div>
+          )}
+
+          {/* PHYSICAL COUNT AUDIT OVERRIDE MODAL */}
+          {isPhysicalCountModalOpen && (
+            <div className="fixed inset-0 z-[9999] overflow-y-auto p-4 flex items-center justify-center">
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm" onClick={() => setIsPhysicalCountModalOpen(false)} />
+              <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="bg-white w-full max-w-md relative z-10 rounded-2xl shadow-card-xl my-auto flex flex-col max-h-[calc(100vh-2rem)] sm:max-h-[90vh] overflow-hidden">
+                <div className="px-6 py-4 border-b border-amber-100 flex items-center justify-between bg-amber-50 text-amber-950 shrink-0">
+                  <h2 className="text-lg font-bold flex items-center gap-2">Set Physical Stock Count</h2>
+                  <button onClick={() => setIsPhysicalCountModalOpen(false)} className="text-amber-700 hover:text-amber-950"><X className="w-5 h-5" /></button>
+                </div>
+                <form onSubmit={handleSetPhysicalCount} className="p-6 space-y-4 overflow-y-auto flex-1 scrollbar-hide">
+                  <p className="text-xs text-surface-500">
+                    Use this tool to align database inventory directly with the actual physical count sitting on your branch shelves.
+                  </p>
+                  <div>
+                    <label className="label">Select Camera Product *</label>
+                    <select required className="input bg-white text-sm" value={physicalCountForm.product_id} onChange={e => setPhysicalCountForm({...physicalCountForm, product_id: e.target.value})}>
+                      <option value="">Select product...</option>
+                      {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label text-xs">Branch Inventory Location *</label>
+                    <select required className="input bg-white text-xs" value={physicalCountForm.location_id} onChange={e => setPhysicalCountForm({...physicalCountForm, location_id: e.target.value})}>
+                      <option value="">Select branch...</option>
+                      {locations.map(loc => <option key={loc.id} value={loc.id}>{loc.name}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="label">Exact Physical Shelf Count (Units) *</label>
+                    <input required type="number" min={0} className="input font-bold text-xl text-amber-800" value={physicalCountForm.target_quantity} onChange={e => setPhysicalCountForm({...physicalCountForm, target_quantity: Number(e.target.value)})} />
+                  </div>
+                  <div>
+                    <label className="label">Audit Note / Reason</label>
+                    <input type="text" className="input text-xs" placeholder="e.g. Physical inventory count after legacy order cleanup" value={physicalCountForm.notes} onChange={e => setPhysicalCountForm({...physicalCountForm, notes: e.target.value})} />
+                  </div>
+                  <div className="pt-4 flex justify-end gap-3 border-t border-surface-100 sticky bottom-0 bg-white pb-1 -mx-6 px-6 pt-3 mt-4 shrink-0 shadow-xs">
+                    <button type="button" onClick={() => setIsPhysicalCountModalOpen(false)} className="btn-outline">Cancel</button>
+                    <button type="submit" disabled={submitting} className="btn-primary bg-amber-600 hover:bg-amber-700">{submitting ? 'Updating...' : 'Save Physical Count'}</button>
                   </div>
                 </form>
               </motion.div>

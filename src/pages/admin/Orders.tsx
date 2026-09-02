@@ -59,6 +59,10 @@ export function AdminOrders() {
   const [locationInventory, setLocationInventory] = useState<any[]>([])
   const [deliveryOrder, setDeliveryOrder] = useState<Order | null>(null)
   const [deliveryLocationId, setDeliveryLocationId] = useState('')
+  const [isHistoricalBypass, setIsHistoricalBypass] = useState(false)
+  const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([])
+  const [isBulkCleanupModalOpen, setIsBulkCleanupModalOpen] = useState(false)
+  const [bulkProcessing, setBulkProcessing] = useState(false)
   const fetchSequence = useRef(0)
 
   const [editForm, setEditForm] = useState({
@@ -217,25 +221,151 @@ export function AdminOrders() {
       }
     } catch (err: any) {
       console.error('Error creating order:', err)
+    } catch (err) {
+      console.error('Error fetching admin orders:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchData()
+
+    const channel = supabase
+      .channel('admin-orders')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, payload => {
+        const newOrder = payload.new as Order
+        setOrders(current => current.some(order => order.id === newOrder.id) ? current : [newOrder, ...current])
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, payload => {
+        const updatedOrder = payload.new as Order
+        setOrders(current => current.map(order => order.id === updatedOrder.id ? { ...order, ...updatedOrder } : order))
+      })
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'orders' }, payload => {
+        const deletedOrder = payload.old as Pick<Order, 'id'>
+        setOrders(current => current.filter(order => order.id !== deletedOrder.id))
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'installer_jobs' }, () => fetchData())
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [])
+
+  const handleCreateOrder = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setCreateError('')
+    if (!form.product_id) {
+      setCreateError('Select a product before creating the order.')
+      return
+    }
+    
+    setSubmitting(true)
+    try {
+      const product = products.find(p => p.id === form.product_id)
+      if (!product) throw new Error('Product not found')
+
+      const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 4).toUpperCase()}`
+      const productTotal = form.amount > 0 ? form.amount : Number(product.retail_price) * form.quantity
+      const totalAmount = productTotal + (form.installation_needed ? form.installation_price : 0)
+
+      const { data, error } = await supabase
+        .from('orders')
+        .insert([{
+          order_number: orderNumber,
+          dsa_id: form.is_dsa_registered ? (form.dsa_id || null) : null,
+          unregistered_dsa_name: !form.is_dsa_registered ? form.unregistered_dsa_name : null,
+          customer_name: form.customer_name,
+          customer_email: form.customer_email || null,
+          customer_phone: form.customer_phone,
+          customer_address: form.customer_address,
+          product_id: form.product_id,
+          quantity: form.quantity,
+          unit_price: product.retail_price,
+          unit_cost: product.cost_price || 0,
+          total_amount: totalAmount,
+          installation_needed: form.installation_needed,
+          installation_price: form.installation_needed ? form.installation_price : 0,
+          expected_delivery_date: form.expected_delivery_date || null,
+          status: 'pending',
+          notes: form.notes,
+          created_by_auth_id: (await supabase.auth.getSession()).data.session?.user?.id
+        }])
+        .select()
+        .single()
+
+      if (error) throw error
+      if (data) {
+        if (form.customer_email) {
+          sendEmail('new_order', {
+            recipientEmail: form.customer_email,
+            orderNumber: data.order_number,
+            customerName: data.customer_name,
+            totalAmount: data.total_amount
+          }).catch(console.error);
+        }
+        
+        const createdOrder = {
+          ...data,
+          dsa: form.dsa_id
+            ? dsas.find(dsa => dsa.id === form.dsa_id)
+            : undefined,
+        } as Order
+        setOrders(current => [createdOrder, ...current])
+        setIsModalOpen(false)
+        setForm({ is_dsa_registered: true, unregistered_dsa_name: '', dsa_id: '', customer_name: '', customer_email: '', customer_phone: '', customer_address: '', product_id: '', quantity: 1, amount: 0, installation_needed: false, installation_price: 0, expected_delivery_date: '', notes: '' })
+      }
+    } catch (err: any) {
+      console.error('Error creating order:', err)
       setCreateError(err?.message || 'Failed to create order. Please try again.')
     } finally {
       setSubmitting(false)
     }
   }
 
-  const handleUpdateStatus = async (orderId: string, newStatus: OrderStatus, fulfillmentLocationId?: string) => {
+  const handleUpdateStatus = async (
+    orderId: string,
+    newStatus: OrderStatus,
+    fulfillmentLocationId?: string,
+    bypassStock?: boolean
+  ) => {
     const selectedOrder = orders.find(order => order.id === orderId)
-    if (newStatus === 'delivered' && !fulfillmentLocationId) {
+    if (newStatus === 'delivered' && !fulfillmentLocationId && !bypassStock) {
       setDeliveryOrder(selectedOrder ?? null)
       setDeliveryLocationId('')
+      setIsHistoricalBypass(false)
       setOpenDropdownId(null)
       return
     }
     setUpdating(orderId)
     try {
-      const { error } = newStatus === 'delivered'
-        ? await supabase.rpc('fulfill_order_from_location', { p_order_id: orderId, p_location_id: fulfillmentLocationId })
-        : await supabase.from('orders').update({ status: newStatus, updated_at: new Date().toISOString() }).eq('id', orderId)
+      let error: any = null
+      if (newStatus === 'delivered') {
+        if (bypassStock) {
+          const updateRes = await supabase
+            .from('orders')
+            .update({
+              status: 'delivered',
+              delivered_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              fulfillment_location_id: fulfillmentLocationId || null,
+              notes: (selectedOrder?.notes || '') + ' [Historical Delivery Cleanup (No Stock Deducted)]'
+            })
+            .eq('id', orderId)
+          error = updateRes.error
+        } else {
+          const rpcRes = await supabase.rpc('fulfill_order_from_location', {
+            p_order_id: orderId,
+            p_location_id: fulfillmentLocationId
+          })
+          error = rpcRes.error
+        }
+      } else {
+        const updateRes = await supabase
+          .from('orders')
+          .update({ status: newStatus, updated_at: new Date().toISOString() })
+          .eq('id', orderId)
+        error = updateRes.error
+      }
 
       if (error) throw error
       
@@ -300,6 +430,7 @@ export function AdminOrders() {
       if (newStatus === 'delivered') {
         setDeliveryOrder(null)
         setDeliveryLocationId('')
+        setIsHistoricalBypass(false)
         fetchData()
       }
     } catch (err) {
@@ -1045,27 +1176,60 @@ export function AdminOrders() {
                 <div className="flex items-start justify-between gap-4">
                   <div>
                     <h2 className="text-lg font-bold text-surface-900">Choose fulfillment location</h2>
-                    <p className="mt-1 text-sm text-surface-500">Order {deliveryOrder.order_number} needs {deliveryOrder.quantity || 1} unit(s). Stock is deducted only after this succeeds.</p>
+                    <p className="mt-1 text-sm text-surface-500">Order {deliveryOrder.order_number} needs {deliveryOrder.quantity || 1} unit(s).</p>
                   </div>
                   <button type="button" onClick={() => setDeliveryOrder(null)} className="rounded-lg p-1 text-surface-400 hover:bg-surface-100 hover:text-surface-700"><X className="h-5 w-5" /></button>
                 </div>
-                <div className="mt-5 space-y-2">
-                  {inventoryLocations.map(location => {
-                    const available = Number(locationInventory.find(item => item.location_id === location.id && item.product_id === deliveryOrder.product_id)?.quantity || 0)
-                    const enough = available >= (deliveryOrder.quantity || 1)
-                    return (
-                      <label key={location.id} className={`flex items-center justify-between rounded-xl border p-3 ${enough ? 'cursor-pointer border-surface-200 hover:border-brand-300' : 'cursor-not-allowed border-surface-100 bg-surface-50 opacity-60'}`}>
-                        <span className="flex items-center gap-3"><input type="radio" name="fulfillment-location" disabled={!enough} checked={deliveryLocationId === location.id} onChange={() => setDeliveryLocationId(location.id)} /><span><span className="block text-sm font-bold text-surface-900">{location.name}</span><span className="block text-xs text-surface-500">{location.address || 'No address set'}</span></span></span>
-                        <span className={`text-xs font-bold ${enough ? 'text-success-700' : 'text-danger-600'}`}>{available} available</span>
-                      </label>
-                    )
-                  })}
-                  {inventoryLocations.length === 0 && <p className="rounded-xl bg-warning-50 p-3 text-sm text-warning-800">No inventory location is configured. Run the V3 database migration, then capture stock on the Products page.</p>}
+
+                {/* Legacy / Historical Order Bypass Toggle */}
+                <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1.5">
+                  <label className="flex items-center gap-2.5 text-xs font-bold text-amber-950 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={isHistoricalBypass}
+                      onChange={e => {
+                        setIsHistoricalBypass(e.target.checked)
+                        if (e.target.checked) setDeliveryLocationId('')
+                      }}
+                      className="w-4 h-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
+                    />
+                    <span>Historical Order Cleanup (Bypass Current Stock Deduction)</span>
+                  </label>
+                  <p className="text-[11px] text-amber-800 leading-snug font-medium pl-6">
+                    Check this box for legacy orders placed before multi-branch stock tracking. It will mark the order Delivered and record DSA sales/commissions without subtracting from today's physical branch inventory.
+                  </p>
                 </div>
+
+                {!isHistoricalBypass ? (
+                  <div className="mt-4 space-y-2">
+                    <p className="text-xs font-bold text-surface-700">Select Branch Inventory Location:</p>
+                    {inventoryLocations.map(location => {
+                      const available = Number(locationInventory.find(item => item.location_id === location.id && item.product_id === deliveryOrder.product_id)?.quantity || 0)
+                      const enough = available >= (deliveryOrder.quantity || 1)
+                      return (
+                        <label key={location.id} className={`flex items-center justify-between rounded-xl border p-3 ${enough ? 'cursor-pointer border-surface-200 hover:border-brand-300' : 'cursor-not-allowed border-surface-100 bg-surface-50 opacity-60'}`}>
+                          <span className="flex items-center gap-3"><input type="radio" name="fulfillment-location" disabled={!enough} checked={deliveryLocationId === location.id} onChange={() => setDeliveryLocationId(location.id)} /><span><span className="block text-sm font-bold text-surface-900">{location.name}</span><span className="block text-xs text-surface-500">{location.address || 'No address set'}</span></span></span>
+                          <span className={`text-xs font-bold ${enough ? 'text-success-700' : 'text-danger-600'}`}>{available} available</span>
+                        </label>
+                      )
+                    })}
+                    {inventoryLocations.length === 0 && <p className="rounded-xl bg-warning-50 p-3 text-sm text-warning-800">No inventory location is configured. Run the V3 database migration, then capture stock on the Products page.</p>}
+                  </div>
+                ) : (
+                  <div className="mt-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 font-medium">
+                    ✨ Ready to confirm historical delivery. Current branch stock will remain untouched.
+                  </div>
+                )}
+
                 <div className="mt-6 flex justify-end gap-3 border-t border-surface-100 pt-4">
                   <button type="button" className="btn-outline" onClick={() => setDeliveryOrder(null)} disabled={Boolean(updating)}>Cancel</button>
-                  <button type="button" className="btn-primary" disabled={!deliveryLocationId || Boolean(updating)} onClick={() => handleUpdateStatus(deliveryOrder.id, 'delivered', deliveryLocationId)}>
-                    {updating ? 'Completing...' : 'Confirm delivery'}
+                  <button
+                    type="button"
+                    className="btn-primary"
+                    disabled={(!deliveryLocationId && !isHistoricalBypass) || Boolean(updating)}
+                    onClick={() => handleUpdateStatus(deliveryOrder.id, 'delivered', deliveryLocationId || undefined, isHistoricalBypass)}
+                  >
+                    {updating ? 'Completing...' : isHistoricalBypass ? 'Confirm Historical Delivery' : 'Confirm Delivery'}
                   </button>
                 </div>
               </motion.div>
