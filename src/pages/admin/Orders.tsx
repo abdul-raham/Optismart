@@ -59,7 +59,6 @@ export function AdminOrders() {
   const [locationInventory, setLocationInventory] = useState<any[]>([])
   const [deliveryOrder, setDeliveryOrder] = useState<Order | null>(null)
   const [deliveryLocationId, setDeliveryLocationId] = useState('')
-  const [isHistoricalBypass, setIsHistoricalBypass] = useState(false)
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([])
   const [isBulkCleanupModalOpen, setIsBulkCleanupModalOpen] = useState(false)
   const [bulkProcessing, setBulkProcessing] = useState(false)
@@ -230,14 +229,12 @@ export function AdminOrders() {
   const handleUpdateStatus = async (
     orderId: string,
     newStatus: OrderStatus,
-    fulfillmentLocationId?: string,
-    bypassStock?: boolean
+    fulfillmentLocationId?: string
   ) => {
     const selectedOrder = orders.find(order => order.id === orderId)
-    if (newStatus === 'delivered' && !fulfillmentLocationId && !bypassStock) {
+    if (newStatus === 'delivered' && !fulfillmentLocationId) {
       setDeliveryOrder(selectedOrder ?? null)
       setDeliveryLocationId('')
-      setIsHistoricalBypass(false)
       setOpenDropdownId(null)
       return
     }
@@ -245,24 +242,23 @@ export function AdminOrders() {
     try {
       let error: any = null
       if (newStatus === 'delivered') {
-        if (bypassStock) {
+        if (fulfillmentLocationId) {
+          const rpcRes = await supabase.rpc('fulfill_order_from_location', {
+            p_order_id: orderId,
+            p_location_id: fulfillmentLocationId
+          })
+          error = rpcRes.error
+        } else {
           const updateRes = await supabase
             .from('orders')
             .update({
               status: 'delivered',
               delivered_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
-              fulfillment_location_id: fulfillmentLocationId || null,
-              notes: (selectedOrder?.notes || '') + ' [Historical Delivery Cleanup (No Stock Deducted)]'
+              notes: (selectedOrder?.notes || '') + ' [Delivered — No inventory recorded at time of fulfillment]'
             })
             .eq('id', orderId)
           error = updateRes.error
-        } else {
-          const rpcRes = await supabase.rpc('fulfill_order_from_location', {
-            p_order_id: orderId,
-            p_location_id: fulfillmentLocationId
-          })
-          error = rpcRes.error
         }
       } else {
         const updateRes = await supabase
@@ -335,7 +331,6 @@ export function AdminOrders() {
       if (newStatus === 'delivered') {
         setDeliveryOrder(null)
         setDeliveryLocationId('')
-        setIsHistoricalBypass(false)
         fetchData()
       }
     } catch (err) {
@@ -1086,55 +1081,49 @@ export function AdminOrders() {
                   <button type="button" onClick={() => setDeliveryOrder(null)} className="rounded-lg p-1 text-surface-400 hover:bg-surface-100 hover:text-surface-700"><X className="h-5 w-5" /></button>
                 </div>
 
-                {/* Legacy / Historical Order Bypass Toggle */}
-                <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl space-y-1.5">
-                  <label className="flex items-center gap-2.5 text-xs font-bold text-amber-950 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={isHistoricalBypass}
-                      onChange={e => {
-                        setIsHistoricalBypass(e.target.checked)
-                        if (e.target.checked) setDeliveryLocationId('')
-                      }}
-                      className="w-4 h-4 rounded border-amber-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
-                    />
-                    <span>Historical Order Cleanup (Bypass Current Stock Deduction)</span>
-                  </label>
-                  <p className="text-[11px] text-amber-800 leading-snug font-medium pl-6">
-                    Check this box for legacy orders placed before multi-branch stock tracking. It will mark the order Delivered and record DSA sales/commissions without subtracting from today's physical branch inventory.
-                  </p>
-                </div>
-
-                {!isHistoricalBypass ? (
-                  <div className="mt-4 space-y-2">
-                    <p className="text-xs font-bold text-surface-700">Select Branch Inventory Location:</p>
-                    {inventoryLocations.map(location => {
-                      const available = Number(locationInventory.find(item => item.location_id === location.id && item.product_id === deliveryOrder.product_id)?.quantity || 0)
-                      const enough = available >= (deliveryOrder.quantity || 1)
-                      return (
-                        <label key={location.id} className={`flex items-center justify-between rounded-xl border p-3 ${enough ? 'cursor-pointer border-surface-200 hover:border-brand-300' : 'cursor-not-allowed border-surface-100 bg-surface-50 opacity-60'}`}>
-                          <span className="flex items-center gap-3"><input type="radio" name="fulfillment-location" disabled={!enough} checked={deliveryLocationId === location.id} onChange={() => setDeliveryLocationId(location.id)} /><span><span className="block text-sm font-bold text-surface-900">{location.name}</span><span className="block text-xs text-surface-500">{location.address || 'No address set'}</span></span></span>
-                          <span className={`text-xs font-bold ${enough ? 'text-success-700' : 'text-danger-600'}`}>{available} available</span>
-                        </label>
-                      )
-                    })}
-                    {inventoryLocations.length === 0 && <p className="rounded-xl bg-warning-50 p-3 text-sm text-warning-800">No inventory location is configured. Run the V3 database migration, then capture stock on the Products page.</p>}
-                  </div>
-                ) : (
-                  <div className="mt-4 p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 font-medium">
-                    ✨ Ready to confirm historical delivery. Current branch stock will remain untouched.
-                  </div>
-                )}
+                {(() => {
+                  const hasStock = inventoryLocations.some(loc =>
+                    Number(locationInventory.find(i => i.location_id === loc.id && i.product_id === deliveryOrder.product_id)?.quantity || 0)
+                    >= (deliveryOrder.quantity || 1)
+                  )
+                  return hasStock ? (
+                    <div className="mt-4 space-y-2">
+                      <p className="text-xs font-bold text-surface-700">Select Branch Inventory Location:</p>
+                      {inventoryLocations.map(location => {
+                        const available = Number(locationInventory.find(item => item.location_id === location.id && item.product_id === deliveryOrder.product_id)?.quantity || 0)
+                        const enough = available >= (deliveryOrder.quantity || 1)
+                        return (
+                          <label key={location.id} className={`flex items-center justify-between rounded-xl border p-3 ${enough ? 'cursor-pointer border-surface-200 hover:border-brand-300' : 'cursor-not-allowed border-surface-100 bg-surface-50 opacity-60'}`}>
+                            <span className="flex items-center gap-3"><input type="radio" name="fulfillment-location" disabled={!enough} checked={deliveryLocationId === location.id} onChange={() => setDeliveryLocationId(location.id)} /><span><span className="block text-sm font-bold text-surface-900">{location.name}</span><span className="block text-xs text-surface-500">{location.address || 'No address set'}</span></span></span>
+                            <span className={`text-xs font-bold ${enough ? 'text-success-700' : 'text-danger-600'}`}>{available} available</span>
+                          </label>
+                        )
+                      })}
+                      {inventoryLocations.length === 0 && <p className="rounded-xl bg-warning-50 p-3 text-sm text-warning-800">No inventory location is configured.</p>}
+                    </div>
+                  ) : (
+                    <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
+                      <p className="text-xs font-bold text-amber-900">No inventory recorded for this product</p>
+                      <p className="text-[11px] text-amber-800 mt-1 leading-snug">
+                        No branch currently holds stock for this item. The order will be marked as Delivered and commissions will be recorded — inventory will not be deducted.
+                      </p>
+                    </div>
+                  )
+                })()}
 
                 <div className="mt-6 flex justify-end gap-3 border-t border-surface-100 pt-4">
                   <button type="button" className="btn-outline" onClick={() => setDeliveryOrder(null)} disabled={Boolean(updating)}>Cancel</button>
                   <button
                     type="button"
                     className="btn-primary"
-                    disabled={(!deliveryLocationId && !isHistoricalBypass) || Boolean(updating)}
-                    onClick={() => handleUpdateStatus(deliveryOrder.id, 'delivered', deliveryLocationId || undefined, isHistoricalBypass)}
+                    disabled={(
+                      inventoryLocations.some(loc =>
+                        Number(locationInventory.find(i => i.location_id === loc.id && i.product_id === deliveryOrder.product_id)?.quantity || 0) >= (deliveryOrder.quantity || 1)
+                      ) && !deliveryLocationId
+                    ) || Boolean(updating)}
+                    onClick={() => handleUpdateStatus(deliveryOrder.id, 'delivered', deliveryLocationId || undefined)}
                   >
-                    {updating ? 'Completing...' : isHistoricalBypass ? 'Confirm Historical Delivery' : 'Confirm Delivery'}
+                    {updating ? 'Completing...' : 'Confirm Delivery'}
                   </button>
                 </div>
               </motion.div>
