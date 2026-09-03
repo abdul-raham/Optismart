@@ -740,7 +740,7 @@ export function UserDetail() {
                 <DollarSign className="w-4 h-4 text-cyan-600" /> Total Sales Value
               </span>
               <p className="text-2xl font-black text-surface-900 mt-2">
-                {formatCurrency(userOrders.filter(o => o.status !== 'cancelled').reduce((sum, o) => sum + Number(o.total_amount || 0), 0))}
+                {formatCurrency(userOrders.filter(o => o.status === 'delivered').reduce((sum, o) => sum + Number(o.total_amount || 0), 0))}
               </p>
             </div>
 

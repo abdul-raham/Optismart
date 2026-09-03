@@ -47,7 +47,8 @@ export function AdminDashboard() {
 
       if (orders) {
         const activeOrders = orders.filter(o => o.status !== 'cancelled')
-        const revenue = activeOrders.reduce((sum, o) => sum + Number(o.total_amount), 0)
+        const deliveredOrders = orders.filter(o => o.status === 'delivered')
+        const revenue = deliveredOrders.reduce((sum, o) => sum + Number(o.total_amount), 0)
         
         // Outstanding orders: pending, unassigned, in_progress, processing
         const outstanding = orders.filter(o => ['pending', 'unassigned', 'in_progress', 'processing'].includes(o.status))

@@ -269,12 +269,12 @@ export function AdminReports() {
         monthMap[month].cameras += o.quantity || 0
         monthMap[month].delivered_orders += 1
         monthMap[month].revenue += o.total_amount || 0
-      }
 
-      const dsaName = o.dsa?.full_name || 'Unregistered'
-      if (!dsaMonthSales[month]) dsaMonthSales[month] = {}
-      if (!dsaMonthSales[month][dsaName]) dsaMonthSales[month][dsaName] = 0
-      dsaMonthSales[month][dsaName] += o.quantity || 0
+        const dsaName = o.dsa?.full_name || 'Unregistered'
+        if (!dsaMonthSales[month]) dsaMonthSales[month] = {}
+        if (!dsaMonthSales[month][dsaName]) dsaMonthSales[month][dsaName] = 0
+        dsaMonthSales[month][dsaName] += o.quantity || 0
+      }
     });
 
     (comms || []).forEach((c: any) => {
