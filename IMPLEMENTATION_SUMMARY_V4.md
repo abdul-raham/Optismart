@@ -1,22 +1,22 @@
-# OptiSmart Portal — Implementation & Workflow Guide (v4 Update)
+# OptiSmart Portal — System Updates & Workflow Guide
 
-This document provides a comprehensive explanation of all system updates, business logic corrections, operational workflows, and SQL scripts implemented today.
+This document provides a clear explanation of all portal system updates, sales reporting fixes, stock fulfillment rules, and database setup instructions.
 
 ---
 
-## 1. The Sales Report Discrepancy & Pending Orders Fix
+## 1. Accurate Sales Reporting & Pending Orders Fix
 
 ### The Problem
-Previously, the sales reports and DSA summaries counted **all created orders** (including `pending`, `processing`, `dispatched`, etc.) as "Cameras Sold" and "Delivered Revenue". This inflated DSA performance figures (e.g., showing 139 cameras sold instead of the actual 55 delivered units).
+Previously, the portal counted all created orders (including `pending`, `processing`, `dispatched`, etc.) as "Cameras Sold" and "Delivered Revenue". This caused inaccurate sales figures (e.g. showing 139 cameras sold instead of 55 delivered).
 
-### The Business Rule
-> **Core Rule**: *"Pending orders do NOT count as sold. Only orders with status `delivered` represent actual sales and revenue."*
+### The System Rule
+> **Core Rule**: *"Pending orders do NOT count as sold. Only orders with status DELIVERED represent actual sales and revenue."*
 
-### Implementation Highlights (`src/pages/admin/Reports.tsx`)
-- **Cameras Sold**: Calculated strictly when `status === 'delivered'`.
-- **Delivered Revenue**: Calculated strictly when `status === 'delivered'`.
+### What Changed in Reports
+- **Cameras Sold**: Calculated strictly when status is `Delivered`.
+- **Delivered Revenue**: Calculated strictly when status is `Delivered`.
 - **Pending Orders**: Explicitly tracks active pipeline orders (`pending`, `approved`, `processing`, `dispatched`, `rescheduled`).
-- **Total Originated Orders**: Maintained for full historical and audit visibility.
+- **Total Originated Orders**: Maintained for full audit visibility.
 - **Table & Export Transparency**: Updated UI headers and CSV/Excel exports to display:
   - `Delivered Cameras`
   - `Delivered Orders`
@@ -26,60 +26,56 @@ Previously, the sales reports and DSA summaries counted **all created orders** (
 
 ---
 
-## 2. Legacy / Historical Pending Order Fulfillment Flow
+## 2. Automatic Historical Pending Order Fulfillment
 
 ### The Problem
-Historical pending orders created before multi-branch inventory tracking was introduced could not be marked as delivered without attempting to deduct current store inventory or requiring manual branch selection.
+Historical pending orders created before multi-branch inventory tracking was introduced could not be marked as delivered without attempting to deduct current shop inventory or requiring manual settings.
 
-### Solution: Smart Auto-Detect Fulfillment (`src/pages/admin/Orders.tsx`)
-- **No Manual Checkboxes**: We removed manual "Historical Order Cleanup" toggle checkboxes to prevent human error, confusion across multiple DSAs, and race conditions.
+### New Automatic Flow
+- **No Manual Checkboxes**: Manual toggle checkboxes were removed to prevent human error, confusion across multiple DSAs, and multi-admin race conditions.
 - **Automated Inventory Detection**:
-  - When an admin clicks **Mark Delivered**, the system checks physical inventory across all branch locations for that product.
-  - **If Inventory Exists**: The branch selection UI is shown, and stock is deducted via `fulfill_order_from_location`.
-  - **If No Inventory Exists** (e.g., historical orders or un-tracked items): The modal displays an automated message:
-    > *"No inventory recorded for this product — The order will be marked as Delivered and commissions will be recorded without deducting stock."*
-  - Admin clicks **Confirm Delivery** once to fulfill the order cleanly with an automated audit note appended.
+  - When an admin clicks **Mark Delivered**, the system automatically checks physical inventory across all branch locations for that product.
+  - **If Inventory Exists**: The branch selection menu is shown, and stock is deducted from the chosen store location.
+  - **If No Inventory Exists** (e.g., historical orders or un-tracked items): The system automatically detects this and displays:
+    > *"No inventory recorded for this product — Order will be marked as Delivered and commissions recorded without deducting stock."*
+  - Admin simply clicks **Confirm Delivery**. The system handles the decision automatically with zero manual toggles.
 
 ---
 
 ## 3. Physical Inventory Count Override Tool
 
-### Overview (`src/pages/admin/Products.tsx` & `feature_update_v4.sql`)
-To match database inventory numbers with actual physical store shelf counts:
-- Super Admins / Authorized Admins can navigate to **Products ➔ Inventory** and select **Set Physical Count**.
-- Specifying a target quantity (e.g. setting shelf count to `15` units) calculates the variance against previous database inventory.
-- The stored function `public.inventory_set_physical_count` updates branch inventory and logs a corresponding `stock_in` or `stock_out` audit entry in `stock_movements`.
+### How to Match Database Stock with Physical Store Shelf Stock
+- Navigate to **Admin Portal ➔ Products ➔ Inventory tab**.
+- Click **Set Physical Count** next to any product.
+- Enter the exact number of units physically sitting on your store shelf (e.g. `15`).
+- The system automatically calculates the difference, updates the inventory count, and logs an audit movement note.
 
 ---
 
 ## 4. Granular Admin Permissions & Admin Profile View
 
-1. **Permission Flags**: Added granular permission toggles to `public.users`:
-   - `can_manage_inventory`
-   - `can_manage_users`
-   - `can_manage_expenses`
-   - `can_view_reports`
-   - `can_delete_records`
-2. **Admin Profile View (`UserDetail.tsx`)**:
-   - Admin user cards now display administrative permission settings and inventory audit logs executed by that admin.
+1. **Permission Controls**: Super Admins can toggle individual permission flags on admin users:
+   - `Manage Inventory`
+   - `Manage Users`
+   - `Manage Expenses`
+   - `View Reports`
+   - `Delete Records`
+2. **Admin Profile Cards**:
+   - Admin user cards in the Portal now display exact administrative permissions and inventory audit logs executed by that admin.
 
 ---
 
-## 5. SQL Migration Script Instructions (`feature_update_v4.sql`)
+## 5. Database Setup Script to Run in Supabase
 
-Run the contents of [feature_update_v4.sql](file:///c:/Users/Abdurrahman/Documents/Optismart/feature_update_v4.sql) in your **Supabase SQL Editor**. It is idempotent and safe to run multiple times.
+Please copy and run the script below in your **Supabase SQL Editor** (safe to re-run anytime):
 
 ```sql
--- OPTISMART FEATURE UPDATE V4
--- Granular Super Admin Permission Toggles & Physical Stock Audit Override
-
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS can_manage_inventory BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS can_manage_users BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS can_manage_expenses BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS can_view_reports BOOLEAN NOT NULL DEFAULT true;
 ALTER TABLE public.users ADD COLUMN IF NOT EXISTS can_delete_records BOOLEAN NOT NULL DEFAULT false;
 
--- Direct Stock Count Override (Set Physical Inventory Count)
 CREATE OR REPLACE FUNCTION public.inventory_set_physical_count(
   p_product_id UUID,
   p_location_id UUID,
@@ -130,11 +126,3 @@ END; $$;
 
 GRANT EXECUTE ON FUNCTION public.inventory_set_physical_count(UUID, UUID, INTEGER, TEXT) TO authenticated;
 ```
-
----
-
-## 6. Verification Status
-
-- **TypeScript Compilation**: 0 Errors (`tsc` passed).
-- **Vite Production Build**: Successfully built bundle (`npm run build`).
-- **Git Repository**: All code changes committed and pushed to `main`.
