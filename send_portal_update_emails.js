@@ -72,7 +72,7 @@ async function run() {
     process.exit(1)
   }
 
-  console.log(`Found ${users.length} active users. Dispatching role-tailored announcement emails...\n`)
+  console.log(`Found ${users.length} active users. Dispatching deliverability-optimized announcement emails...\n`)
 
   let successCount = 0
   for (const user of users) {
@@ -82,13 +82,15 @@ async function run() {
     const name = user.full_name || user.email.split('@')[0]
 
     let subject = ''
+    let textContent = ''
     let htmlContent = ''
 
     if (isAdmin) {
-      subject = `OptiSmart Portal Release: Dual Admin Sales Rights & Automated Commissions 🛡️`
+      subject = `OptiSmart System Update: Administrative Enhancements`
+      textContent = `Hello ${name},\n\nWe have deployed system updates tailored for administrative management:\n\n1. Dual Admin + DSA Posting Rights: Post orders and leads directly under your own name while maintaining full Admin powers.\n2. Targeted Account Consolidation: Interactive login prompt to consolidate duplicate accounts into 1 primary profile.\n3. Fail-safe Commission Trigger: Automated database trigger calculates and logs ₦5,000/camera commissions automatically when orders are delivered.\n4. Physical Inventory Count Override: Set physical stock counts on hand with audit trail logs.\n5. Security Controls: Toggle individual Admin permissions for Inventory, Users, Expenses, Reports, and Deletions.\n\nOpen Admin Portal: ${appUrl}/app/admin\n\nOptiSmart Team`
       htmlContent = layout('Portal System Upgrade', `
         <h2>Hello ${escapeHtml(name)},</h2>
-        <p>We've deployed major portal enhancements tailored for administrative management & dual sales capabilities!</p>
+        <p>We have deployed system updates tailored for administrative management and sales tracking.</p>
         
         <div class="feature-box">
           <h3>Admin & Management Features Released:</h3>
@@ -106,15 +108,16 @@ async function run() {
         </div>
       `)
     } else {
-      subject = `OptiSmart Portal Release: Automatic Commission Logging & Live Leaderboard 🚀`
-      htmlContent = layout('New Portal Features', `
+      subject = `OptiSmart Portal Update: New Features for Your Account`
+      textContent = `Hello ${name},\n\nWe have deployed new performance and tracking features to your OptiSmart Portal:\n\n1. Automated Commission Logging: Your ₦5,000 commission per camera is calculated and credited automatically when an order is marked delivered.\n2. My Commissions Dashboard: Track your total earnings, pending payouts, and paid commission history.\n3. Live Sales Leaderboard: View your global rank based on delivered orders and total revenue.\n4. Seamless Lead & Order Entry: Quickly post leads, set follow-up dates, and track customer orders.\n\nOpen your portal here: ${appUrl}/app/dsa\n\nOptiSmart Team`
+      htmlContent = layout('New DSA Features', `
         <h2>Hello ${escapeHtml(name)},</h2>
-        <p>We've deployed exciting new performance and tracking features to your OptiSmart Portal!</p>
+        <p>We have deployed new performance and tracking features to your OptiSmart Portal.</p>
         
         <div class="feature-box">
-          <h3>What's New In Your DSA Portal:</h3>
+          <h3>What is New In Your DSA Portal:</h3>
           <ul>
-            <li><strong>Automated Commission Logging:</strong> Your ₦5,000 commission per camera is calculated and credited automatically the instant an order is marked delivered!</li>
+            <li><strong>Automated Commission Logging:</strong> Your ₦5,000 commission per camera is calculated and credited automatically the instant an order is marked delivered.</li>
             <li><strong>My Commissions Dashboard:</strong> Track your real-time total earnings, pending payouts, and paid commission history line-by-line.</li>
             <li><strong>Live Sales Leaderboard:</strong> Compete and view your global rank based on delivered orders and total revenue.</li>
             <li><strong>Seamless Lead & Order Entry:</strong> Quickly post leads, set follow-up dates, and track customer orders.</li>
@@ -130,18 +133,24 @@ async function run() {
     try {
       await transporter.sendMail({
         from: `"${fromName}" <${gmailUser}>`,
+        replyTo: gmailUser,
         to: user.email,
         subject: subject,
-        html: htmlContent
+        text: textContent,
+        html: htmlContent,
+        headers: {
+          'X-Mailer': 'OptiSmart Portal Service',
+          'X-Entity-Ref-ID': Date.now().toString(),
+        }
       })
-      console.log(`✓ Email sent to ${user.email} (${user.role})`)
+      console.log(`✓ High-deliverability email sent to ${user.email} (${user.role})`)
       successCount++
     } catch (sendErr) {
       console.error(`✕ Failed to send email to ${user.email}:`, sendErr.message)
     }
   }
 
-  console.log(`\nSuccessfully dispatched ${successCount}/${users.length} role-tailored announcement emails!`)
+  console.log(`\nSuccessfully dispatched ${successCount}/${users.length} deliverability-optimized announcement emails!`)
   process.exit(0)
 }
 

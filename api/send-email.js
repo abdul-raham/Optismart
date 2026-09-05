@@ -200,15 +200,16 @@ const templates = {
 
   portal_update_dsa: ({ recipientEmail, recipientName }) => ({
     to: recipientEmail,
-    subject: `OptiSmart Portal Update: Automatic Commission Logging & Live Leaderboard 🚀`,
+    subject: `OptiSmart Portal Update: New Features for Your Account`,
+    text: `Hello ${recipientName || 'Sales Partner'},\n\nWe have deployed new performance and tracking features to your OptiSmart Portal:\n\n1. Automated Commission Logging: Your ₦5,000 commission per camera is calculated and credited automatically when an order is marked delivered.\n2. My Commissions Dashboard: Track your total earnings, pending payouts, and paid commission history.\n3. Live Sales Leaderboard: View your global rank based on delivered orders and total revenue.\n4. Seamless Lead & Order Entry: Quickly post leads, set follow-up dates, and track customer orders.\n\nOpen your portal here: ${appUrl}/app/dsa\n\nOptiSmart Team`,
     html: layout('New DSA Features', `
       <h2>Hello ${escapeHtml(recipientName || 'Sales Partner')},</h2>
-      <p>We've deployed exciting new performance and tracking features to your OptiSmart Portal!</p>
+      <p>We have deployed new performance and tracking features to your OptiSmart Portal.</p>
       
       <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; margin: 24px 0;">
-        <h3 style="margin-top: 0; color: #0A74FF;">What's New In Your DSA Portal:</h3>
+        <h3 style="margin-top: 0; color: #0A74FF;">What is New In Your DSA Portal:</h3>
         <ul style="padding-left: 20px; color: #334155; margin-bottom: 0;">
-          <li style="margin-bottom: 12px;"><strong>Automated Commission Logging:</strong> Your ₦5,000 commission per camera is calculated and credited automatically the instant an order is delivered!</li>
+          <li style="margin-bottom: 12px;"><strong>Automated Commission Logging:</strong> Your ₦5,000 commission per camera is calculated and credited automatically the instant an order is marked delivered.</li>
           <li style="margin-bottom: 12px;"><strong>My Commissions Dashboard:</strong> Track your real-time total earnings, pending payouts, and paid commission history line-by-line.</li>
           <li style="margin-bottom: 12px;"><strong>Live Sales Leaderboard:</strong> Compete and view your global rank based on delivered orders and total revenue.</li>
           <li style="margin-bottom: 0;"><strong>Seamless Lead & Order Entry:</strong> Quickly post leads, set follow-up dates, and track customer orders.</li>
@@ -221,10 +222,11 @@ const templates = {
 
   portal_update_admin: ({ recipientEmail, recipientName }) => ({
     to: recipientEmail,
-    subject: `OptiSmart Portal Update: Dual Admin Sales Rights & Automated Commissions 🛡️`,
+    subject: `OptiSmart System Update: Administrative Enhancements`,
+    text: `Hello ${recipientName || 'Administrator'},\n\nWe have deployed system updates tailored for administrative management:\n\n1. Dual Admin + DSA Posting Rights: Post orders and leads directly under your own name while maintaining full Admin powers.\n2. Targeted Account Consolidation: Interactive login prompt to consolidate duplicate accounts into 1 primary profile.\n3. Fail-safe Commission Trigger: Automated database trigger calculates and logs ₦5,000/camera commissions automatically when orders are delivered.\n4. Physical Inventory Count Override: Set physical stock counts on hand with audit trail logs.\n5. Security Controls: Toggle individual Admin permissions for Inventory, Users, Expenses, Reports, and Deletions.\n\nOpen Admin Portal: ${appUrl}/app/admin\n\nOptiSmart Team`,
     html: layout('Portal System Upgrade', `
       <h2>Hello ${escapeHtml(recipientName || 'Administrator')},</h2>
-      <p>We've deployed major portal enhancements tailored for administrative management & dual sales capabilities!</p>
+      <p>We have deployed system updates tailored for administrative management and sales tracking.</p>
       
       <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 16px; padding: 24px; margin: 24px 0;">
         <h3 style="margin-top: 0; color: #0A74FF;">Admin Features Released:</h3>
@@ -271,6 +273,11 @@ export default async function handler(req, res) {
 
     await transporter.sendMail({
       from: `"${String(fromName).replace(/["\r\n]/g, '')}" <${emailUser}>`,
+      replyTo: supportEmail,
+      headers: {
+        'X-Mailer': 'OptiSmart Portal Service',
+        'X-Entity-Ref-ID': Date.now().toString(),
+      },
       ...email,
     })
 
