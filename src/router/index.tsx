@@ -172,6 +172,8 @@ export function AppRouter() {
             <Route path="/app/admin/analytics"  element={<AdminAnalytics />} />
             <Route path="/app/admin/training"   element={<AdminTraining />} />
             <Route path="/app/admin/reports"    element={<AdminReports />} />
+            <Route path="/app/admin/commissions" element={<DSACommissions />} />
+            <Route path="/app/admin/leaderboard" element={<DSALeaderboard />} />
           </Route>
 
           {/* DSA */}

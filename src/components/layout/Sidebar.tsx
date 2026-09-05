@@ -46,6 +46,8 @@ export const NAV_ITEMS: Record<UserRole, NavItem[]> = {
     { label: 'Installers', href: '/app/admin/installers', icon: Wrench },
     { label: 'Analytics',  href: '/app/admin/analytics',  icon: BarChart3 },
     { label: 'Reports',    href: '/app/admin/reports',    icon: FileText },
+    { label: 'My Commissions', href: '/app/admin/commissions', icon: Banknote },
+    { label: 'Leaderboard',    href: '/app/admin/leaderboard', icon: Award },
     { label: 'Training',   href: '/app/admin/training',   icon: BookOpen },
     { label: 'Settings',   href: '/app/settings',         icon: Settings },
   ],
