@@ -30,8 +30,8 @@ export function DSALeaderboard() {
   const fetchLeaderboard = async () => {
     setLoading(true)
     try {
-      // 1. Fetch all DSAs
-      const { data: dsas } = await supabase.from('users').select('id, full_name, email').eq('role', 'dsa')
+      // 1. Fetch all sales agents (DSAs & Admins)
+      const { data: dsas } = await supabase.from('users').select('id, full_name, email').in('role', ['dsa', 'admin', 'super_admin']).eq('status', 'active')
       
       // 2. Fetch all delivered orders (filter by date later or query)
       const { data: orders } = await supabase.from('orders').select('dsa_id, created_at, total_amount').eq('status', 'delivered')

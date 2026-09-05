@@ -114,6 +114,28 @@ export const useAuthStore = create<AuthState>()(
               return { error: 'Your account is suspended. Contact admin.' }
             }
 
+            // Auto-consolidate any duplicate accounts sharing the same phone number
+            if (profile.phone) {
+              try {
+                const { data: duplicates } = await supabase
+                  .from('users')
+                  .select('id')
+                  .eq('phone', profile.phone)
+                  .neq('id', profile.id)
+
+                if (duplicates && duplicates.length > 0) {
+                  for (const dup of duplicates) {
+                    await supabase.rpc('merge_duplicate_user_accounts', {
+                      primary_user_id: profile.id,
+                      duplicate_user_id: dup.id
+                    })
+                  }
+                }
+              } catch (mergeErr) {
+                console.warn('Auto-merge duplicate accounts notice:', mergeErr)
+              }
+            }
+
             set({
               user: profile as User,
               role: profile.role as UserRole,

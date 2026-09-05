@@ -58,10 +58,20 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
 
   const fetchDsas = async () => {
     try {
-      const { data } = await supabase.from('users').select('id, full_name').eq('role', 'dsa')
-      if (data) setDsas(data)
+      const { data } = await supabase
+        .from('users')
+        .select('id, full_name, role')
+        .in('role', ['dsa', 'admin', 'super_admin'])
+        .eq('status', 'active')
+        .order('full_name')
+      if (data) {
+        setDsas(data)
+        if (user?.id && (!selectedDsaId || selectedDsaId === '')) {
+          setSelectedDsaId(user.id)
+        }
+      }
     } catch (err) {
-      console.error('Error fetching DSAs:', err)
+      console.error('Error fetching sales agents:', err)
     }
   }
 
@@ -326,9 +336,11 @@ export function CreateOrderModal({ isOpen, onClose, onSuccess }: CreateOrderModa
                         onChange={(e) => setSelectedDsaId(e.target.value)}
                         className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-surface-200 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 outline-none text-sm transition-all bg-white appearance-none"
                       >
-                        <option value="" disabled>Select a DSA...</option>
+                        <option value="" disabled>Select Sales Agent / DSA...</option>
                         {dsas.map(dsa => (
-                          <option key={dsa.id} value={dsa.id}>{dsa.full_name}</option>
+                          <option key={dsa.id} value={dsa.id}>
+                            {dsa.full_name} {dsa.id === user?.id ? '(Me)' : dsa.role !== 'dsa' ? `(${dsa.role.replace('_', ' ')})` : ''}
+                          </option>
                         ))}
                       </select>
                     </div>

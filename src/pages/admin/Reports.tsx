@@ -143,7 +143,7 @@ export function AdminReports() {
   }
 
   const fetchDsaList = async () => {
-    const { data, error } = await supabase.from('users').select('id, full_name').eq('role', 'dsa').eq('status', 'active')
+    const { data, error } = await supabase.from('users').select('id, full_name, role').in('role', ['dsa', 'admin', 'super_admin']).eq('status', 'active').order('full_name')
     if (error) throw error
     if (data) setDsaList(data)
   }
