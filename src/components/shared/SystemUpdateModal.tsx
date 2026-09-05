@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Sparkles, CheckCircle2, Sliders, Clock, ShoppingBag, ShieldCheck, X, ArrowRight, Package, DollarSign } from 'lucide-react'
+import { Sparkles, CheckCircle2, Sliders, Clock, ShoppingBag, ShieldCheck, X, ArrowRight, Package, DollarSign, Award, Target, BookOpen, UserCheck, Banknote } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { supabase } from '@/lib/supabase'
 
@@ -12,54 +12,92 @@ const ICON_MAP: Record<string, any> = {
   DollarSign,
   Sliders,
   ShoppingBag,
+  Award,
+  Target,
+  BookOpen,
+  UserCheck,
+  Banknote,
 }
 
-const STATIC_RELEASE_VERSION = 'v3.1_aug_2026'
+const STATIC_RELEASE_VERSION = 'v4.5_sept_2026'
 
-const STATIC_FEATURES = [
-  {
-    icon: Package,
-    color: 'text-brand-600 bg-brand-50 border-brand-200',
-    title: 'Multi-Branch Inventory & Stock Control',
-    description: 'Track camera stock across multiple locations (Lagos HQ, Abuja Branch, PH Depot). Log Stock In, perform inter-branch Stock Transfers, and view stock movement audit logs.',
-    route: '/app/admin/products'
-  },
-  {
-    icon: ShieldCheck,
-    color: 'text-emerald-600 bg-emerald-50 border-emerald-200',
-    title: 'Dedicated Admin Probation Review Panel',
-    description: 'Clean admin review card on DSA profiles for agents under the 20-order target. Confirm probation or waive targets with distinct, clear buttons.',
-    route: '/app/admin/users?highlight=probation'
-  },
-  {
-    icon: Clock,
-    color: 'text-amber-500 bg-amber-50 border-amber-200',
-    title: 'Day 7 Eviction Action Prompt & Clock Pausing',
-    description: 'Automated Day 7 safety suspension with an unmissable Eviction Action Banner for admins to either Reset Window or Delete Account. Suspended accounts are automatically excluded from clock countdowns.',
-    route: '/app/admin/users?highlight=performance'
-  },
-  {
-    icon: DollarSign,
-    color: 'text-cyan-600 bg-cyan-50 border-cyan-200',
-    title: 'Ad Spend Allocation & Per-DSA Tracking',
-    description: 'Assign specific Sales Agents (DSAs) to Advertising & Marketing expenses. View Total Ad Spend Allocation (₦) and Ad Spend Per Delivered Order on DSA profiles.',
-    route: '/app/admin/expenses'
-  },
-  {
-    icon: Sliders,
-    color: 'text-indigo-500 bg-indigo-50 border-indigo-200',
-    title: 'Clean Products Toolbar & Mobile Responsiveness',
-    description: 'Redesigned Products header with segmented tab bar, prominent search bar, and clean responsive toolbar across all admin pages.',
-    route: '/app/admin/products'
-  },
-  {
-    icon: ShoppingBag,
-    color: 'text-rose-500 bg-rose-50 border-rose-200',
-    title: 'Order Fulfillment Stock-Out Integration',
-    description: 'Filter orders by Sales Agent. Marking orders DELIVERED automatically deducts camera inventory from selected branch locations.',
-    route: '/app/admin/orders'
-  }
-]
+const ROLE_FEATURES: Record<string, Array<{ icon: any; color: string; title: string; description: string; route: string }>> = {
+  dsa: [
+    {
+      icon: DollarSign,
+      color: 'text-emerald-600 bg-emerald-50 border-emerald-200',
+      title: 'Automated ₦5,000 Commission Credit',
+      description: 'Your ₦5,000 commission per camera is calculated & credited to your account automatically the instant an order is marked delivered!',
+      route: '/app/dsa/commission'
+    },
+    {
+      icon: Banknote,
+      color: 'text-cyan-600 bg-cyan-50 border-cyan-200',
+      title: 'My Commissions Real-Time Dashboard',
+      description: 'View total earnings, pending payout balances, and complete line-by-line commission records per order.',
+      route: '/app/dsa/commission'
+    },
+    {
+      icon: Award,
+      color: 'text-amber-500 bg-amber-50 border-amber-200',
+      title: 'Live Global DSA Sales Leaderboard',
+      description: 'Track your global rank, delivered order count, and revenue performance live against other Sales Agents.',
+      route: '/app/dsa/leaderboard'
+    },
+    {
+      icon: Target,
+      color: 'text-brand-600 bg-brand-50 border-brand-200',
+      title: 'Streamlined Lead & Order Submissions',
+      description: 'Capture prospective customers, schedule follow-up reminders, and log customer orders with instant email receipts.',
+      route: '/app/dsa/leads'
+    },
+    {
+      icon: BookOpen,
+      color: 'text-indigo-500 bg-indigo-50 border-indigo-200',
+      title: 'ProNet Training & Certificate Catalog',
+      description: 'Access video lessons, technical guides, ebooks, and earn your official OptiSmart Sales & Technical Certificate.',
+      route: '/app/training'
+    }
+  ],
+
+  admin: [
+    {
+      icon: UserCheck,
+      color: 'text-brand-600 bg-brand-50 border-brand-200',
+      title: 'Dual Admin + Personal DSA Sales Rights',
+      description: 'Post orders and leads directly under your own name as a sales agent while maintaining full Admin administrative control & earning commissions.',
+      route: '/app/admin/orders'
+    },
+    {
+      icon: Sparkles,
+      color: 'text-cyan-600 bg-cyan-50 border-cyan-200',
+      title: 'Targeted Interactive Account Upgrade Prompt',
+      description: 'Promoted users receive an interactive login choice modal to consolidate duplicate accounts into 1 primary profile with zero data loss.',
+      route: '/app/admin/users'
+    },
+    {
+      icon: DollarSign,
+      color: 'text-emerald-600 bg-emerald-50 border-emerald-200',
+      title: 'Fail-Safe Automated Commission Engine',
+      description: 'Database-level trigger calculates and logs ₦5,000/camera commissions automatically whenever any order status changes to Delivered.',
+      route: '/app/admin/commissions'
+    },
+    {
+      icon: Package,
+      color: 'text-indigo-500 bg-indigo-50 border-indigo-200',
+      title: 'Physical Inventory Count Override',
+      description: 'Directly set exact shelf inventory counts per branch location with automated audit logging for stock accuracy.',
+      route: '/app/admin/products'
+    },
+    {
+      icon: ShieldCheck,
+      color: 'text-rose-500 bg-rose-50 border-rose-200',
+      title: 'Granular Admin Security Permissions',
+      description: 'Custom security toggles for Manage Inventory, Manage Users, Manage Expenses, View Reports, and Delete Records per Admin.',
+      route: '/app/admin/users'
+    }
+  ]
+}
 
 export function SystemUpdateModal() {
   const { user } = useAuthStore()
@@ -67,18 +105,21 @@ export function SystemUpdateModal() {
   const [isOpen, setIsOpen] = useState(false)
   const [activeVersion, setActiveVersion] = useState(STATIC_RELEASE_VERSION)
   const [updateTitle, setUpdateTitle] = useState("What's New in OptiSmart Portal")
-  const [updateSubtitle, setUpdateSubtitle] = useState("We've deployed major performance tracking, probation automation, and analytics tools. Here's a breakdown of the new features:")
-  const [featuresList, setFeaturesList] = useState<any[]>(STATIC_FEATURES)
+  const [updateSubtitle, setUpdateSubtitle] = useState("We've deployed new performance, automation, and tracking tools tailored for your role:")
+  const [featuresList, setFeaturesList] = useState<any[]>([])
 
   useEffect(() => {
     if (!user) return
-    const isAdmin = user.role === 'admin' || user.role === 'super_admin'
-    if (!isAdmin) return
-
     checkForUpdates()
   }, [user])
 
   const checkForUpdates = async () => {
+    if (!user) return
+
+    const role = user.role || 'dsa'
+    const isAdmin = role === 'admin' || role === 'super_admin'
+    const roleFeatures = isAdmin ? ROLE_FEATURES.admin : (ROLE_FEATURES[role] || ROLE_FEATURES.dsa)
+
     try {
       // 1. Try to fetch the latest active release update from Supabase public.system_updates table
       const { data, error } = await supabase
@@ -91,7 +132,7 @@ export function SystemUpdateModal() {
       if (!error && data && data.length > 0) {
         const latestDbUpdate = data[0]
         const dbVersion = latestDbUpdate.version_tag
-        const seenVersion = localStorage.getItem('optismart_release_version')
+        const seenVersion = localStorage.getItem(`optismart_release_version_${user.id}`)
 
         if (seenVersion !== dbVersion) {
           setActiveVersion(dbVersion)
@@ -104,26 +145,30 @@ export function SystemUpdateModal() {
               icon: ICON_MAP[f.icon] || Package
             }))
             setFeaturesList(mapped)
+          } else {
+            setFeaturesList(roleFeatures)
           }
           setIsOpen(true)
           return
         }
       }
     } catch (err) {
-      console.warn('Could not query dynamic system_updates table, using static fallback:', err)
+      console.warn('Could not query dynamic system_updates table, using role features fallback:', err)
     }
 
-    // Fallback to static release check
-    const seenVersion = localStorage.getItem('optismart_release_version')
+    // Fallback to role-tailored static features check
+    const seenVersion = localStorage.getItem(`optismart_release_version_${user.id}`)
     if (seenVersion !== STATIC_RELEASE_VERSION) {
       setActiveVersion(STATIC_RELEASE_VERSION)
-      setFeaturesList(STATIC_FEATURES)
+      setFeaturesList(roleFeatures)
       setIsOpen(true)
     }
   }
 
   const handleDismiss = () => {
-    localStorage.setItem('optismart_release_version', activeVersion)
+    if (user?.id) {
+      localStorage.setItem(`optismart_release_version_${user.id}`, activeVersion)
+    }
     setIsOpen(false)
   }
 
@@ -153,7 +198,7 @@ export function SystemUpdateModal() {
             </button>
 
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/20 text-white text-xs font-black uppercase tracking-wider mb-3">
-              <Sparkles className="w-4 h-4 text-amber-300" /> Platform Release {activeVersion}
+              <Sparkles className="w-4 h-4 text-amber-300" /> Release {activeVersion}
             </div>
 
             <h2 className="text-2xl font-bold tracking-tight">{updateTitle}</h2>
@@ -165,11 +210,12 @@ export function SystemUpdateModal() {
           {/* Feature List */}
           <div className="p-6 overflow-y-auto space-y-3 flex-1">
             {featuresList.map((feat, idx) => {
-              const Icon = typeof feat.icon === 'function' ? feat.icon : Package
+              const Icon = typeof feat.icon === 'function' ? feat.icon : (ICON_MAP[feat.icon] || Package)
+              const defaultRoute = user?.role === 'dsa' ? '/app/dsa' : '/app/admin'
               return (
                 <div
                   key={idx}
-                  onClick={() => handleNavigateToFeature(feat.route || '/app/admin')}
+                  onClick={() => handleNavigateToFeature(feat.route || defaultRoute)}
                   className="p-3.5 rounded-2xl border border-surface-200/80 bg-white hover:bg-brand-50/40 hover:border-brand-300 transition-all cursor-pointer group flex items-center justify-between gap-4 shadow-2xs"
                 >
                   <div className="flex items-start gap-3.5">
@@ -196,12 +242,12 @@ export function SystemUpdateModal() {
 
           {/* Footer Action */}
           <div className="p-4 border-t border-surface-100 bg-surface-50 flex items-center justify-between">
-            <span className="text-xs font-semibold text-surface-500">OptiSmart Portal • Automated Updates</span>
+            <span className="text-xs font-semibold text-surface-500">OptiSmart Portal • Role-Based Updates</span>
             <button
               onClick={handleDismiss}
               className="btn-primary px-6 py-2.5 text-xs font-bold flex items-center gap-2 shadow-brand"
             >
-              <CheckCircle2 className="w-4 h-4" /> Got it! Explore New Features
+              <CheckCircle2 className="w-4 h-4" /> Got it! Explore Features
             </button>
           </div>
         </motion.div>
