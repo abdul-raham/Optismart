@@ -15,6 +15,7 @@ interface AuthState {
   login: (email: string, password: string) => Promise<{ error: string | null }>
   logout: () => Promise<void>
   setUser: (user: User | null) => void
+  refreshProfile: () => Promise<void>
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -114,28 +115,6 @@ export const useAuthStore = create<AuthState>()(
               return { error: 'Your account is suspended. Contact admin.' }
             }
 
-            // Auto-consolidate any duplicate accounts sharing the same phone number
-            if (profile.phone) {
-              try {
-                const { data: duplicates } = await supabase
-                  .from('users')
-                  .select('id')
-                  .eq('phone', profile.phone)
-                  .neq('id', profile.id)
-
-                if (duplicates && duplicates.length > 0) {
-                  for (const dup of duplicates) {
-                    await supabase.rpc('merge_duplicate_user_accounts', {
-                      primary_user_id: profile.id,
-                      duplicate_user_id: dup.id
-                    })
-                  }
-                }
-              } catch (mergeErr) {
-                console.warn('Auto-merge duplicate accounts notice:', mergeErr)
-              }
-            }
-
             set({
               user: profile as User,
               role: profile.role as UserRole,
@@ -160,6 +139,25 @@ export const useAuthStore = create<AuthState>()(
 
       setUser: (user) => {
         set({ user, role: user?.role ?? null, isAuthenticated: !!user })
+      },
+
+      refreshProfile: async () => {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.user) {
+          const { data: profile } = await supabase
+            .from('users')
+            .select('*')
+            .eq('auth_id', session.user.id)
+            .maybeSingle()
+
+          if (profile && profile.status === 'active') {
+            set({
+              user: profile as User,
+              role: profile.role as UserRole,
+              isAuthenticated: true,
+            })
+          }
+        }
       },
     }),
     {

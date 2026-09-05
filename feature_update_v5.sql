@@ -1,95 +1,99 @@
 -- ============================================================
 -- OPTISMART FEATURE UPDATE V5
--- Account Consolidation & Duplicate Account Merge Procedure
+-- Targeted Account Upgrade & Consolidation Procedure
 -- Run this in Supabase SQL Editor
 -- ============================================================
 
--- 1. Create reusable Account Merge RPC Procedure
-CREATE OR REPLACE FUNCTION public.merge_duplicate_user_accounts(
-  primary_user_id UUID,
-  duplicate_user_id UUID
+-- 1. RPC Procedure to Consolidate Accounts upon User Confirmation in UI
+CREATE OR REPLACE FUNCTION public.consolidate_user_accounts(
+  primary_email TEXT,
+  secondary_email TEXT
 )
-RETURNS VOID AS $$
+RETURNS JSONB AS $$
+DECLARE
+  v_primary_id UUID;
+  v_secondary_id UUID;
 BEGIN
-  IF primary_user_id IS NULL OR duplicate_user_id IS NULL OR primary_user_id = duplicate_user_id THEN
-    RETURN;
+  IF primary_email IS NULL OR secondary_email IS NULL OR LOWER(primary_email) = LOWER(secondary_email) THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Invalid email parameters provided');
   END IF;
 
-  -- Reassign orders
-  UPDATE public.orders
-    SET dsa_id = primary_user_id
-    WHERE dsa_id = duplicate_user_id;
+  -- Find primary user ID
+  SELECT id INTO v_primary_id
+    FROM public.users
+    WHERE LOWER(email) = LOWER(primary_email)
+    LIMIT 1;
 
-  -- Reassign leads
-  UPDATE public.leads
-    SET dsa_id = primary_user_id
-    WHERE dsa_id = duplicate_user_id;
+  -- Find secondary user ID
+  SELECT id INTO v_secondary_id
+    FROM public.users
+    WHERE LOWER(email) = LOWER(secondary_email)
+    LIMIT 1;
 
-  -- Reassign commissions
-  UPDATE public.commissions
-    SET dsa_id = primary_user_id
-    WHERE dsa_id = duplicate_user_id;
+  IF v_primary_id IS NULL THEN
+    RETURN jsonb_build_object('success', false, 'message', 'Primary account not found');
+  END IF;
 
-  -- Reassign expenses
-  UPDATE public.expenses
-    SET dsa_id = primary_user_id
-    WHERE dsa_id = duplicate_user_id;
+  -- If secondary account exists, reassign all records to primary account
+  IF v_secondary_id IS NOT NULL AND v_secondary_id <> v_primary_id THEN
+    -- Reassign orders
+    UPDATE public.orders
+      SET dsa_id = v_primary_id
+      WHERE dsa_id = v_secondary_id;
 
-  -- Reassign installer jobs if dsa_id column exists
-  BEGIN
-    UPDATE public.installer_jobs
-      SET dsa_id = primary_user_id
-      WHERE dsa_id = duplicate_user_id;
-  EXCEPTION WHEN OTHERS THEN
-    NULL; -- ignore if dsa_id column is not in installer_jobs
-  END;
+    -- Reassign leads
+    UPDATE public.leads
+      SET dsa_id = v_primary_id
+      WHERE dsa_id = v_secondary_id;
 
-  -- Reassign LMS user progress if exists
-  BEGIN
-    UPDATE public.lms_user_progress
-      SET user_id = primary_user_id
-      WHERE user_id = duplicate_user_id;
-  EXCEPTION WHEN OTHERS THEN
-    NULL;
-  END;
+    -- Reassign commissions
+    UPDATE public.commissions
+      SET dsa_id = v_primary_id
+      WHERE dsa_id = v_secondary_id;
 
-  -- Delete duplicate user record from public.users
-  DELETE FROM public.users
-    WHERE id = duplicate_user_id;
+    -- Reassign expenses
+    UPDATE public.expenses
+      SET dsa_id = v_primary_id
+      WHERE dsa_id = v_secondary_id;
 
+    -- Reassign installer jobs if dsa_id column exists
+    BEGIN
+      UPDATE public.installer_jobs
+        SET dsa_id = v_primary_id
+        WHERE dsa_id = v_secondary_id;
+    EXCEPTION WHEN OTHERS THEN
+      NULL;
+    END;
+
+    -- Reassign LMS progress
+    BEGIN
+      UPDATE public.lms_user_progress
+        SET user_id = v_primary_id
+        WHERE user_id = v_secondary_id;
+    EXCEPTION WHEN OTHERS THEN
+      NULL;
+    END;
+
+    -- Delete secondary user record from public.users
+    DELETE FROM public.users
+      WHERE id = v_secondary_id;
+  END IF;
+
+  -- Ensure primary user has Admin role with full permissions & personal sales rights
+  UPDATE public.users
+    SET role = 'admin',
+        can_manage_inventory = true,
+        can_manage_users = true,
+        can_manage_expenses = true,
+        can_view_reports = true,
+        commission_per_camera = COALESCE(commission_per_camera, 5000),
+        status = 'active',
+        updated_at = NOW()
+    WHERE id = v_primary_id;
+
+  RETURN jsonb_build_object('success', true, 'message', 'Account successfully upgraded and consolidated');
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 2. Execute Merge specifically for Abisola Idogbe
-DO $$
-DECLARE
-  v_admin_id UUID := '1ab596bf-7a65-4b23-89d5-626586ce67b1';
-  v_dsa_id UUID;
-BEGIN
-  -- Find duplicate DSA account ID for Abisola
-  SELECT id INTO v_dsa_id
-    FROM public.users
-    WHERE role = 'dsa'
-      AND (email ILIKE 'abisolaidogbe@gmail.com' OR phone = '07051205864')
-      AND id <> v_admin_id
-    LIMIT 1;
-
-  IF v_dsa_id IS NOT NULL THEN
-    -- Merge duplicate into primary Admin account
-    PERFORM public.merge_duplicate_user_accounts(v_admin_id, v_dsa_id);
-    RAISE NOTICE 'Merged DSA account % into Admin account %', v_dsa_id, v_admin_id;
-  ELSE
-    RAISE NOTICE 'No duplicate DSA account found for Abisola.';
-  END IF;
-
-  -- Update email to abisolaidogbe@gmail.com on her Admin profile if needed
-  UPDATE public.users
-    SET email = 'abisolaidogbe@gmail.com',
-        updated_at = NOW()
-    WHERE id = v_admin_id
-      AND email ILIKE 'abisolaidogbe484@gmail.com';
-
-END $$;
-
--- 3. Reload schema cache
+-- 2. Reload schema cache
 NOTIFY pgrst, 'reload schema';

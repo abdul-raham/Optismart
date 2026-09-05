@@ -8,6 +8,7 @@ import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { InstallPWA } from '@/components/pwa/InstallPWA'
 import { NotificationPrompt } from '@/components/shared/NotificationPrompt'
 import { SystemUpdateModal } from '@/components/shared/SystemUpdateModal'
+import { AccountUpgradeModal } from '@/components/shared/AccountUpgradeModal'
 
 export function AppShell() {
   const { sidebarCollapsed, toggleSidebar } = useUIStore()
@@ -17,6 +18,7 @@ export function AppShell() {
       <InstallPWA />
       <NotificationPrompt />
       <SystemUpdateModal />
+      <AccountUpgradeModal />
       
       {/* Sidebar — desktop only */}
       <div className="hidden md:block">
