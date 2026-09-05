@@ -1,6 +1,6 @@
 -- ============================================================
 -- OPTISMART FEATURE UPDATE V5
--- Targeted Account Upgrade & Consolidation Procedure
+-- Targeted Account Upgrade & Automated Commission Trigger
 -- Run this in Supabase SQL Editor
 -- ============================================================
 
@@ -95,5 +95,64 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
--- 2. Reload schema cache
+-- 2. Fail-safe Automated Commission Database Trigger
+CREATE OR REPLACE FUNCTION public.trigger_auto_commission_on_delivery()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_rate NUMERIC;
+  v_quantity INT;
+  v_comm_amount NUMERIC;
+  v_existing_id UUID;
+BEGIN
+  -- Only run if order is set to 'delivered' and has an associated dsa_id
+  IF NEW.status = 'delivered' AND NEW.dsa_id IS NOT NULL THEN
+    
+    -- Check if a commission record already exists for this order
+    SELECT id INTO v_existing_id
+      FROM public.commissions
+      WHERE order_id = NEW.id
+      LIMIT 1;
+
+    IF v_existing_id IS NULL THEN
+      -- Get agent commission rate (defaults to 5000 per camera)
+      SELECT COALESCE(commission_per_camera, 5000) INTO v_rate
+        FROM public.users
+        WHERE id = NEW.dsa_id;
+
+      v_rate := COALESCE(v_rate, 5000);
+      v_quantity := COALESCE(NEW.quantity, 1);
+      v_comm_amount := v_quantity * v_rate;
+
+      -- Insert pending commission record
+      INSERT INTO public.commissions (
+        dsa_id,
+        order_id,
+        amount,
+        status,
+        triggered_at,
+        notes
+      ) VALUES (
+        NEW.dsa_id,
+        NEW.id,
+        v_comm_amount,
+        'pending',
+        NOW(),
+        CONCAT('Commission for delivered order #', NEW.order_number)
+      );
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+-- Re-create trigger safely
+DROP TRIGGER IF EXISTS trg_auto_commission_on_delivery ON public.orders;
+
+CREATE TRIGGER trg_auto_commission_on_delivery
+  AFTER INSERT OR UPDATE OF status ON public.orders
+  FOR EACH ROW
+  EXECUTE FUNCTION public.trigger_auto_commission_on_delivery();
+
+-- 3. Reload schema cache
 NOTIFY pgrst, 'reload schema';
