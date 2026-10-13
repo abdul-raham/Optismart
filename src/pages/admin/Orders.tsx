@@ -46,7 +46,7 @@ export function AdminOrders() {
   const [assignedOrderIds, setAssignedOrderIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all')
   const [updating, setUpdating] = useState<string | null>(null)
   const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
   const [assigningOrderId, setAssigningOrderId] = useState<string | null>(null)

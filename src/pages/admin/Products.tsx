@@ -26,7 +26,7 @@ export function AdminProducts() {
   const [syncing, setSyncing] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
 
-  const [activeTab, setActiveTab] = useState<'products' | 'promos' | 'inventory'>('products')
+  const [activeTab, setActiveTab] = useState<'products' | 'promos' | 'inventory'>(searchParams.get('tab') === 'inventory' ? 'inventory' : 'products')
   const [locations, setLocations] = useState<any[]>([])
   const [inventoryList, setInventoryList] = useState<any[]>([])
   const [movementsList, setMovementsList] = useState<any[]>([])

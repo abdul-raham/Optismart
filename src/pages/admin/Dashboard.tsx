@@ -6,7 +6,7 @@ import { useAuthStore } from '@/stores/authStore'
 import { StatCard } from '@/components/shared/StatCard'
 import { OrderStatusBadge } from '@/components/shared/Badges'
 import { StatCardSkeleton, TableSkeleton } from '@/components/shared/Skeletons'
-import { ShoppingBag, Users, Banknote, Wrench, ArrowUpRight, Download, FileSpreadsheet, AlertTriangle, Clock, Plus } from 'lucide-react'
+import { ShoppingBag, Users, Banknote, Wrench, ArrowUpRight, Download, FileSpreadsheet, Clock, Package } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { MobileDashboardNav } from '@/components/layout/MobileDashboardNav'
 import { exportToExcel, exportToCSV } from '@/utils/exportUtils'
@@ -42,8 +42,24 @@ export function AdminDashboard() {
       const { data: users } = await supabase.from('users').select('role, status')
 
       // Fetch Low Stock Products (stock <= 5)
-      const { data: lowStock } = await supabase.from('products').select('id, name, stock_quantity').lte('stock_quantity', 5)
-      if (lowStock) setLowStockProducts(lowStock)
+      // Stock alerts come from branch counts (a branch row exists once that product was stocked there).
+      const [{ data: prods }, { data: inv }, { data: locs }] = await Promise.all([
+        supabase.from('products').select('id, name, min_stock_level, is_active').eq('is_active', true),
+        supabase.from('product_inventory').select('product_id, location_id, quantity'),
+        supabase.from('inventory_locations').select('id, name').eq('is_active', true),
+      ])
+      const branchName = new Map((locs ?? []).map((l: any) => [l.id, l.name]))
+      const alerts = (prods ?? []).map((pr: any) => {
+        const min = pr.min_stock_level || 5
+        const rows = (inv ?? []).filter((i: any) => i.product_id === pr.id && branchName.has(i.location_id))
+        const total = rows.reduce((sum: number, i: any) => sum + (i.quantity || 0), 0)
+        const low = rows.filter((i: any) => (i.quantity || 0) <= min)
+          .map((i: any) => ({ branch: branchName.get(i.location_id) as string, qty: i.quantity || 0 }))
+          .sort((a: any, b: any) => a.qty - b.qty)
+        return { id: pr.id, name: pr.name, total, min, low, out: total === 0 }
+      }).filter((a: any) => a.out || a.low.length > 0)
+        .sort((a: any, b: any) => Number(b.out) - Number(a.out) || a.total - b.total)
+      setLowStockProducts(alerts)
 
       if (orders) {
         const activeOrders = orders.filter(o => o.status !== 'cancelled')
@@ -51,7 +67,9 @@ export function AdminDashboard() {
         const revenue = deliveredOrders.reduce((sum, o) => sum + Number(o.total_amount), 0)
         
         // Outstanding orders: pending, unassigned, in_progress, processing
-        const outstanding = orders.filter(o => ['pending', 'unassigned', 'in_progress', 'processing'].includes(o.status))
+        // Everything not finished yet, oldest first.
+        const outstanding = orders.filter(o => !['delivered', 'completed', 'cancelled'].includes(o.status))
+          .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
         const outstandingVal = outstanding.reduce((sum, o) => sum + Number(o.total_amount), 0)
 
         setStats(prev => ({
@@ -139,30 +157,57 @@ export function AdminDashboard() {
         </div>
       </div>
 
-      {/* 🚨 Low Stock Warning Alert Banner for Admin 🚨 */}
-      {lowStockProducts.length > 0 && (
-        <div className="rounded-2xl border-2 border-amber-300 bg-amber-50/90 p-4 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold shrink-0 shadow-xs">
-              <AlertTriangle className="w-5 h-5" />
+      {/* Stock alerts */}
+      {lowStockProducts.length > 0 && (() => {
+        const outCount = lowStockProducts.filter(a => a.out).length
+        const lowCount = lowStockProducts.length - outCount
+        return (
+          <div className="glass-card overflow-hidden">
+            <div className="flex flex-col gap-3 border-b border-surface-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <span className="grid h-9 w-9 place-items-center rounded-xl bg-rose-50 text-rose-600"><Package className="h-4 w-4" /></span>
+                <div>
+                  <h2 className="text-base font-bold text-surface-900">Stock to top up</h2>
+                  <p className="text-xs text-surface-500">At or below each product's minimum, by branch.</p>
+                </div>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {outCount > 0 && <span className="rounded-full bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700">{outCount} out everywhere</span>}
+                {lowCount > 0 && <span className="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-700">{lowCount} low at a branch</span>}
+                <button onClick={() => navigate('/app/admin/products?tab=inventory')} className="flex items-center gap-1 text-sm font-semibold text-brand-600 hover:text-brand-700">
+                  Branch stock <ArrowUpRight className="h-4 w-4" />
+                </button>
+              </div>
             </div>
-            <div>
-              <h3 className="text-sm font-bold text-amber-950">
-                Low Inventory Warning ({lowStockProducts.length} Camera{lowStockProducts.length > 1 ? 's' : ''} at or below 5 units)
-              </h3>
-              <p className="text-xs text-amber-800 font-medium mt-0.5">
-                {lowStockProducts.map(p => `${p.name} (${p.stock_quantity} left)`).join(', ')}
-              </p>
-            </div>
+            <ul className="divide-y divide-surface-100">
+              {lowStockProducts.slice(0, 6).map(a => (
+                <li key={a.id} className="flex flex-col gap-2 px-5 py-3 sm:flex-row sm:items-center">
+                  <div className="flex min-w-0 flex-1 items-center gap-2.5">
+                    <span className={`h-2 w-2 shrink-0 rounded-full ${a.out ? 'bg-rose-500' : 'bg-amber-400'}`} />
+                    <span className="truncate text-sm font-semibold text-surface-900">{a.name}</span>
+                    <span className="shrink-0 text-xs text-surface-500">{a.out ? 'none in any branch' : `${a.total} in total`}</span>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5 sm:justify-end">
+                    {a.low.slice(0, 3).map((l: any) => (
+                      <span key={l.branch} className={`rounded-md px-2 py-0.5 text-[11px] font-semibold ${l.qty === 0 ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-800'}`}>
+                        {l.branch} · {l.qty}
+                      </span>
+                    ))}
+                    {a.low.length > 3 && <span className="text-[11px] text-surface-500">+{a.low.length - 3} more</span>}
+                    <button onClick={() => navigate(`/app/admin/products?action=stock_in&product_id=${a.id}`)}
+                      className="ml-1 rounded-lg px-2 py-1 text-[11px] font-bold text-brand-600 hover:bg-brand-50">+ Stock</button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+            {lowStockProducts.length > 6 && (
+              <button onClick={() => navigate('/app/admin/products?tab=inventory')} className="w-full border-t border-surface-100 py-2.5 text-xs font-semibold text-surface-500 hover:bg-surface-50 hover:text-surface-800">
+                {lowStockProducts.length - 6} more products to top up →
+              </button>
+            )}
           </div>
-          <button
-            onClick={() => navigate(`/app/admin/products?action=stock_in&product_id=${lowStockProducts[0]?.id}`)}
-            className="btn-primary h-9 px-4 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shrink-0 flex items-center gap-1.5 shadow-xs transition-all"
-          >
-            <Plus className="w-3.5 h-3.5" /> Top Up Stock Now
-          </button>
-        </div>
-      )}
+        )
+      })()}
 
       {loading ? (
         <StatCardSkeleton count={4} />
@@ -213,66 +258,83 @@ export function AdminDashboard() {
         </div>
       )}
 
-      {/* PRIORITY: Outstanding Orders Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="glass-card overflow-hidden border-2 border-amber-300/80 shadow-md"
-      >
-        <div className="flex flex-col gap-3 border-b border-amber-200/80 bg-amber-50/80 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-full bg-amber-500 text-white flex items-center justify-center font-bold">
-              <AlertTriangle className="w-4 h-4" />
+      {/* Orders needing action */}
+      {(() => {
+        const byStatus = outstandingOrders.reduce((acc: Record<string, number>, o) => { acc[o.status] = (acc[o.status] || 0) + 1; return acc }, {})
+        const daysOld = (iso: string) => Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)
+        const stale = outstandingOrders.filter(o => daysOld(o.created_at) > 7).length
+        return (
+          <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="glass-card overflow-hidden">
+            <div className="flex flex-col gap-3 border-b border-surface-100 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-3">
+                <span className="grid h-9 w-9 place-items-center rounded-xl bg-brand-50 text-brand-600"><Clock className="h-4 w-4" /></span>
+                <div>
+                  <h2 className="flex items-center gap-2 text-base font-bold text-surface-900">
+                    Orders needing action
+                    <span className="rounded-full bg-surface-100 px-2 py-0.5 text-xs font-bold text-surface-700">{stats.outstandingOrdersCount}</span>
+                  </h2>
+                  <p className="text-xs text-surface-500">
+                    Not delivered yet · {formatCurrency(stats.outstandingOrdersValue)}{stale > 0 ? ` · ${stale} older than a week` : ''}
+                  </p>
+                </div>
+              </div>
+              <button onClick={() => navigate('/app/admin/orders')} className="btn-primary flex h-9 items-center gap-1.5 rounded-xl px-4 text-xs font-bold">
+                Manage orders <ArrowUpRight className="h-3.5 w-3.5" />
+              </button>
             </div>
-            <div>
-              <h2 className="text-base font-bold text-amber-950 flex items-center gap-2">
-                Outstanding Orders Needing Action ({stats.outstandingOrdersCount})
-              </h2>
-              <p className="text-xs text-amber-800 font-medium">Orders pending assignment, dispatch, or confirmation.</p>
-            </div>
-          </div>
-          <button onClick={() => window.location.href = '/app/admin/orders'} className="btn-sm bg-amber-600 hover:bg-amber-700 text-white font-bold">
-            Manage Orders <ArrowUpRight className="w-3.5 h-3.5" />
-          </button>
-        </div>
-
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] text-left border-collapse text-sm">
-            <thead>
-              <tr className="bg-surface-50/60 text-surface-500 text-xs uppercase tracking-wider font-semibold border-b border-surface-100">
-                <th className="py-3 px-5">Order #</th>
-                <th className="py-3 px-5">Customer</th>
-                <th className="py-3 px-5">Date</th>
-                <th className="py-3 px-5">Amount</th>
-                <th className="py-3 px-5">Status</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-surface-100">
-              {loading ? (
-                <tr>
-                  <td colSpan={5} className="py-6 text-center text-surface-400">Loading outstanding orders...</td>
-                </tr>
-              ) : outstandingOrders.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="py-6 text-center text-emerald-700 bg-emerald-50/50 font-semibold">
-                    All caught up. No pending or unassigned orders.
-                  </td>
-                </tr>
-              ) : (
-                outstandingOrders.slice(0, 6).map((order) => (
-                  <tr key={order.id} className="hover:bg-amber-50/30 transition-colors">
-                    <td className="py-3 px-5 font-bold text-surface-900">{order.order_number}</td>
-                    <td className="py-3 px-5 font-medium text-surface-800">{order.customer_name}</td>
-                    <td className="py-3 px-5 text-surface-500">{formatDate(order.created_at)}</td>
-                    <td className="py-3 px-5 font-bold text-surface-900">{formatCurrency(order.total_amount)}</td>
-                    <td className="py-3 px-5"><OrderStatusBadge status={order.status} /></td>
+            {Object.keys(byStatus).length > 0 && (
+              <div className="flex flex-wrap gap-1.5 border-b border-surface-100 px-5 py-2.5">
+                {Object.entries(byStatus).sort((a, b) => b[1] - a[1]).map(([st, n]) => (
+                  <button key={st} onClick={() => navigate(`/app/admin/orders?status=${st}`)}
+                    className="rounded-full border border-surface-200 px-2.5 py-0.5 text-xs font-semibold capitalize text-surface-600 hover:border-brand-300 hover:text-brand-700">
+                    {st.replace(/_/g, ' ')} <span className="text-surface-400">{n}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[640px] border-collapse text-left text-sm">
+                <thead>
+                  <tr className="border-b border-surface-100 bg-surface-50/60 text-xs font-semibold uppercase tracking-wider text-surface-500">
+                    <th className="px-5 py-3">Order</th>
+                    <th className="px-5 py-3">Customer</th>
+                    <th className="px-5 py-3">Waiting</th>
+                    <th className="px-5 py-3 text-right">Amount</th>
+                    <th className="px-5 py-3">Status</th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </motion.div>
+                </thead>
+                <tbody className="divide-y divide-surface-100">
+                  {loading ? (
+                    <tr><td colSpan={5} className="py-6 text-center text-surface-400">Loading…</td></tr>
+                  ) : outstandingOrders.length === 0 ? (
+                    <tr><td colSpan={5} className="py-6 text-center font-semibold text-emerald-700">All caught up — nothing waiting.</td></tr>
+                  ) : outstandingOrders.slice(0, 6).map(order => {
+                    const d = daysOld(order.created_at)
+                    return (
+                      <tr key={order.id} className="cursor-pointer transition-colors hover:bg-surface-50" onClick={() => navigate('/app/admin/orders')}>
+                        <td className="px-5 py-3 font-bold text-surface-900">{order.order_number}</td>
+                        <td className="px-5 py-3 text-surface-800">{order.customer_name}</td>
+                        <td className="px-5 py-3">
+                          <span className={`rounded-md px-2 py-0.5 text-xs font-semibold ${d > 7 ? 'bg-rose-50 text-rose-700' : d > 2 ? 'bg-amber-50 text-amber-800' : 'bg-surface-100 text-surface-600'}`}>
+                            {d === 0 ? 'Today' : `${d} day${d === 1 ? '' : 's'}`}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3 text-right font-bold text-surface-900">{formatCurrency(order.total_amount)}</td>
+                        <td className="px-5 py-3"><OrderStatusBadge status={order.status} /></td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+            {outstandingOrders.length > 6 && (
+              <button onClick={() => navigate('/app/admin/orders')} className="w-full border-t border-surface-100 py-2.5 text-xs font-semibold text-surface-500 hover:bg-surface-50 hover:text-surface-800">
+                Show all {outstandingOrders.length} →
+              </button>
+            )}
+          </motion.div>
+        )
+      })()}
 
       {/* Recent Orders Section */}
       <motion.div
