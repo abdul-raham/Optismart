@@ -21,6 +21,26 @@ const ICON_MAP: Record<string, any> = {
 
 const STATIC_RELEASE_VERSION = 'v4.5_sept_2026'
 
+// Each release is remembered separately. (One shared key let the database release and the built-in release
+// overwrite each other, so the two popups took turns forever.)
+const seenKey = (userId: string) => `optismart_releases_seen_${userId}`
+function hasSeen(userId: string, version: string): boolean {
+  try {
+    const list: string[] = JSON.parse(localStorage.getItem(seenKey(userId)) || '[]')
+    return list.includes(version) || localStorage.getItem(`optismart_release_version_${userId}`) === version
+  } catch {
+    return false
+  }
+}
+function markSeen(userId: string, version: string) {
+  try {
+    const list: string[] = JSON.parse(localStorage.getItem(seenKey(userId)) || '[]')
+    if (!list.includes(version)) localStorage.setItem(seenKey(userId), JSON.stringify([...list, version].slice(-20)))
+  } catch {
+    /* storage unavailable: the popup may show again next visit */
+  }
+}
+
 const ROLE_FEATURES: Record<string, Array<{ icon: any; color: string; title: string; description: string; route: string }>> = {
   dsa: [
     {
@@ -132,9 +152,7 @@ export function SystemUpdateModal() {
       if (!error && data && data.length > 0) {
         const latestDbUpdate = data[0]
         const dbVersion = latestDbUpdate.version_tag
-        const seenVersion = localStorage.getItem(`optismart_release_version_${user.id}`)
-
-        if (seenVersion !== dbVersion) {
+        if (!hasSeen(user.id, dbVersion)) {
           setActiveVersion(dbVersion)
           if (latestDbUpdate.title) setUpdateTitle(latestDbUpdate.title)
           if (latestDbUpdate.subtitle) setUpdateSubtitle(latestDbUpdate.subtitle)
@@ -157,8 +175,7 @@ export function SystemUpdateModal() {
     }
 
     // Fallback to role-tailored static features check
-    const seenVersion = localStorage.getItem(`optismart_release_version_${user.id}`)
-    if (seenVersion !== STATIC_RELEASE_VERSION) {
+    if (!hasSeen(user.id, STATIC_RELEASE_VERSION)) {
       setActiveVersion(STATIC_RELEASE_VERSION)
       setFeaturesList(roleFeatures)
       setIsOpen(true)
@@ -166,9 +183,7 @@ export function SystemUpdateModal() {
   }
 
   const handleDismiss = () => {
-    if (user?.id) {
-      localStorage.setItem(`optismart_release_version_${user.id}`, activeVersion)
-    }
+    if (user?.id) markSeen(user.id, activeVersion)
     setIsOpen(false)
   }
 

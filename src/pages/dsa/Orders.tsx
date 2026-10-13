@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { BranchPicker, type Branch, type BranchStock } from '@/components/shared/BranchPicker'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { ShoppingBag, Plus, Search, Calendar, MapPin, X, Package, Edit2, Filter, Share2 } from 'lucide-react'
@@ -41,6 +42,8 @@ export function DSAOrders() {
   const [orders, setOrders] = useState<Order[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [dsas, setDsas] = useState<any[]>([])
+  const [branches, setBranches] = useState<Branch[]>([])
+  const [branchStock, setBranchStock] = useState<BranchStock[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -57,6 +60,7 @@ export function DSAOrders() {
     customer_phone: '',
     customer_address: '',
     product_id: '',
+    fulfillment_location_id: '',
     quantity: 1,
     amount: 0,
     installation_needed: false,
@@ -70,17 +74,21 @@ export function DSAOrders() {
       const { data: { session } } = await supabase.auth.getSession()
       const authId = session?.user?.id
 
-      const [ordersRes, productsRes, dsasRes] = await Promise.all([
+      const [ordersRes, productsRes, dsasRes, branchesRes, stockRes] = await Promise.all([
         supabase.from('orders').select('*')
           .or(`dsa_id.eq.${user?.id},created_by_auth_id.eq.${authId}`)
           .order('created_at', { ascending: false }),
         supabase.from('products').select('*').eq('is_active', true),
-        supabase.from('users').select('id, full_name, email').eq('role', 'dsa')
+        supabase.from('users').select('id, full_name, email').eq('role', 'dsa'),
+        supabase.from('inventory_locations').select('id, name, address').eq('is_active', true).order('name'),
+        supabase.from('product_inventory').select('product_id, location_id, quantity')
       ])
       
       if (ordersRes.data) setOrders(ordersRes.data)
       if (productsRes.data) setProducts(productsRes.data)
       if (dsasRes.data) setDsas(dsasRes.data)
+      if (branchesRes.data) setBranches(branchesRes.data)
+      if (stockRes.data) setBranchStock(stockRes.data)
     } catch (err) {
       console.error('Error fetching data:', err)
     } finally {
@@ -137,7 +145,8 @@ export function DSAOrders() {
           installation_price: form.installation_needed ? form.installation_price : 0,
           expected_delivery_date: form.expected_delivery_date || null,
           status: 'pending',
-          notes: form.notes
+          notes: form.notes,
+          fulfillment_location_id: form.fulfillment_location_id || null
         }])
         .select()
         .single()
@@ -168,7 +177,7 @@ export function DSAOrders() {
 
         setOrders(current => current.some(order => order.id === data.id) ? current : [data, ...current])
         setIsModalOpen(false)
-        setForm({ is_dsa_registered: true, unregistered_dsa_name: '', dsa_id: user?.id || '', customer_name: '', customer_email: '', customer_phone: '', customer_address: '', product_id: '', quantity: 1, amount: 0, installation_needed: false, installation_price: 0, expected_delivery_date: '', notes: '' })
+        setForm({ is_dsa_registered: true, unregistered_dsa_name: '', dsa_id: user?.id || '', customer_name: '', customer_email: '', customer_phone: '', customer_address: '', product_id: '', fulfillment_location_id: '', quantity: 1, amount: 0, installation_needed: false, installation_price: 0, expected_delivery_date: '', notes: '' })
       }
     } catch (err) {
       console.error('Error creating order:', err)
@@ -468,6 +477,9 @@ export function DSAOrders() {
                     </select>
                   </div>
                 </div>
+
+                <BranchPicker productId={form.product_id} quantity={form.quantity} branches={branches} stock={branchStock}
+                  value={form.fulfillment_location_id} onChange={id => setForm(f => ({ ...f, fulfillment_location_id: id }))} />
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>

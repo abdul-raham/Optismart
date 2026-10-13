@@ -131,12 +131,7 @@ export function AssignInstallerModal({ isOpen, onClose, onSuccess, order }: Assi
           }).catch(console.error)
         }
         
-        sendWebPush(
-          selectedInstallerId,
-          'New Installation Job',
-          `You have been assigned to order ${order.order_number} for ${order.customer_name}.`,
-          '/app/installer/jobs'
-        ).catch(console.error)
+        // The installer's notification (bell + push) is created by the database when the job is assigned.
       }
 
       onSuccess()

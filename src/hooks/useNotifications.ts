@@ -8,7 +8,7 @@ export interface AppNotification {
   title: string
   message: string
   type: string
-  read: boolean
+  is_read: boolean
   link: string | null
   created_at: string
 }
@@ -41,7 +41,7 @@ export function useNotifications() {
 
     if (data && !error) {
       setNotifications(data)
-      setUnreadCount(data.filter(n => !n.read).length)
+      setUnreadCount(data.filter(n => !n.is_read).length)
     }
   }, [user])
 
@@ -68,13 +68,13 @@ export function useNotifications() {
   }, [user, fetchNotifications])
 
   const markAsRead = async (id: string) => {
-    await supabase.from('notifications').update({ read: true }).eq('id', id)
+    await supabase.from('notifications').update({ is_read: true }).eq('id', id)
     fetchNotifications()
   }
 
   const markAllAsRead = async () => {
     if (!user) return
-    await supabase.from('notifications').update({ read: true }).eq('user_id', user.id).eq('read', false)
+    await supabase.from('notifications').update({ is_read: true }).eq('user_id', user.id).eq('is_read', false)
     fetchNotifications()
   }
 

@@ -2,7 +2,19 @@ import webpush from 'web-push';
 import { createClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY; 
+const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+let cachedSecret = null;
+
+// The database sends every push (one per new notification) with a secret kept in Supabase Vault.
+async function validSecret(supabase, given) {
+  if (!given) return false;
+  if (!cachedSecret) {
+    const { data, error } = await supabase.rpc('push_webhook_secret');
+    if (error || !data) return false;
+    cachedSecret = data;
+  }
+  return given.length === cachedSecret.length && given === cachedSecret;
+}
 
 const VAPID_PUBLIC = process.env.VITE_VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY;
@@ -47,6 +59,9 @@ export default async function handler(req, res) {
   }
 
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  if (!(await validSecret(supabase, req.headers['x-push-secret']))) {
+    return res.status(401).json({ error: 'Not allowed' });
+  }
 
   try {
     // Fetch subscriptions for the specific user

@@ -80,10 +80,10 @@ export function InstallerJobs() {
       
       const targetJob = jobs.find(j => j.id === jobId)
       if (targetJob?.order_id && ['installed', 'completed'].includes(newStatus)) {
-        await supabase
-          .from('orders')
-          .update({ status: 'delivered', updated_at: new Date().toISOString() })
-          .eq('id', targetJob.order_id)
+        // Delivers the order from its branch (stock and commission follow), or flags it for an admin to pick one.
+        const { data: outcome, error: doneErr } = await supabase.rpc('complete_installation_job', { p_job_id: jobId, p_status: newStatus })
+        if (doneErr) throw doneErr
+        if (outcome === 'needs_branch') alert('Job saved. An admin will choose the branch to complete the delivery.')
       }
 
       setJobs(jobs.map(j => j.id === jobId ? { ...j, status: newStatus as any } : j))

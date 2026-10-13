@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
+import { BranchPicker } from '@/components/shared/BranchPicker'
 import { supabase } from '@/lib/supabase'
 import { ShoppingBag, Search, Calendar, Check, X, ArrowRightLeft, Plus, MapPin, Package, User, Edit2, ChevronDown, Filter, Download, FileSpreadsheet, Share2 } from 'lucide-react'
 import { formatDate, formatCurrency } from '@/lib/utils'
@@ -59,6 +60,7 @@ export function AdminOrders() {
   const [locationInventory, setLocationInventory] = useState<any[]>([])
   const [deliveryOrder, setDeliveryOrder] = useState<Order | null>(null)
   const [deliveryLocationId, setDeliveryLocationId] = useState('')
+  const [deliveryReason, setDeliveryReason] = useState('')
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([])
   const [isBulkCleanupModalOpen, setIsBulkCleanupModalOpen] = useState(false)
   const [bulkProcessing, setBulkProcessing] = useState(false)
@@ -79,6 +81,7 @@ export function AdminOrders() {
     customer_phone: '',
     customer_address: '',
     product_id: '',
+    fulfillment_location_id: '',
     quantity: 1,
     amount: 0,
     installation_needed: false,
@@ -96,8 +99,8 @@ export function AdminOrders() {
     processing: ['dispatched', 'delivered', 'cancelled'],
     dispatched: ['delivered', 'rescheduled', 'cancelled'],
     rescheduled: ['delivered', 'cancelled'],
-    delivered: [],
-    completed: [],
+    delivered: ['cancelled'],
+    completed: ['cancelled'],
     cancelled: []
   }
 
@@ -192,6 +195,7 @@ export function AdminOrders() {
           expected_delivery_date: form.expected_delivery_date || null,
           status: 'pending',
           notes: form.notes,
+          fulfillment_location_id: form.fulfillment_location_id || null,
           created_by_auth_id: (await supabase.auth.getSession()).data.session?.user?.id
         }])
         .select()
@@ -216,7 +220,7 @@ export function AdminOrders() {
         } as Order
         setOrders(current => [createdOrder, ...current])
         setIsModalOpen(false)
-        setForm({ is_dsa_registered: true, unregistered_dsa_name: '', dsa_id: '', customer_name: '', customer_email: '', customer_phone: '', customer_address: '', product_id: '', quantity: 1, amount: 0, installation_needed: false, installation_price: 0, expected_delivery_date: '', notes: '' })
+        setForm({ is_dsa_registered: true, unregistered_dsa_name: '', dsa_id: '', customer_name: '', customer_email: '', customer_phone: '', customer_address: '', product_id: '', fulfillment_location_id: '', quantity: 1, amount: 0, installation_needed: false, installation_price: 0, expected_delivery_date: '', notes: '' })
       }
     } catch (err: any) {
       console.error('Error creating order:', err)
@@ -232,34 +236,35 @@ export function AdminOrders() {
     fulfillmentLocationId?: string
   ) => {
     const selectedOrder = orders.find(order => order.id === orderId)
-    if (newStatus === 'delivered' && !fulfillmentLocationId) {
+    if (newStatus === 'delivered' && fulfillmentLocationId === undefined) {
       setDeliveryOrder(selectedOrder ?? null)
-      setDeliveryLocationId('')
+      setDeliveryLocationId((selectedOrder as any)?.fulfillment_location_id || '')
+      setDeliveryReason('')
       setOpenDropdownId(null)
+      return
+    }
+    const wasDelivered = ['delivered', 'completed'].includes(selectedOrder?.status || '')
+    if (wasDelivered && newStatus === 'cancelled') {
+      const reason = window.prompt(`Cancel delivered order ${selectedOrder?.order_number}? Its stock goes back to the branch it left from and any unpaid commission is cancelled.\n\nReason:`)
+      if (reason === null) return
+      setUpdating(orderId)
+      const { error } = await supabase.rpc('return_delivered_order', { p_order_id: orderId, p_restock: true, p_reason: reason || 'Cancelled after delivery', p_new_status: 'cancelled' })
+      setUpdating(null)
+      if (error) { alert(error.message); return }
+      setOrders(orders.map(o => o.id === orderId ? { ...o, status: 'cancelled' } : o))
+      fetchData()
       return
     }
     setUpdating(orderId)
     try {
       let error: any = null
       if (newStatus === 'delivered') {
-        if (fulfillmentLocationId) {
-          const rpcRes = await supabase.rpc('fulfill_order_from_location', {
-            p_order_id: orderId,
-            p_location_id: fulfillmentLocationId
-          })
-          error = rpcRes.error
-        } else {
-          const updateRes = await supabase
-            .from('orders')
-            .update({
-              status: 'delivered',
-              delivered_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              notes: (selectedOrder?.notes || '') + ' [Delivered — No inventory recorded at time of fulfillment]'
-            })
-            .eq('id', orderId)
-          error = updateRes.error
-        }
+        // Stock leaves the chosen branch in the same database transaction (or the delivery is recorded as
+        // untracked with a reason when no branch has the stock). The database refuses any other way.
+        const rpcRes = await supabase.rpc('fulfill_order', fulfillmentLocationId
+          ? { p_order_id: orderId, p_location_id: fulfillmentLocationId }
+          : { p_order_id: orderId, p_untracked: true, p_reason: deliveryReason || 'No branch had stock' })
+        error = rpcRes.error
       } else {
         const updateRes = await supabase
           .from('orders')
@@ -283,12 +288,7 @@ export function AdminOrders() {
             status: newStatus
           }).catch(console.error);
         }
-        sendWebPush(
-          updatedOrder.dsa_id,
-          'Order Status Updated',
-          `Order ${updatedOrder.order_number} for ${updatedOrder.customer_name} is now ${newStatus.toUpperCase()}`,
-          '/app/dsa/orders'
-        ).catch(console.error);
+        // The DSA's notification (bell + push) is created by the database on every status change.
       }
 
       // Send Notification to Customer
@@ -301,30 +301,7 @@ export function AdminOrders() {
         }).catch(console.error);
       }
 
-      // Auto-create commission for DSA when order status is marked DELIVERED
-      if (newStatus === 'delivered' && updatedOrder?.dsa_id) {
-        try {
-          const { data: dsaUser } = await supabase
-            .from('users')
-            .select('commission_per_camera, commission_threshold')
-            .eq('id', updatedOrder.dsa_id)
-            .single()
-
-          const perCameraRate = dsaUser?.commission_per_camera || 5000
-          const commAmount = (updatedOrder.quantity || 1) * perCameraRate
-
-          await supabase.from('commissions').insert([{
-            dsa_id: updatedOrder.dsa_id,
-            order_id: updatedOrder.id,
-            amount: commAmount,
-            status: 'pending',
-            triggered_at: new Date().toISOString(),
-            notes: `Commission for delivered order #${updatedOrder.order_number}`
-          }])
-        } catch (commErr) {
-          console.warn('Auto-commission insertion skipped:', commErr)
-        }
-      }
+      // The commission (and the DSA's in-app notification) are created by the database on delivery.
 
       // Update local state
       setOrders(orders.map(o => o.id === orderId ? { ...o, status: newStatus } : o))
@@ -335,7 +312,7 @@ export function AdminOrders() {
       }
     } catch (err) {
       console.error('Failed to update status:', err)
-      alert('Failed to update order status')
+      alert((err as any)?.message || 'Failed to update order status')
     } finally {
       setUpdating(null)
     }
@@ -997,6 +974,9 @@ export function AdminOrders() {
                   </div>
                 </div>
 
+                <BranchPicker productId={form.product_id} quantity={form.quantity} branches={inventoryLocations} stock={locationInventory}
+                  value={form.fulfillment_location_id} onChange={id => setForm(f => ({ ...f, fulfillment_location_id: id }))} />
+
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="label">Quantity *</label>
@@ -1105,8 +1085,11 @@ export function AdminOrders() {
                     <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
                       <p className="text-xs font-bold text-amber-900">No inventory recorded for this product</p>
                       <p className="text-[11px] text-amber-800 mt-1 leading-snug">
-                        No branch currently holds stock for this item. The order will be marked as Delivered and commissions will be recorded — inventory will not be deducted.
+                        No branch has enough stock. You can record the delivery without deducting stock — say why (e.g. "sold from
+                        stock not yet entered"), then add the stock so counts stay right.
                       </p>
+                      <textarea className="input mt-2 min-h-[64px] text-xs" placeholder="Reason (required)" value={deliveryReason}
+                        onChange={e => setDeliveryReason(e.target.value)} />
                     </div>
                   )
                 })()}
@@ -1119,9 +1102,9 @@ export function AdminOrders() {
                     disabled={(
                       inventoryLocations.some(loc =>
                         Number(locationInventory.find(i => i.location_id === loc.id && i.product_id === deliveryOrder.product_id)?.quantity || 0) >= (deliveryOrder.quantity || 1)
-                      ) && !deliveryLocationId
+                      ) ? !deliveryLocationId : !deliveryReason.trim()
                     ) || Boolean(updating)}
-                    onClick={() => handleUpdateStatus(deliveryOrder.id, 'delivered', deliveryLocationId || undefined)}
+                    onClick={() => handleUpdateStatus(deliveryOrder.id, 'delivered', deliveryLocationId || '')}
                   >
                     {updating ? 'Completing...' : 'Confirm Delivery'}
                   </button>

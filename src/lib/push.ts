@@ -1,10 +1,13 @@
+import { supabase } from '@/lib/supabase'
+
 export interface SendWebPushOptions {
-  endpoint?: string
+  type?: 'order' | 'job' | 'payment' | 'system' | 'training' | 'commission'
   onError?: (error: any) => void
 }
 
 /**
- * Call the Vercel web-push endpoint.
+ * Notify a portal user. Creates an in-app notification; the database then pushes it to every device the user
+ * enabled notifications on. (Pushes are only sent by the database, so nobody can push to users directly.)
  */
 export async function sendWebPush(
   userId: string,
@@ -13,34 +16,13 @@ export async function sendWebPush(
   url?: string,
   options: SendWebPushOptions = {}
 ) {
-  try {
-    const response = await fetch(options.endpoint || '/api/send-web-push', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        user_id: userId,
-        title,
-        body,
-        url
-      }),
-    })
-
-    const result = await response.json().catch(() => ({}))
-
-    if (!response.ok) {
-      // Silently ignore on localhost where API routes don't exist
-      if (window.location.hostname === 'localhost') return { success: false }
-      throw new Error(result.error || `Push request failed (${response.status})`)
-    }
-
-    return result
-  } catch (error: any) {
-    if (options.onError) {
-      options.onError(error)
-      return { success: false, error: error.message }
-    }
-    // Silently fail if no onError provided, web pushes shouldn't break the app flow
-    console.error('[WebPush]', error)
+  const { error } = await supabase.rpc('send_portal_notification', {
+    p_user: userId, p_title: title, p_message: body, p_link: url || '/app', p_type: options.type || 'system',
+  })
+  if (error) {
+    if (options.onError) options.onError(error)
+    else console.error('[Notify]', error.message)
     return { success: false, error: error.message }
   }
+  return { success: true }
 }
