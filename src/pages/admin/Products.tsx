@@ -691,7 +691,7 @@ export function AdminProducts() {
           <div className="overflow-hidden rounded-2xl border border-surface-200 bg-white">
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-surface-100 px-4 py-3">
               <h3 className="flex items-center gap-2 text-sm font-bold text-surface-900"><Package className="h-4 w-4 text-brand-600" /> Stock by branch</h3>
-              <p className="text-xs text-surface-500">Tap a cell to add stock there · red = at or below the product's minimum</p>
+              <p className="text-xs text-surface-500">Tap a number to correct it · ✎ edits the product · red = at or below the minimum</p>
             </div>
             <div className="max-h-[70vh] overflow-auto">
               <table className="border-separate border-spacing-0 text-sm">
@@ -713,6 +713,9 @@ export function AdminProducts() {
                             <img src={getProductImage(p.name, p.image_url)} alt="" className="h-full w-full object-contain" loading="lazy" />
                           </span>
                           <span className="truncate font-bold text-surface-900">{p.name}</span>
+                          <button onClick={() => startEdit(p)} title="Edit product" className="ml-auto shrink-0 rounded-md p-1 text-surface-300 transition-colors hover:bg-brand-50 hover:text-brand-600 group-hover:text-surface-500">
+                            <Edit2 className="h-3.5 w-3.5" />
+                          </button>
                         </div>
                       </td>
                       <td className="whitespace-nowrap border-b border-surface-100 px-4 py-2.5 text-right font-black text-surface-900">{totalStock(p.id)}</td>
@@ -721,7 +724,8 @@ export function AdminProducts() {
                         const low = qty <= (p.min_stock_level || 5)
                         return (
                           <td key={loc.id} className="border-b border-surface-100 px-2 py-2 text-center">
-                            <button onClick={() => openStockInForProduct(p.id, loc.id)} title={`Add ${p.name} stock at ${loc.name}`}
+                            <button onClick={() => { setPhysicalCountForm({ product_id: p.id, location_id: loc.id, target_quantity: qty, notes: `Stock corrected at ${loc.name}` }); setIsPhysicalCountModalOpen(true) }}
+                              title={`Set ${p.name} stock at ${loc.name}`}
                               className={`min-w-[44px] rounded-lg px-2 py-1 text-xs font-extrabold transition-colors ${qty === 0 ? 'text-surface-300 hover:bg-surface-100 hover:text-surface-600' : low ? 'bg-rose-50 text-rose-700 hover:bg-rose-100' : 'bg-surface-100 text-surface-800 hover:bg-brand-50 hover:text-brand-700'}`}>
                               {qty}
                             </button>
@@ -919,7 +923,7 @@ export function AdminProducts() {
                 </div>
                 <form onSubmit={handleStockIn} className="p-6 space-y-4 overflow-y-auto flex-1 scrollbar-hide">
                   <div>
-                    <label className="label">Select Camera Product *</label>
+                    <label className="label">Product *</label>
                     <select required className="input bg-white text-sm" value={stockInForm.product_id} onChange={e => setStockInForm({...stockInForm, product_id: e.target.value})}>
                       <option value="">Select product...</option>
                       {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
@@ -1005,7 +1009,7 @@ export function AdminProducts() {
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm" onClick={() => setIsPhysicalCountModalOpen(false)} />
               <motion.div initial={{ opacity: 0, scale: 0.95, y: 20 }} animate={{ opacity: 1, scale: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95, y: 20 }} className="bg-white w-full max-w-md relative z-10 rounded-2xl shadow-card-xl my-auto flex flex-col max-h-[calc(100vh-2rem)] sm:max-h-[90vh] overflow-hidden">
                 <div className="px-6 py-4 border-b border-amber-100 flex items-center justify-between bg-amber-50 text-amber-950 shrink-0">
-                  <h2 className="text-lg font-bold flex items-center gap-2">Set Physical Stock Count</h2>
+                  <h2 className="text-lg font-bold flex items-center gap-2">Set stock count</h2>
                   <button onClick={() => setIsPhysicalCountModalOpen(false)} className="text-amber-700 hover:text-amber-950"><X className="w-5 h-5" /></button>
                 </div>
                 <form onSubmit={handleSetPhysicalCount} className="p-6 space-y-4 overflow-y-auto flex-1 scrollbar-hide">
@@ -1027,7 +1031,7 @@ export function AdminProducts() {
                     </select>
                   </div>
                   <div>
-                    <label className="label">Exact Physical Shelf Count (Units) *</label>
+                    <label className="label">Units on the shelf now *</label>
                     <input required type="number" min={0} className="input font-bold text-xl text-amber-800" value={physicalCountForm.target_quantity} onChange={e => setPhysicalCountForm({...physicalCountForm, target_quantity: Number(e.target.value)})} />
                   </div>
                   <div>
