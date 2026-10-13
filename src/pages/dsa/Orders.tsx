@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { SdCardOption, findSdCard, type SdCardValue } from '@/components/shared/SdCardOption'
 import { BranchPicker, type Branch, type BranchStock } from '@/components/shared/BranchPicker'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
@@ -44,6 +45,7 @@ export function DSAOrders() {
   const [dsas, setDsas] = useState<any[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
   const [branchStock, setBranchStock] = useState<BranchStock[]>([])
+  const [sd, setSd] = useState<SdCardValue>({ enabled: false, quantity: 0, charge: false })
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -120,7 +122,10 @@ export function DSAOrders() {
 
       const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 4).toUpperCase()}`
       const productTotal = form.amount > 0 ? form.amount : Number(product.retail_price) * form.quantity
-      const totalAmount = productTotal + (form.installation_needed ? form.installation_price : 0)
+      const sdCard = findSdCard(products)
+      const sdQty = sd.enabled && sdCard ? sd.quantity : 0
+      const sdPrice = sd.enabled && sd.charge && sdCard ? Number(sdCard.retail_price) : 0
+      const totalAmount = productTotal + (form.installation_needed ? form.installation_price : 0) + sdQty * sdPrice
 
       const { data: { session } } = await supabase.auth.getSession()
       const authId = session?.user?.id
@@ -141,6 +146,9 @@ export function DSAOrders() {
           unit_price: product.retail_price,
           unit_cost: product.cost_price || 0,
           total_amount: totalAmount,
+          accessory_product_id: sdQty > 0 ? sdCard?.id : null,
+          accessory_quantity: sdQty,
+          accessory_price: sdPrice,
           installation_needed: form.installation_needed,
           installation_price: form.installation_needed ? form.installation_price : 0,
           expected_delivery_date: form.expected_delivery_date || null,
@@ -177,6 +185,7 @@ export function DSAOrders() {
 
         setOrders(current => current.some(order => order.id === data.id) ? current : [data, ...current])
         setIsModalOpen(false)
+        setSd({ enabled: false, quantity: 0, charge: false })
         setForm({ is_dsa_registered: true, unregistered_dsa_name: '', dsa_id: user?.id || '', customer_name: '', customer_email: '', customer_phone: '', customer_address: '', product_id: '', fulfillment_location_id: '', quantity: 1, amount: 0, installation_needed: false, installation_price: 0, expected_delivery_date: '', notes: '' })
       }
     } catch (err) {
@@ -480,6 +489,8 @@ export function DSAOrders() {
 
                 <BranchPicker productId={form.product_id} quantity={form.quantity} branches={branches} stock={branchStock}
                   value={form.fulfillment_location_id} onChange={id => setForm(f => ({ ...f, fulfillment_location_id: id }))} />
+                {form.product_id && <SdCardOption sdCard={findSdCard(products)} cameraQuantity={form.quantity} branchId={form.fulfillment_location_id}
+                  stock={branchStock} value={sd} onChange={setSd} />}
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
