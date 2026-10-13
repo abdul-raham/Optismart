@@ -15,11 +15,11 @@ const usersToCreate = [
 ]
 
 async function seedAuth() {
-  console.log('Registering users with password "Temitayo2"...')
+  console.log('Registering users with the password in PORTAL_SCRIPT_PASSWORD...')
   for (const user of usersToCreate) {
     const { data, error } = await supabase.auth.signUp({
       email: user.email,
-      password: 'Temitayo2',
+      password: process.env.PORTAL_SCRIPT_PASSWORD,
       options: {
         data: {
           role: user.role,

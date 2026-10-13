@@ -15,7 +15,7 @@ async function testInsert() {
   console.log('Logging in...')
   const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
     email: 'abdulrahmanbakare001@gmail.com',
-    password: 'Temitayo2'
+    password: process.env.PORTAL_SCRIPT_PASSWORD
   })
 
   if (authError) {

@@ -7,7 +7,7 @@ const supabase = createClient(supabaseUrl, supabaseKey)
 async function checkUser() {
   const { data, error } = await supabase.auth.signInWithPassword({
     email: 'abdulrahmanbakare001@gmail.com',
-    password: 'Temitayo2'
+    password: process.env.PORTAL_SCRIPT_PASSWORD
   })
 
   if (error) {
