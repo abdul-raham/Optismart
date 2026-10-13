@@ -51,6 +51,7 @@ export interface Product {
   image_url: string | null
   source_url?: string | null
   specs?: string[]
+  category?: 'camera' | 'sd_card' | 'accessory'
   is_active: boolean
   created_at: string
   updated_at?: string

@@ -3,6 +3,13 @@
 
 BEGIN;
 
+-- Product groups: cameras, SD cards and other accessories, so new SD cards (32GB, 128GB…) sit under "SD cards".
+ALTER TABLE public.products ADD COLUMN IF NOT EXISTS category TEXT NOT NULL DEFAULT 'camera';
+ALTER TABLE public.products DROP CONSTRAINT IF EXISTS products_category_check;
+ALTER TABLE public.products ADD CONSTRAINT products_category_check CHECK (category IN ('camera', 'sd_card', 'accessory'));
+UPDATE public.products SET category = 'sd_card'
+ WHERE category = 'camera' AND name ~* '(memory card|sd card|micro ?sd|\m\d+ ?gb?\M.*card)';
+
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS accessory_product_id UUID REFERENCES public.products(id);
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS accessory_quantity INTEGER NOT NULL DEFAULT 0 CHECK (accessory_quantity >= 0);
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS accessory_price NUMERIC NOT NULL DEFAULT 0 CHECK (accessory_price >= 0);

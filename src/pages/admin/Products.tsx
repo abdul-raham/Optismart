@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { Fragment, useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -101,7 +101,9 @@ export function AdminProducts() {
     min_stock_level: 5,
     source_url: '',
     image_url: '',
+    category: 'camera' as 'camera' | 'sd_card' | 'accessory',
   })
+  const [categoryFilter, setCategoryFilter] = useState<'all' | 'camera' | 'sd_card' | 'accessory'>('all')
 
   const openStockInForProduct = (productId: string, locationId: string = '') => {
     const defaultLocId = locationId || (locations.length > 0 ? locations[0].id : '')
@@ -338,7 +340,7 @@ export function AdminProducts() {
   const closeModal = () => {
     setIsModalOpen(false)
     setEditingId(null)
-    setForm({ name: '', description: '', retail_price: 0, wholesale_price: 0, cost_price: 0, stock_quantity: 0, min_stock_level: 5, source_url: '', image_url: '' })
+    setForm({ name: '', description: '', retail_price: 0, wholesale_price: 0, cost_price: 0, stock_quantity: 0, min_stock_level: 5, source_url: '', image_url: '', category: 'camera' })
   }
 
   const toggleProductStatus = async (id: string, currentStatus: boolean) => {
@@ -399,7 +401,12 @@ export function AdminProducts() {
     }
   }
 
-  const filteredProducts = products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
+  const CATEGORY_LABEL = { camera: 'Cameras', sd_card: 'SD cards', accessory: 'Accessories' } as const
+  const categoryOf = (p: Product) => p.category || 'camera'
+  const filteredProducts = products
+    .filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
+    .filter(p => categoryFilter === 'all' || categoryOf(p) === categoryFilter)
+    .sort((a, b) => ['camera', 'sd_card', 'accessory'].indexOf(categoryOf(a)) - ['camera', 'sd_card', 'accessory'].indexOf(categoryOf(b)) || a.name.localeCompare(b.name))
 
   const stockAt = (productId: string, locationId: string) =>
     Number(inventoryList.find(i => i.product_id === productId && i.location_id === locationId)?.quantity || 0)
@@ -418,6 +425,7 @@ export function AdminProducts() {
       name: product.name, description: product.description || '', retail_price: product.retail_price,
       wholesale_price: product.wholesale_price, cost_price: product.cost_price || 0, stock_quantity: product.stock_quantity,
       min_stock_level: product.min_stock_level, source_url: product.source_url || '', image_url: product.image_url || '',
+      category: product.category || 'camera',
     })
     setIsModalOpen(true)
   }
@@ -486,7 +494,7 @@ export function AdminProducts() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {activeTab === 'products' && (
-            <button onClick={() => { setEditingId(null); setForm({ name: '', description: '', retail_price: 0, wholesale_price: 0, cost_price: 0, stock_quantity: 0, min_stock_level: 5, source_url: '', image_url: '' }); setIsModalOpen(true) }}
+            <button onClick={() => { setEditingId(null); setForm({ name: '', description: '', retail_price: 0, wholesale_price: 0, cost_price: 0, stock_quantity: 0, min_stock_level: 5, source_url: '', image_url: '', category: 'camera' }); setIsModalOpen(true) }}
               className="btn-primary flex h-9 items-center gap-1.5 rounded-xl px-4 text-xs font-bold">
               <Plus className="h-4 w-4" /> Add product
             </button>
@@ -518,6 +526,21 @@ export function AdminProducts() {
           )}
         </div>
       </div>
+
+      {activeTab !== 'promos' && (
+        <div className="flex flex-wrap gap-1.5">
+          {(['all', 'camera', 'sd_card', 'accessory'] as const).map(c => {
+            const n = c === 'all' ? products.length : products.filter(p => categoryOf(p) === c).length
+            if (c !== 'all' && n === 0) return null
+            return (
+              <button key={c} onClick={() => setCategoryFilter(c)}
+                className={`rounded-full border px-3 py-1 text-xs font-bold transition-colors ${categoryFilter === c ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-surface-200 bg-white text-surface-600 hover:bg-surface-50'}`}>
+                {c === 'all' ? 'All' : CATEGORY_LABEL[c]} <span className="text-surface-400">{n}</span>
+              </button>
+            )
+          })}
+        </div>
+      )}
 
       {/* Low stock */}
       {lowStockProducts.length > 0 && activeTab !== 'promos' && (
@@ -570,7 +593,10 @@ export function AdminProducts() {
                               <img src={getProductImage(p.name, p.image_url)} alt="" className="h-full w-full object-contain" loading="lazy" />
                             </span>
                             <span className="min-w-0">
-                              <span className="block truncate font-bold text-surface-900">{p.name}</span>
+                              <span className="flex items-center gap-1.5">
+                                <span className="truncate font-bold text-surface-900">{p.name}</span>
+                                {categoryOf(p) !== 'camera' && <span className="shrink-0 rounded-md bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold uppercase text-indigo-700">{CATEGORY_LABEL[categoryOf(p)]}</span>}
+                              </span>
                               {p.source_url
                                 ? <a href={p.source_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-600 hover:underline">Website page <ExternalLink className="h-3 w-3" /></a>
                                 : <span className="block truncate text-[11px] text-surface-400">{p.description || '—'}</span>}
@@ -705,7 +731,13 @@ export function AdminProducts() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredProducts.map(p => (
+                  {filteredProducts.map((p, i) => (<Fragment key={p.id}>
+                    {(i === 0 || categoryOf(filteredProducts[i - 1]) !== categoryOf(p)) && (
+                      <tr key={`group-${categoryOf(p)}`}>
+                        <td className="sticky left-0 z-10 border-b border-surface-200 bg-surface-100 px-4 py-1.5 text-[11px] font-black uppercase tracking-wider text-surface-600">{CATEGORY_LABEL[categoryOf(p)]}</td>
+                        <td colSpan={locations.length + 1} className="border-b border-surface-200 bg-surface-100" />
+                      </tr>
+                    )}
                     <tr key={p.id} className="group hover:bg-surface-50">
                       <td className={firstCol}>
                         <div className="flex max-w-[260px] items-center gap-2.5">
@@ -733,7 +765,7 @@ export function AdminProducts() {
                         )
                       })}
                     </tr>
-                  ))}
+                  </Fragment>))}
                 </tbody>
               </table>
             </div>
@@ -1082,6 +1114,19 @@ export function AdminProducts() {
                     <div>
                       <label className="label">Product Name *</label>
                       <input required type="text" className="input" placeholder="e.g. 4-Channel CCTV Kit" value={form.name} onChange={e => setForm({...form, name: e.target.value})} />
+                    </div>
+
+                    <div>
+                      <label className="label">Group *</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {(['camera', 'sd_card', 'accessory'] as const).map(c => (
+                          <button key={c} type="button" onClick={() => setForm({ ...form, category: c })}
+                            className={`rounded-xl border px-3 py-2 text-xs font-bold transition-colors ${form.category === c ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-surface-200 text-surface-600 hover:bg-surface-50'}`}>
+                            {CATEGORY_LABEL[c]}
+                          </button>
+                        ))}
+                      </div>
+                      <p className="mt-1 text-[11px] text-surface-500">SD cards appear as an add-on when placing an order and are deducted from the same branch.</p>
                     </div>
 
                     <div>
