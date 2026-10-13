@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
-import { Package, Plus, Search, Edit2, Trash2, X, RefreshCw, ExternalLink, Upload, Loader2, MapPin, AlertTriangle } from 'lucide-react'
+import { Package, Plus, Search, Edit2, Trash2, X, RefreshCw, ExternalLink, Upload, Loader2, MapPin, AlertTriangle, ArrowRightLeft, ClipboardCheck } from 'lucide-react'
 import { formatCurrency } from '@/lib/utils'
 import type { Product } from '@/types'
 import { CardGridSkeleton } from '@/components/shared/Skeletons'
@@ -232,18 +232,7 @@ export function AdminProducts() {
         p_notes: physicalCountForm.notes || 'Physical Stock Audit Count Override'
       })
 
-      if (error) {
-        // Fallback to direct table update if RPC function isn't run yet
-        const { error: directErr } = await supabase
-          .from('product_inventory')
-          .upsert({
-            product_id: physicalCountForm.product_id,
-            location_id: physicalCountForm.location_id,
-            quantity: Number(physicalCountForm.target_quantity),
-            updated_at: new Date().toISOString()
-          })
-        if (directErr) throw directErr
-      }
+      if (error) throw error
 
       alert('Physical stock count set successfully!')
       setIsPhysicalCountModalOpen(false)
@@ -412,272 +401,221 @@ export function AdminProducts() {
 
   const filteredProducts = products.filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
 
+  const stockAt = (productId: string, locationId: string) =>
+    Number(inventoryList.find(i => i.product_id === productId && i.location_id === locationId)?.quantity || 0)
+  const totalStock = (productId: string) => locations.reduce((sum, loc) => sum + stockAt(productId, loc.id), 0)
+  const branchesHolding = (productId: string) => locations.filter(loc => stockAt(productId, loc.id) > 0).length
+  const isLow = (p: Product) => totalStock(p.id) <= (p.min_stock_level || 5)
+  const totalUnits = products.reduce((sum, p) => sum + totalStock(p.id), 0)
+  const stockValue = products.reduce((sum, p) => sum + totalStock(p.id) * Number(p.cost_price || 0), 0)
+  const lowCount = products.filter(p => p.is_active && isLow(p)).length
+  const branchTotals = locations
+    .map(loc => ({ ...loc, units: inventoryList.filter(i => i.location_id === loc.id).reduce((s, i) => s + (i.quantity || 0), 0) }))
+    .sort((a, b) => b.units - a.units)
+  const startEdit = (product: Product) => {
+    setEditingId(product.id)
+    setForm({
+      name: product.name, description: product.description || '', retail_price: product.retail_price,
+      wholesale_price: product.wholesale_price, cost_price: product.cost_price || 0, stock_quantity: product.stock_quantity,
+      min_stock_level: product.min_stock_level, source_url: product.source_url || '', image_url: product.image_url || '',
+    })
+    setIsModalOpen(true)
+  }
+  const margin = (p: Product) => {
+    const retail = Number(p.retail_price || 0), cost = Number(p.cost_price || 0)
+    return retail > 0 && cost > 0 ? (retail - cost) / retail : null
+  }
+  const TABS = [
+    { id: 'products' as const, label: 'Products', count: products.length },
+    { id: 'inventory' as const, label: 'Branch stock', count: locations.length },
+    { id: 'promos' as const, label: 'Promo packages', count: promoPackages.length },
+  ]
+  // Frozen table chrome: header row sticks to the top, the first column sticks to the left.
+  const thBase = 'sticky top-0 z-20 bg-surface-50 px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-surface-500 whitespace-nowrap border-b border-surface-200'
+  const corner = 'sticky left-0 top-0 z-30 bg-surface-50 px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-surface-500 border-b border-r border-surface-200 shadow-[2px_0_4px_-2px_rgba(15,23,42,0.08)]'
+  const firstCol = 'sticky left-0 z-10 bg-white group-hover:bg-surface-50 px-4 py-3 border-r border-surface-100 shadow-[2px_0_4px_-2px_rgba(15,23,42,0.08)]'
+
   return (
-    <div className="space-y-6 relative">
-      {/* Top Header Title & Global Sync */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="space-y-5 relative">
+      {/* Header */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-surface-900 tracking-tight">Products & Inventory</h1>
-          <p className="text-sm text-surface-500 mt-1">Manage cameras, acquisition costs, branch stock, and promo packages.</p>
+          <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-brand-600">Catalogue &amp; stock</p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight text-surface-900">Products &amp; Inventory</h1>
+          <p className="mt-1 text-sm text-surface-500">Prices, costs and live stock across every branch.</p>
         </div>
-        <button
-          onClick={syncOptismartCatalog}
-          disabled={syncing}
-          className="btn-outline h-9 px-3.5 text-xs font-bold flex items-center gap-2 self-start sm:self-auto rounded-xl border-surface-200 hover:bg-surface-50"
-        >
-          <RefreshCw className={`w-3.5 h-3.5 ${syncing ? 'animate-spin text-brand-600' : 'text-surface-400'}`} />
-          {syncing ? 'Syncing...' : 'Sync Catalog'}
+        <button onClick={syncOptismartCatalog} disabled={syncing}
+          className="btn-outline h-9 self-start rounded-xl border-surface-200 px-3.5 text-xs font-bold sm:self-auto flex items-center gap-2 hover:bg-surface-50">
+          <RefreshCw className={`h-3.5 w-3.5 ${syncing ? 'animate-spin text-brand-600' : 'text-surface-400'}`} />
+          {syncing ? 'Syncing…' : 'Sync website catalogue'}
         </button>
       </div>
 
-      {/* Modern Underline Tab Bar */}
-      <div className="flex items-center gap-2 border-b border-surface-200 overflow-x-auto hide-scrollbar">
-        <button
-          onClick={() => setActiveTab('products')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold border-b-2 transition-all whitespace-nowrap -mb-px ${
-            activeTab === 'products'
-              ? 'border-brand-600 text-brand-600'
-              : 'border-transparent text-surface-500 hover:text-surface-800'
-          }`}
-        >
-          <span>Camera Catalog</span>
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-            activeTab === 'products' ? 'bg-brand-100 text-brand-700' : 'bg-surface-100 text-surface-600'
-          }`}>
-            {products.length}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('promos')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold border-b-2 transition-all whitespace-nowrap -mb-px ${
-            activeTab === 'promos'
-              ? 'border-brand-600 text-brand-600'
-              : 'border-transparent text-surface-500 hover:text-surface-800'
-          }`}
-        >
-          <span>Promo Packages</span>
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-            activeTab === 'promos' ? 'bg-brand-100 text-brand-700' : 'bg-surface-100 text-surface-600'
-          }`}>
-            {promoPackages.length}
-          </span>
-        </button>
-
-        <button
-          onClick={() => setActiveTab('inventory')}
-          className={`flex items-center gap-2 px-4 py-2.5 text-sm font-bold border-b-2 transition-all whitespace-nowrap -mb-px ${
-            activeTab === 'inventory'
-              ? 'border-brand-600 text-brand-600'
-              : 'border-transparent text-surface-500 hover:text-surface-800'
-          }`}
-        >
-          <span>Branch Stock</span>
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
-            activeTab === 'inventory' ? 'bg-brand-100 text-brand-700' : 'bg-surface-100 text-surface-600'
-          }`}>
-            {locations.length} Locations
-          </span>
-        </button>
+      {/* Summary */}
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        {[
+          { label: 'Products', value: products.filter(p => p.is_active).length, sub: `${products.length - products.filter(p => p.is_active).length} draft` },
+          { label: 'Units in stock', value: totalUnits.toLocaleString(), sub: `across ${locations.length} branches` },
+          { label: 'Low stock', value: lowCount, sub: lowCount ? 'need topping up' : 'all healthy', warn: lowCount > 0 },
+          { label: 'Stock value (cost)', value: formatCurrency(stockValue), sub: 'units × cost price' },
+        ].map(k => (
+          <div key={k.label} className={`rounded-2xl border p-4 ${k.warn ? 'border-amber-200 bg-amber-50/70' : 'border-surface-200 bg-white'}`}>
+            <p className="text-[11px] font-bold uppercase tracking-wider text-surface-500">{k.label}</p>
+            <p className={`mt-1 text-xl font-black tracking-tight ${k.warn ? 'text-amber-800' : 'text-surface-900'}`}>{k.value}</p>
+            <p className="mt-0.5 text-xs text-surface-500">{k.sub}</p>
+          </div>
+        ))}
       </div>
 
-      {/* Contextual Toolbar (Search + Actions) */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-surface-50/70 p-3 rounded-2xl border border-surface-100">
-        <div className="relative flex-1 min-w-0">
-          <Search className="w-4 h-4 text-surface-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            placeholder={activeTab === 'products' ? "Search cameras by name..." : activeTab === 'promos' ? "Filter promos..." : "Search stock items..."}
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="w-full pl-10 pr-4 py-2 border border-surface-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none bg-white transition-all shadow-2xs"
-          />
+      {/* Toolbar: tabs, search, actions */}
+      <div className="flex flex-col gap-3 rounded-2xl border border-surface-200 bg-white p-2.5 lg:flex-row lg:items-center">
+        <div className="flex shrink-0 gap-1 overflow-x-auto rounded-xl bg-surface-100 p-1 hide-scrollbar">
+          {TABS.map(t => (
+            <button key={t.id} onClick={() => setActiveTab(t.id)}
+              className={`flex items-center gap-2 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${activeTab === t.id ? 'bg-white text-surface-900 shadow-sm' : 'text-surface-500 hover:text-surface-800'}`}>
+              {t.label}
+              <span className={`rounded-full px-1.5 text-[10px] ${activeTab === t.id ? 'bg-brand-100 text-brand-700' : 'bg-surface-200 text-surface-600'}`}>{t.count}</span>
+            </button>
+          ))}
         </div>
-
-        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+        <div className="relative min-w-0 flex-1">
+          <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-400" />
+          <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+            placeholder={activeTab === 'promos' ? 'Filter promo packages…' : 'Search products…'}
+            className="w-full rounded-xl border border-surface-200 bg-surface-50/60 py-2 pl-10 pr-4 text-sm outline-none transition-all focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/20" />
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
           {activeTab === 'products' && (
-            <button
-              onClick={() => { setEditingId(null); setForm({ name: '', description: '', retail_price: 0, wholesale_price: 0, cost_price: 0, stock_quantity: 0, min_stock_level: 5, source_url: '', image_url: '' }); setIsModalOpen(true); }}
-              className="btn-primary h-9 px-4 text-xs font-bold flex items-center gap-1.5 rounded-xl shadow-brand"
-            >
-              <Plus className="w-4 h-4" /> Add Product
+            <button onClick={() => { setEditingId(null); setForm({ name: '', description: '', retail_price: 0, wholesale_price: 0, cost_price: 0, stock_quantity: 0, min_stock_level: 5, source_url: '', image_url: '' }); setIsModalOpen(true) }}
+              className="btn-primary flex h-9 items-center gap-1.5 rounded-xl px-4 text-xs font-bold">
+              <Plus className="h-4 w-4" /> Add product
             </button>
           )}
-
           {activeTab === 'promos' && (
-            <button
-              onClick={() => { setEditingPromo(null); setPromoForm({ title: '', description: '', bonus_item_name: '', promo_price: 0, cost_price: 0, is_active: true }); setIsPromoModalOpen(true); }}
-              className="btn-primary h-9 px-4 text-xs font-bold flex items-center gap-1.5 rounded-xl shadow-brand"
-            >
-              <Plus className="w-4 h-4" /> Create Promo Package
+            <button onClick={() => { setEditingPromo(null); setPromoForm({ title: '', description: '', bonus_item_name: '', promo_price: 0, cost_price: 0, is_active: true }); setIsPromoModalOpen(true) }}
+              className="btn-primary flex h-9 items-center gap-1.5 rounded-xl px-4 text-xs font-bold">
+              <Plus className="h-4 w-4" /> New promo package
             </button>
           )}
-
           {activeTab === 'inventory' && (
             <>
-              <button
-                onClick={() => setIsLocationModalOpen(true)}
-                className="btn-outline h-9 px-3 text-xs font-bold flex items-center gap-1.5 bg-white border-surface-200 text-surface-700 hover:bg-surface-50 rounded-xl"
-              >
-                <MapPin className="w-3.5 h-3.5 text-surface-500" /> Add Location
+              <button onClick={() => setIsStockInModalOpen(true)} className="btn-primary flex h-9 items-center gap-1.5 rounded-xl bg-emerald-600 px-3 text-xs font-bold text-white hover:bg-emerald-700">
+                <Plus className="h-3.5 w-3.5" /> Stock in
               </button>
-              <button
-                onClick={() => setIsStockInModalOpen(true)}
-                className="btn-primary h-9 px-3 text-xs font-bold flex items-center gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-xs"
-              >
-                <Plus className="w-3.5 h-3.5" /> Stock In
+              <button onClick={() => setIsTransferModalOpen(true)} className="btn-outline flex h-9 items-center gap-1.5 rounded-xl border-surface-200 px-3 text-xs font-bold">
+                <ArrowRightLeft className="h-3.5 w-3.5 text-brand-600" /> Transfer
               </button>
-              <button
-                onClick={() => setIsTransferModalOpen(true)}
-                className="btn-outline h-9 px-3 text-xs font-bold flex items-center gap-1.5 border-brand-300 text-brand-700 bg-brand-50 hover:bg-brand-100 rounded-xl"
-              >
-                <RefreshCw className="w-3.5 h-3.5 text-brand-600" /> Stock Transfer
+              <button onClick={() => {
+                setPhysicalCountForm({ product_id: products[0]?.id || '', location_id: locations[0]?.id || '', target_quantity: 0, notes: 'Physical Stock Count Audit' })
+                setIsPhysicalCountModalOpen(true)
+              }} className="btn-outline flex h-9 items-center gap-1.5 rounded-xl border-surface-200 px-3 text-xs font-bold">
+                <ClipboardCheck className="h-3.5 w-3.5 text-amber-600" /> Count
+              </button>
+              <button onClick={() => setIsLocationModalOpen(true)} className="btn-outline flex h-9 items-center gap-1.5 rounded-xl border-surface-200 px-3 text-xs font-bold">
+                <MapPin className="h-3.5 w-3.5 text-surface-500" /> Add branch
               </button>
             </>
           )}
         </div>
       </div>
 
-      {/* 🚨 Low Stock Warning Banner for Admin 🚨 */}
-      {lowStockProducts.length > 0 && (
-        <div className="rounded-2xl border-2 border-amber-300 bg-amber-50/90 p-4 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-3">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center font-bold shrink-0 shadow-xs">
-              <AlertTriangle className="w-4 h-4" />
-            </div>
-            <div>
-              <h4 className="text-sm font-bold text-amber-950 flex items-center gap-2">
-                Low Stock Warning ({lowStockProducts.length} Product{lowStockProducts.length > 1 ? 's' : ''} at or below 5 units)
-              </h4>
-              <p className="text-xs text-amber-800 font-medium mt-0.5">
-                {lowStockProducts.map(p => `${p.name} (${p.stock_quantity} left)`).join(', ')}
-              </p>
+      {/* Low stock */}
+      {lowStockProducts.length > 0 && activeTab !== 'promos' && (
+        <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50/80 p-3.5 md:flex-row md:items-center md:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-amber-500 text-white"><AlertTriangle className="h-4 w-4" /></span>
+            <div className="min-w-0">
+              <p className="text-sm font-bold text-amber-950">{lowStockProducts.length} product{lowStockProducts.length > 1 ? 's are' : ' is'} low on stock</p>
+              <p className="truncate text-xs text-amber-800">{lowStockProducts.map(p => `${p.name} (${p.stock_quantity})`).join(' · ')}</p>
             </div>
           </div>
-          <button
-            onClick={() => openStockInForProduct(lowStockProducts[0].id)}
-            className="btn-primary h-9 px-4 text-xs font-bold bg-amber-600 hover:bg-amber-700 text-white shrink-0 flex items-center gap-1.5 shadow-xs"
-          >
-            <Plus className="w-3.5 h-3.5" /> Top Up Low Stock Now
+          <button onClick={() => openStockInForProduct(lowStockProducts[0].id)} className="btn-primary flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-amber-600 px-4 text-xs font-bold text-white hover:bg-amber-700">
+            <Plus className="h-3.5 w-3.5" /> Top up
           </button>
         </div>
       )}
 
       {activeTab === 'products' ? (
-        loading ? (
-          <CardGridSkeleton count={6} />
-        ) : filteredProducts.length === 0 ? (
-        <div className="glass-card p-12 flex flex-col items-center justify-center text-center">
-          <div className="w-16 h-16 rounded-2xl bg-surface-100 flex items-center justify-center mb-4">
-            <Package className="w-8 h-8 text-surface-400" />
+        loading ? <CardGridSkeleton count={6} /> : filteredProducts.length === 0 ? (
+          <div className="glass-card flex flex-col items-center justify-center p-12 text-center">
+            <div className="mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-surface-100"><Package className="h-8 w-8 text-surface-400" /></div>
+            <h3 className="mb-2 text-lg font-bold text-surface-900">{search ? 'No products match your search' : 'No products in the catalogue'}</h3>
+            <p className="max-w-md text-surface-500">{search ? 'Try another name.' : 'Sync the OptiSmart website catalogue so DSAs and resellers can sell real products.'}</p>
           </div>
-          <h3 className="text-lg font-bold text-surface-900 mb-2">No products in catalog</h3>
-          <p className="text-surface-500 max-w-md">Sync the OptiSmart website catalog into Supabase so DSAs and resellers can sell real products.</p>
-          <button onClick={syncOptismartCatalog} disabled={syncing} className="btn-primary mt-6">
-            {syncing ? 'Syncing...' : 'Sync OptiSmart Catalog'}
-          </button>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          <AnimatePresence>
-            {filteredProducts.map(product => (
-              <motion.div
-                key={product.id}
-                layout
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className={`glass-card p-5 relative overflow-hidden transition-all ${!product.is_active ? 'opacity-60 grayscale-[0.5]' : 'hover:border-brand-200'}`}
-              >
-                <div className="flex items-start justify-between mb-4">
-                  <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-brand-50 to-cyan-50 flex items-center justify-center text-brand-600 border border-brand-100 overflow-hidden">
-                    <img src={getProductImage(product.name, product.image_url)} alt={product.name} className="h-full w-full object-contain" />
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button 
-                      onClick={() => toggleProductStatus(product.id, product.is_active)}
-                      className={`text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md transition-colors ${
-                        product.is_active ? 'bg-success-50 text-success-700 hover:bg-success-100' : 'bg-surface-200 text-surface-600 hover:bg-surface-300'
-                      }`}
-                    >
-                      {product.is_active ? 'Active' : 'Draft'}
-                    </button>
-                    <button 
-                      onClick={() => {
-                        setEditingId(product.id)
-                        setForm({
-                          name: product.name,
-                          description: product.description || '',
-                          retail_price: product.retail_price,
-                          wholesale_price: product.wholesale_price,
-                          cost_price: product.cost_price || 0,
-                          stock_quantity: product.stock_quantity,
-                          min_stock_level: product.min_stock_level,
-                          source_url: product.source_url || '',
-                          image_url: product.image_url || ''
-                        })
-                        setIsModalOpen(true)
-                      }}
-                      className="p-1.5 text-surface-400 hover:text-brand-600 hover:bg-brand-50 rounded-md transition-colors"
-                      title="Edit Product"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button 
-                      onClick={() => handleDeleteProduct(product.id, product.name)}
-                      className="p-1.5 text-surface-400 hover:text-danger-600 hover:bg-danger-50 rounded-md transition-colors"
-                      title="Delete Product"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-
-                <h3 className="font-bold text-surface-900 mb-1">{product.name}</h3>
-                <p className="text-xs text-surface-500 line-clamp-2 mb-4 h-8">{product.description}</p>
-                {product.source_url && (
-                  <a href={product.source_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700 mb-4">
-                    Website product page <ExternalLink className="w-3 h-3" />
-                  </a>
-                )}
-
-                <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
-                  <div className="bg-danger-50 p-2 rounded-lg border border-danger-100">
-                    <span className="text-[10px] uppercase font-bold text-danger-400 block mb-0.5">Cost</span>
-                    <span className="text-sm font-bold text-danger-700">{formatCurrency(product.cost_price || 0)}</span>
-                  </div>
-                  <div className="bg-surface-50 p-2 rounded-lg border border-surface-100">
-                    <span className="text-[10px] uppercase font-bold text-surface-400 block mb-0.5">Retail Price</span>
-                    <span className="text-sm font-bold text-brand-700">{formatCurrency(product.retail_price)}</span>
-                  </div>
-                  <div className="bg-surface-50 p-2 rounded-lg border border-surface-100">
-                    <span className="text-[10px] uppercase font-bold text-surface-400 block mb-0.5">Wholesale</span>
-                    <span className="text-sm font-bold text-surface-700">{formatCurrency(product.wholesale_price)}</span>
-                  </div>
-                </div>
-
-                <div className="pt-3 border-t border-surface-100 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className={`w-2 h-2 rounded-full ${product.stock_quantity <= (product.min_stock_level || 5) ? 'bg-danger-500 animate-pulse' : 'bg-success-500'}`} />
-                    <span className={`text-xs font-semibold ${product.stock_quantity <= (product.min_stock_level || 5) ? 'text-danger-600 font-bold' : 'text-surface-600'}`}>
-                      {product.stock_quantity} in stock
-                    </span>
-                  </div>
-                  {product.stock_quantity <= (product.min_stock_level || 5) && (
-                    <button
-                      onClick={() => openStockInForProduct(product.id)}
-                      className="btn-outline text-[11px] font-bold h-7 px-2.5 bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100 flex items-center gap-1 transition-all rounded-lg"
-                      title="Click to open Stock In top-up modal for this product"
-                    >
-                      <Plus className="w-3 h-3 text-rose-600" /> Top Up Stock
-                    </button>
-                  )}
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
-      )) : activeTab === 'promos' ? (
+        ) : (
+          <div className="overflow-hidden rounded-2xl border border-surface-200 bg-white">
+            <div className="max-h-[70vh] overflow-auto">
+              <table className="w-full min-w-[980px] border-separate border-spacing-0 text-left text-sm">
+                <thead>
+                  <tr>
+                    <th className={corner}>Product</th>
+                    <th className={thBase}>Status</th>
+                    <th className={`${thBase} text-right`}>Retail</th>
+                    <th className={`${thBase} text-right`}>Wholesale</th>
+                    <th className={`${thBase} text-right`}>Cost</th>
+                    <th className={`${thBase} text-right`}>Margin</th>
+                    <th className={`${thBase} text-right`}>In stock</th>
+                    <th className={thBase}>Branches</th>
+                    <th className={`${thBase} text-right`}>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredProducts.map(p => {
+                    const total = totalStock(p.id), m = margin(p), low = isLow(p)
+                    return (
+                      <tr key={p.id} className={`group transition-colors hover:bg-surface-50 ${!p.is_active ? 'opacity-60' : ''}`}>
+                        <td className={firstCol}>
+                          <div className="flex min-w-[220px] max-w-[300px] items-center gap-3">
+                            <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-xl border border-surface-100 bg-white">
+                              <img src={getProductImage(p.name, p.image_url)} alt="" className="h-full w-full object-contain" loading="lazy" />
+                            </span>
+                            <span className="min-w-0">
+                              <span className="block truncate font-bold text-surface-900">{p.name}</span>
+                              {p.source_url
+                                ? <a href={p.source_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] font-semibold text-brand-600 hover:underline">Website page <ExternalLink className="h-3 w-3" /></a>
+                                : <span className="block truncate text-[11px] text-surface-400">{p.description || '—'}</span>}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="border-b border-surface-100 px-4 py-3">
+                          <button onClick={() => toggleProductStatus(p.id, p.is_active)}
+                            className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider transition-colors ${p.is_active ? 'bg-success-50 text-success-700 hover:bg-success-100' : 'bg-surface-100 text-surface-600 hover:bg-surface-200'}`}
+                            title={p.is_active ? 'Click to hide from sellers' : 'Click to make it sellable'}>
+                            {p.is_active ? 'Active' : 'Draft'}
+                          </button>
+                        </td>
+                        <td className="whitespace-nowrap border-b border-surface-100 px-4 py-3 text-right font-bold text-surface-900">{formatCurrency(p.retail_price)}</td>
+                        <td className="whitespace-nowrap border-b border-surface-100 px-4 py-3 text-right text-surface-700">{formatCurrency(p.wholesale_price)}</td>
+                        <td className="whitespace-nowrap border-b border-surface-100 px-4 py-3 text-right text-surface-500">{formatCurrency(p.cost_price || 0)}</td>
+                        <td className={`whitespace-nowrap border-b border-surface-100 px-4 py-3 text-right font-semibold ${m == null ? 'text-surface-400' : m < 0.15 ? 'text-danger-600' : 'text-success-700'}`}>
+                          {m == null ? '—' : `${Math.round(m * 100)}%`}
+                        </td>
+                        <td className="whitespace-nowrap border-b border-surface-100 px-4 py-3 text-right">
+                          <span className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-extrabold ${low ? 'bg-rose-50 text-rose-700 ring-1 ring-rose-200' : 'bg-surface-100 text-surface-800'}`}>
+                            {low && <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />}{total}
+                          </span>
+                        </td>
+                        <td className="whitespace-nowrap border-b border-surface-100 px-4 py-3 text-xs text-surface-600">
+                          {branchesHolding(p.id)} of {locations.length}
+                        </td>
+                        <td className="whitespace-nowrap border-b border-surface-100 px-4 py-3">
+                          <div className="flex items-center justify-end gap-1">
+                            <button onClick={() => openStockInForProduct(p.id)} className={`rounded-lg px-2 py-1 text-[11px] font-bold transition-colors ${low ? 'bg-rose-50 text-rose-700 hover:bg-rose-100' : 'text-surface-500 hover:bg-surface-100 hover:text-surface-800'}`}>
+                              + Stock
+                            </button>
+                            <button onClick={() => startEdit(p)} className="rounded-lg p-1.5 text-surface-400 transition-colors hover:bg-brand-50 hover:text-brand-600" title="Edit"><Edit2 className="h-4 w-4" /></button>
+                            <button onClick={() => handleDeleteProduct(p.id, p.name)} className="rounded-lg p-1.5 text-surface-400 transition-colors hover:bg-danger-50 hover:text-danger-600" title="Delete"><Trash2 className="h-4 w-4" /></button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )
+      ) : activeTab === 'promos' ? (
         /* PROMO PACKAGES TAB */
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
           {promoPackages.map(promo => (
@@ -737,111 +675,98 @@ export function AdminProducts() {
           ))}
         </div>
       ) : (
-        /* MULTI-BRANCH INVENTORY TAB */
-        <div className="space-y-6">
-          {/* Branch Overview Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {locations.map(loc => {
-              const locTotalStock = inventoryList
-                .filter(i => i.location_id === loc.id)
-                .reduce((sum, i) => sum + (i.quantity || 0), 0)
-              return (
-                <div key={loc.id} className="glass-card relative border border-brand-100 bg-brand-50/30 p-5">
-                  <span className="text-[10px] font-extrabold uppercase tracking-wider text-brand-600 bg-brand-50 px-2 py-0.5 rounded-full border border-brand-200">
-                    {loc.name}
-                  </span>
-                  <h3 className="text-2xl font-black text-surface-900 mt-2">{locTotalStock} Cameras</h3>
-                  <p className="text-xs text-surface-500 mt-0.5">{loc.address || 'Regional Stock Hub'}</p>
-                </div>
-              )
-            })}
+        <div className="space-y-5">
+          {/* Branch totals */}
+          <div className="flex gap-2 overflow-x-auto pb-1 hide-scrollbar">
+            {branchTotals.map(b => (
+              <div key={b.id} className="min-w-[132px] shrink-0 rounded-xl border border-surface-200 bg-white px-3 py-2.5">
+                <p className="truncate text-[11px] font-bold uppercase tracking-wider text-surface-500" title={b.address || b.name}>{b.name}</p>
+                <p className={`mt-0.5 text-lg font-black ${b.units === 0 ? 'text-surface-300' : 'text-surface-900'}`}>{b.units}</p>
+                <p className="text-[10px] text-surface-400">units</p>
+              </div>
+            ))}
           </div>
 
-          {/* Product Stock Level Breakdown Table */}
-          <div className="glass-card overflow-hidden">
-            <div className="flex flex-col gap-3 border-b border-surface-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-              <h3 className="text-base font-bold text-surface-900 flex items-center gap-2">
-                <Package className="w-5 h-5 text-brand-600" /> Multi-Branch Stock Availability
-              </h3>
-              <div className="flex items-center gap-2">
-                <button onClick={() => setIsStockInModalOpen(true)} className="btn-primary text-xs h-9 px-3 bg-emerald-600 hover:bg-emerald-700">
-                  + Stock In
-                </button>
-                <button onClick={() => setIsTransferModalOpen(true)} className="btn-outline text-xs h-9 px-3 border-brand-300 text-brand-700 bg-brand-50">
-                  Stock Transfer
-                </button>
-                <button
-                  onClick={() => {
-                    const firstProd = products[0]?.id || ''
-                    const firstLoc = locations[0]?.id || ''
-                    setPhysicalCountForm({ product_id: firstProd, location_id: firstLoc, target_quantity: 0, notes: 'Physical Stock Count Audit' })
-                    setIsPhysicalCountModalOpen(true)
-                  }}
-                  className="btn-outline text-xs h-9 px-3 border-amber-300 text-amber-800 bg-amber-50 hover:bg-amber-100"
-                >
-                  Set Physical Count
-                </button>
-              </div>
+          {/* Product × branch grid */}
+          <div className="overflow-hidden rounded-2xl border border-surface-200 bg-white">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-surface-100 px-4 py-3">
+              <h3 className="flex items-center gap-2 text-sm font-bold text-surface-900"><Package className="h-4 w-4 text-brand-600" /> Stock by branch</h3>
+              <p className="text-xs text-surface-500">Tap a cell to add stock there · red = at or below the product's minimum</p>
             </div>
-
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] text-left border-collapse">
+            <div className="max-h-[70vh] overflow-auto">
+              <table className="border-separate border-spacing-0 text-sm">
                 <thead>
-                  <tr className="bg-surface-50/50 border-b border-surface-100 text-xs font-bold text-surface-500 uppercase tracking-wider">
-                    <th className="py-3.5 px-6">Product / Camera</th>
+                  <tr>
+                    <th className={`${corner} min-w-[220px]`}>Product</th>
+                    <th className={`${thBase} text-right`}>Total</th>
                     {locations.map(loc => (
-                      <th key={loc.id} className="py-3.5 px-6 text-center">{loc.name}</th>
+                      <th key={loc.id} className={`${thBase} min-w-[92px] text-center`} title={loc.address || loc.name}>{loc.name}</th>
                     ))}
-                    <th className="py-3.5 px-6 text-right">Total Available Stock</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-surface-100 text-sm">
-                  {products.map(p => {
-                    const totalProductStock = locations.reduce((total, loc) => {
-                      const item = inventoryList.find(i => i.product_id === p.id && i.location_id === loc.id)
-                      return total + (item?.quantity || 0)
-                    }, 0)
-
-                    return (
-                      <tr key={p.id} className="hover:bg-surface-50/50 transition-colors">
-                        <td className="py-3.5 px-6 font-bold text-surface-900 flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-lg bg-surface-100 flex items-center justify-center font-bold text-brand-600 shrink-0">
-                            <Package className="h-4 w-4" />
-                          </div>
-                          <div>
-                            <p>{p.name}</p>
-                            <p className="text-xs text-surface-400 font-normal">{formatCurrency(p.retail_price)}</p>
-                          </div>
-                        </td>
-                        {locations.map(loc => {
-                          const item = inventoryList.find(i => i.product_id === p.id && i.location_id === loc.id)
-                          const qty = item?.quantity || 0
-                          return (
-                            <td key={loc.id} className="py-3.5 px-6 text-center">
-                              <div className="flex items-center justify-center gap-1.5">
-                                <span className={`px-2.5 py-1 rounded-lg text-xs font-extrabold ${
-                                  qty <= 5 ? 'bg-rose-50 text-rose-700 border border-rose-200' : 'bg-surface-100 text-surface-800'
-                                }`}>
-                                  {qty} units
-                                </span>
-                                {qty <= 5 && (
-                                  <button
-                                    onClick={() => openStockInForProduct(p.id, loc.id)}
-                                    className="p-1 rounded-lg text-rose-600 hover:bg-rose-100 transition-colors"
-                                    title={`Top Up ${p.name} at ${loc.name}`}
-                                  >
-                                    <Plus className="w-3.5 h-3.5 text-rose-600" />
-                                  </button>
-                                )}
-                              </div>
-                            </td>
-                          )
-                        })}
-                        <td className="py-3.5 px-6 text-right font-black text-surface-900">
-                          <span className="px-3 py-1 rounded-full text-xs font-black bg-brand-50 text-brand-700 border border-brand-200">
-                            {totalProductStock} units
+                <tbody>
+                  {filteredProducts.map(p => (
+                    <tr key={p.id} className="group hover:bg-surface-50">
+                      <td className={firstCol}>
+                        <div className="flex max-w-[260px] items-center gap-2.5">
+                          <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-lg border border-surface-100 bg-white">
+                            <img src={getProductImage(p.name, p.image_url)} alt="" className="h-full w-full object-contain" loading="lazy" />
                           </span>
-                        </td>
+                          <span className="truncate font-bold text-surface-900">{p.name}</span>
+                        </div>
+                      </td>
+                      <td className="whitespace-nowrap border-b border-surface-100 px-4 py-2.5 text-right font-black text-surface-900">{totalStock(p.id)}</td>
+                      {locations.map(loc => {
+                        const qty = stockAt(p.id, loc.id)
+                        const low = qty <= (p.min_stock_level || 5)
+                        return (
+                          <td key={loc.id} className="border-b border-surface-100 px-2 py-2 text-center">
+                            <button onClick={() => openStockInForProduct(p.id, loc.id)} title={`Add ${p.name} stock at ${loc.name}`}
+                              className={`min-w-[44px] rounded-lg px-2 py-1 text-xs font-extrabold transition-colors ${qty === 0 ? 'text-surface-300 hover:bg-surface-100 hover:text-surface-600' : low ? 'bg-rose-50 text-rose-700 hover:bg-rose-100' : 'bg-surface-100 text-surface-800 hover:bg-brand-50 hover:text-brand-700'}`}>
+                              {qty}
+                            </button>
+                          </td>
+                        )
+                      })}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* Stock movements */}
+          <div className="overflow-hidden rounded-2xl border border-surface-200 bg-white">
+            <div className="border-b border-surface-100 px-4 py-3">
+              <h3 className="flex items-center gap-2 text-sm font-bold text-surface-900"><RefreshCw className="h-4 w-4 text-brand-600" /> Stock movements</h3>
+            </div>
+            <div className="max-h-[420px] overflow-auto">
+              <table className="w-full min-w-[720px] border-separate border-spacing-0 text-left text-sm">
+                <thead>
+                  <tr>
+                    <th className={corner}>When</th>
+                    <th className={thBase}>Type</th>
+                    <th className={thBase}>Product</th>
+                    <th className={thBase}>From → To</th>
+                    <th className={`${thBase} text-right`}>Units</th>
+                    <th className={thBase}>Note</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {movementsList.length === 0 && (
+                    <tr><td colSpan={6} className="px-4 py-8 text-center text-sm text-surface-500">No stock movements yet.</td></tr>
+                  )}
+                  {movementsList.map(m => {
+                    const tone = m.movement_type === 'stock_in' || m.movement_type === 'return' ? 'bg-emerald-50 text-emerald-700'
+                      : m.movement_type === 'transfer' ? 'bg-brand-50 text-brand-700' : 'bg-rose-50 text-rose-700'
+                    return (
+                      <tr key={m.id} className="group hover:bg-surface-50">
+                        <td className={`${firstCol} whitespace-nowrap text-xs text-surface-500`}>{new Date(m.created_at).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}</td>
+                        <td className="border-b border-surface-100 px-4 py-2.5"><span className={`rounded-md px-2 py-0.5 text-[10px] font-black uppercase ${tone}`}>{String(m.movement_type).replace('_', ' ')}</span></td>
+                        <td className="border-b border-surface-100 px-4 py-2.5 font-semibold text-surface-900">{m.product?.name || '—'}</td>
+                        <td className="whitespace-nowrap border-b border-surface-100 px-4 py-2.5 text-xs text-surface-600">{m.from_loc?.name || '—'} → {m.to_loc?.name || '—'}</td>
+                        <td className="border-b border-surface-100 px-4 py-2.5 text-right font-black text-surface-900">{m.quantity}</td>
+                        <td className="max-w-[280px] truncate border-b border-surface-100 px-4 py-2.5 text-xs text-surface-500" title={m.notes || ''}>{m.notes || '—'}</td>
                       </tr>
                     )
                   })}
@@ -849,43 +774,9 @@ export function AdminProducts() {
               </table>
             </div>
           </div>
-
-          {/* Recent Stock Movement Audit Log */}
-          <div className="glass-card p-6">
-            <h3 className="text-base font-bold text-surface-900 mb-4 flex items-center gap-2">
-              <RefreshCw className="w-5 h-5 text-brand-600" /> Recent Stock Movements (Audit Trail)
-            </h3>
-            <div className="space-y-3 max-h-80 overflow-y-auto">
-              {movementsList.map(m => (
-                <div key={m.id} className="flex flex-col gap-3 rounded-xl border border-surface-200 bg-white p-3 text-xs sm:flex-row sm:items-center sm:justify-between">
-                  <div className="flex items-center gap-3">
-                    <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${
-                      m.movement_type === 'stock_in' ? 'bg-emerald-100 text-emerald-800' :
-                      m.movement_type === 'transfer' ? 'bg-brand-100 text-brand-800' : 'bg-rose-100 text-rose-800'
-                    }`}>
-                      {m.movement_type.replace('_', ' ')}
-                    </span>
-                    <div>
-                      <p className="font-bold text-surface-900">{m.product?.name || 'Camera'}</p>
-                      <p className="text-surface-500 mt-0.5">
-                        {m.movement_type === 'transfer'
-                          ? `Transferred from ${m.from_loc?.name || 'HQ'} to ${m.to_loc?.name || 'Branch'}`
-                          : m.movement_type === 'stock_in'
-                          ? `Stock In added to ${m.to_loc?.name || 'Branch'}`
-                          : `Fulfillment Stock Out from ${m.from_loc?.name || 'Branch'}`}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="font-black text-surface-900 text-sm">{m.quantity} units</span>
-                    <p className="text-[10px] text-surface-400">{new Date(m.created_at).toLocaleString()}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
         </div>
       )}
+
       {createPortal(
         <AnimatePresence>
           {isPromoModalOpen && (
