@@ -12,6 +12,7 @@ import { OrderStatusBadge } from '@/components/shared/Badges'
 import { AssignInstallerModal } from '@/components/shared/AssignInstallerModal'
 import { InstallerPicker, INSTALLER_NONE, type InstallerChoice } from '@/components/shared/InstallerPicker'
 import { GuideTip } from '@/components/shared/GuideTip'
+import { OrderDetailsDrawer } from '@/components/shared/OrderDetailsDrawer'
 import { TableSkeleton } from '@/components/shared/Skeletons'
 import { sendEmail } from '@/lib/email'
 import { sendWebPush } from '@/lib/push'
@@ -35,7 +36,7 @@ const getWhatsAppShareUrl = (order: Order) => {
   if (rawPhone.startsWith('0')) {
     rawPhone = '234' + rawPhone.slice(1)
   }
-  
+
   if (rawPhone.length >= 10) {
     return `https://api.whatsapp.com/send?phone=${rawPhone}&text=${encodeURIComponent(text)}`
   }
@@ -110,7 +111,7 @@ export function AdminOrders() {
     expected_delivery_date: '',
     notes: '',
   })
-  
+
   // A simple mapping for the allowed status transitions in the lifecycle
   const allowedTransitions: Record<string, OrderStatus[]> = {
     pending: ['approved', 'delivered', 'cancelled'],
@@ -140,7 +141,7 @@ export function AdminOrders() {
         supabase.from('users').select('id, full_name').eq('role', 'installer').eq('status', 'active').order('full_name'),
         supabase.from('delivery_agents').select('id, full_name').eq('is_active', true).order('full_name'),
       ])
-      
+
       if (ordersRes.error) throw ordersRes.error
       if (productsRes.error) throw productsRes.error
       if (dsasRes.error) throw dsasRes.error
@@ -193,7 +194,7 @@ export function AdminOrders() {
       setCreateError('Select a product before creating the order.')
       return
     }
-    
+
     setSubmitting(true)
     try {
       const product = products.find(p => p.id === form.product_id)
@@ -252,7 +253,7 @@ export function AdminOrders() {
             totalAmount: data.total_amount
           }).catch(console.error);
         }
-        
+
         const createdOrder = {
           ...data,
           dsa: form.dsa_id
@@ -317,9 +318,9 @@ export function AdminOrders() {
       }
 
       if (error) throw error
-      
+
       const updatedOrder = selectedOrder
-      
+
       // Send Notifications to DSA
       if (updatedOrder?.dsa_id) {
         const dsa = (updatedOrder as any).dsa;
@@ -434,17 +435,31 @@ export function AdminOrders() {
   }
 
   const [dsaFilter, setDsaFilter] = useState('all')
+  const [menuPos, setMenuPos] = useState<{ top: number; right: number; up: boolean } | null>(null)
+  const [viewOrder, setViewOrder] = useState<Order | null>(null)
 
   const filteredOrders = orders.filter(order => {
     const term = search.toLowerCase()
-    const matchesSearch = order.customer_name.toLowerCase().includes(term) || 
+    const matchesSearch = order.customer_name.toLowerCase().includes(term) ||
       order.order_number.toLowerCase().includes(term) ||
       (order.dsa?.full_name || order.unregistered_dsa_name || '').toLowerCase().includes(term)
     const matchesStatus = statusFilter === 'all' || order.status === statusFilter
-    const matchesDsa = dsaFilter === 'all' || 
+    const matchesDsa = dsaFilter === 'all' ||
       (dsaFilter === 'unregistered' ? !order.dsa_id : order.dsa_id === dsaFilter)
     return matchesSearch && matchesStatus && matchesDsa
   })
+
+  const STATUS_ORDER = ['pending', 'paid', 'approved', 'confirmed', 'processing', 'dispatched', 'rescheduled', 'delivered', 'completed', 'cancelled']
+  const statusCounts = orders.reduce((acc: Record<string, number>, order) => {
+    const term = search.toLowerCase()
+    const okSearch = order.customer_name.toLowerCase().includes(term) || order.order_number.toLowerCase().includes(term) ||
+      (order.dsa?.full_name || order.unregistered_dsa_name || '').toLowerCase().includes(term)
+    const okDsa = dsaFilter === 'all' || (dsaFilter === 'unregistered' ? !order.dsa_id : order.dsa_id === dsaFilter)
+    if (okSearch && okDsa) { acc.all = (acc.all || 0) + 1; acc[order.status] = (acc[order.status] || 0) + 1 }
+    return acc
+  }, {})
+  const filtersOn = search !== '' || statusFilter !== 'all' || dsaFilter !== 'all'
+  const clearFilters = () => { setSearch(''); setStatusFilter('all'); setDsaFilter('all') }
 
   const getOrdersExportData = () => {
     return filteredOrders.map(o => ({
@@ -470,41 +485,24 @@ export function AdminOrders() {
   return (
     <div className="space-y-6">
       <GuideTip guideKey="money" />
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <OrderDetailsDrawer
+        order={viewOrder ? (orders.find(o => o.id === viewOrder.id) || viewOrder) : null}
+        onClose={() => setViewOrder(null)}
+        onEdit={o => { setViewOrder(null); openEditModal(o) }}
+        products={products}
+        branches={inventoryLocations}
+        installers={installers}
+        agents={agents}
+        job={viewOrder ? jobsByOrder.get(viewOrder.id) : undefined}
+      />
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-surface-900 tracking-tight">System Orders</h1>
-          <p className="text-sm text-surface-500 mt-1">Manage all orders and update their lifecycle status.</p>
+          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-surface-900">
+            Orders <span className="rounded-full bg-surface-100 px-2.5 py-0.5 text-sm font-bold text-surface-600">{orders.length}</span>
+          </h1>
+          <p className="mt-1 text-sm text-surface-500">Every order, its money and where it is in delivery.</p>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative">
-            <Search className="w-4 h-4 text-surface-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input 
-              type="text" 
-              placeholder="Search by ID or customer..." 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 pr-4 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none w-full sm:w-64 transition-all"
-            />
-          </div>
-          <div className="relative">
-            <Filter className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-400" />
-            <select value={statusFilter} onChange={event => setStatusFilter(event.target.value)} className="h-10 rounded-lg border border-surface-200 bg-white pl-9 pr-8 text-sm outline-none transition-all focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20">
-              <option value="all">All Statuses</option><option value="pending">Pending</option><option value="paid">Paid</option>
-              <option value="approved">Approved</option><option value="confirmed">Confirmed</option><option value="processing">Processing</option>
-              <option value="dispatched">Dispatched</option><option value="rescheduled">Rescheduled</option><option value="delivered">Delivered</option><option value="cancelled">Cancelled</option>
-            </select>
-          </div>
-
-          <div className={`relative ${searchParams.get('highlight') === 'dsa-filter' ? 'animate-feature-glow rounded-xl' : ''}`}>
-            <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-400" />
-            <select value={dsaFilter} onChange={e => setDsaFilter(e.target.value)} className="h-10 rounded-lg border border-surface-200 bg-white pl-9 pr-8 text-sm outline-none transition-all focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 max-w-[200px] truncate">
-              <option value="all">All Sales Agents (DSAs)</option>
-              <option value="unregistered">Unregistered / Direct</option>
-              {dsas.map(dsa => (
-                <option key={dsa.id} value={dsa.id}>{dsa.full_name || dsa.email}</option>
-              ))}
-            </select>
-          </div>
+        <div className="flex items-center gap-2">
           <button
             onClick={() => exportToExcel({
               filename: 'optismart-system-orders',
@@ -512,25 +510,52 @@ export function AdminOrders() {
               reportSubHeading: `Status Filter: ${statusFilter.toUpperCase()} | Total Orders: ${filteredOrders.length}`,
               data: getOrdersExportData()
             })}
-            className="flex items-center gap-1.5 h-10 px-3 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 transition-colors shadow-sm"
-            title="Export to Microsoft Excel"
+            className="btn-outline flex h-10 items-center gap-1.5 px-3 text-sm" title="Export to Excel"
           >
-            <FileSpreadsheet className="w-4 h-4" /> <span className="hidden sm:inline">Excel</span>
+            <FileSpreadsheet className="h-4 w-4 text-emerald-600" /> <span className="hidden sm:inline">Excel</span>
           </button>
-          <button
-            onClick={() => exportToCSV(getOrdersExportData(), 'optismart-system-orders')}
-            className="flex items-center gap-1.5 h-10 px-3 rounded-lg border border-surface-200 bg-white text-surface-700 text-sm font-semibold hover:bg-surface-50 transition-colors shadow-sm"
-            title="Download UTF-8 CSV"
-          >
-            <Download className="w-4 h-4" /> <span className="hidden sm:inline">CSV</span>
+          <button onClick={() => exportToCSV(getOrdersExportData(), 'optismart-system-orders')}
+            className="btn-outline flex h-10 items-center gap-1.5 px-3 text-sm" title="Download CSV">
+            <Download className="h-4 w-4" /> <span className="hidden sm:inline">CSV</span>
           </button>
-          <button 
-            onClick={() => setIsModalOpen(true)}
-            className="btn-primary flex items-center gap-2 py-2"
-          >
-            <Plus className="w-4 h-4" />
-            <span className="hidden sm:inline">Create Order</span>
+          <button onClick={() => setIsModalOpen(true)} className="btn-primary flex h-10 items-center gap-1.5 px-4 text-sm">
+            <Plus className="h-4 w-4" /> New order
           </button>
+        </div>
+      </div>
+
+      <div className="glass-card space-y-3 p-3 sm:p-4">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-400" />
+            <input type="text" placeholder="Search order number, customer or sales agent…" value={search}
+              onChange={e => setSearch(e.target.value)} className="input h-10 w-full pl-9 text-sm" />
+            {search && (
+              <button onClick={() => setSearch('')} aria-label="Clear search" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-surface-400 hover:text-surface-700">
+                <X className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          <div className={`relative sm:w-64 ${searchParams.get('highlight') === 'dsa-filter' ? 'animate-feature-glow rounded-xl' : ''}`}>
+            <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-400" />
+            <select value={dsaFilter} onChange={e => setDsaFilter(e.target.value)} className="input h-10 w-full truncate pl-9 text-sm">
+              <option value="all">All sales agents</option>
+              <option value="unregistered">Unregistered / direct</option>
+              {dsas.map(dsa => <option key={dsa.id} value={dsa.id}>{dsa.full_name || dsa.email}</option>)}
+            </select>
+          </div>
+        </div>
+        <div className="-mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-0.5">
+          <Filter className="h-3.5 w-3.5 shrink-0 text-surface-400" />
+          {['all', ...STATUS_ORDER].filter(st => st === 'all' || statusCounts[st] || statusFilter === st).map(st => (
+            <button key={st} onClick={() => setStatusFilter(st)}
+              className={`shrink-0 rounded-full border px-3 py-1 text-xs font-semibold capitalize transition-colors ${statusFilter === st ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-surface-200 bg-white text-surface-600 hover:bg-surface-50'}`}>
+              {st === 'all' ? 'All' : st} <span className={statusFilter === st ? 'text-brand-500' : 'text-surface-400'}>{statusCounts[st] || 0}</span>
+            </button>
+          ))}
+          {filtersOn && (
+            <button onClick={clearFilters} className="ml-auto shrink-0 px-2 text-xs font-semibold text-surface-500 hover:text-surface-800">Clear filters</button>
+          )}
         </div>
       </div>
 
@@ -541,33 +566,36 @@ export function AdminOrders() {
           <div className="w-16 h-16 rounded-2xl bg-surface-100 flex items-center justify-center mb-4">
             <ShoppingBag className="w-8 h-8 text-surface-400" />
           </div>
-          <h3 className="text-lg font-bold text-surface-900 mb-2">No orders found</h3>
-          <p className="text-surface-500 max-w-md">No matching orders currently exist in the system.</p>
+          <h3 className="text-lg font-bold text-surface-900 mb-2">{orders.length ? 'No orders match these filters' : 'No orders yet'}</h3>
+          <p className="text-surface-500 max-w-md">{orders.length ? `There are ${orders.length} orders in total.` : 'Orders will appear here as soon as they are placed.'}</p>
+          {filtersOn && <button onClick={clearFilters} className="btn-outline mt-4 h-9 px-4 text-sm">Clear filters</button>}
         </div>
       ) : (
-        <div className="glass-card overflow-hidden max-w-[1150px]">
-          {/* Desktop Table — Width constrained so content fits naturally without horizontal scrolling */}
-          <div className="hidden md:block overflow-x-auto">
-            <table className="w-full text-left border-collapse">
+        <div className="glass-card overflow-hidden">
+          {filtersOn && (
+            <p className="border-b border-surface-100 px-4 py-2 text-xs text-surface-500">Showing <strong className="text-surface-800">{filteredOrders.length}</strong> of {orders.length} orders</p>
+          )}
+          <div className="hidden max-h-[72vh] overflow-auto md:block" onScroll={() => openDropdownId && (setOpenDropdownId(null), setMenuPos(null))}>
+            <table className="w-full min-w-[820px] border-separate border-spacing-0 text-left">
               <thead>
-                <tr className="bg-surface-50/70 border-b border-surface-100">
-                  <th className="py-3.5 px-4 text-xs font-bold text-surface-600 uppercase tracking-wider">Order Details</th>
-                  <th className="py-3.5 px-4 text-xs font-bold text-surface-600 uppercase tracking-wider">Customer</th>
-                  <th className="py-3.5 px-4 text-xs font-bold text-surface-600 uppercase tracking-wider">Amount</th>
-                  <th className="py-3.5 px-4 text-xs font-bold text-surface-600 uppercase tracking-wider">Status</th>
-                  <th className="py-3.5 px-4 text-xs font-bold text-surface-600 uppercase tracking-wider text-right">Lifecycle Actions</th>
+                <tr className="text-[11px] font-bold uppercase tracking-wider text-surface-500">
+                  <th className="sticky left-0 top-0 z-30 border-b border-surface-200 bg-surface-50 px-4 py-3">Order</th>
+                  <th className="sticky top-0 z-20 border-b border-surface-200 bg-surface-50 px-4 py-3">Customer</th>
+                  <th className="sticky top-0 z-20 border-b border-surface-200 bg-surface-50 px-4 py-3">Amount</th>
+                  <th className="sticky top-0 z-20 border-b border-surface-200 bg-surface-50 px-4 py-3">Status</th>
+                  <th className="sticky top-0 z-20 border-b border-surface-200 bg-surface-50 px-4 py-3 text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-surface-100">
+              <tbody>
                 <AnimatePresence>
                   {filteredOrders.map(order => (
-                    <motion.tr 
+                    <motion.tr
                       key={order.id}
-                      layout
                       initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                      className="hover:bg-surface-50/60 transition-colors"
+                      onClick={() => setViewOrder(order)}
+                      className="group cursor-pointer transition-colors hover:bg-surface-50 [&>td]:border-b [&>td]:border-surface-100"
                     >
-                      <td className="py-3 px-4">
+                      <td className="sticky left-0 z-10 bg-white py-3 px-4 group-hover:bg-surface-50">
                         <p className="text-sm font-bold text-brand-600">{order.order_number}</p>
                         <p className="text-[10px] text-surface-500 font-medium uppercase tracking-wide mt-0.5">
                           By: {order.dsa?.full_name || order.unregistered_dsa_name || 'System'}
@@ -576,8 +604,8 @@ export function AdminOrders() {
                           <Calendar className="w-3 h-3" /> {formatDate(order.created_at)}
                         </p>
                         {order.installation_needed && (
-                          <span className="inline-flex items-center gap-1 text-[10px] font-bold text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full mt-1 border border-orange-200">
-                            Needs Installer
+                          <span className={`mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold ${assignedOrderIds.has(order.id) ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-800'}`}>
+                            {assignedOrderIds.has(order.id) ? 'Installer assigned' : 'Needs installer'}
                           </span>
                         )}
                       </td>
@@ -593,7 +621,7 @@ export function AdminOrders() {
                       <td className="py-3 px-4">
                         <OrderStatusBadge status={order.status} />
                       </td>
-                      <td className="py-3 px-4 text-right">
+                      <td className="py-3 px-4 text-right" onClick={e => e.stopPropagation()}>
                         <div className="relative inline-block text-left">
                           {updating === order.id ? (
                             <div className="w-5 h-5 border-2 border-brand-500/30 border-t-brand-500 rounded-full animate-spin ml-auto" />
@@ -603,6 +631,8 @@ export function AdminOrders() {
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation()
+                                  const r = e.currentTarget.getBoundingClientRect()
+                                  setMenuPos({ top: r.bottom + 4, right: window.innerWidth - r.right, up: r.bottom + 300 > window.innerHeight })
                                   setOpenDropdownId(openDropdownId === order.id ? null : order.id)
                                 }}
                                 className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-lg border bg-surface-50 border-surface-200 text-surface-700 hover:bg-brand-50 hover:text-brand-700 hover:border-brand-300 transition-all cursor-pointer shadow-xs active:scale-95"
@@ -611,21 +641,22 @@ export function AdminOrders() {
                                 <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${openDropdownId === order.id ? 'rotate-180 text-brand-600' : ''}`} />
                               </button>
 
-                              {openDropdownId === order.id && (
+                              {openDropdownId === order.id && menuPos && createPortal(
                                 <>
                                   {/* Backdrop overlay */}
-                                  <div 
-                                    className="fixed inset-0 z-40" 
+                                  <div
+                                    className="fixed inset-0 z-40"
                                     onClick={(e) => {
                                       e.stopPropagation()
                                       setOpenDropdownId(null)
-                                    }} 
+                                    }}
                                   />
-                                  
+
                                   {/* Dropdown Menu */}
-                                  <div className="absolute right-0 top-full mt-1 z-50 w-48 rounded-xl bg-white border border-surface-200 shadow-xl py-1 flex flex-col text-left divide-y divide-surface-100 animate-fade-up">
+                                  <div style={menuPos.up ? { bottom: window.innerHeight - menuPos.top + 36, right: menuPos.right } : { top: menuPos.top, right: menuPos.right }}
+                                    className="fixed z-50 w-52 rounded-xl bg-white border border-surface-200 shadow-xl py-1 flex flex-col text-left divide-y divide-surface-100 animate-fade-up">
                                     <div className="py-1">
-                                      {!['delivered', 'completed', 'cancelled'].includes(order.status) && (
+                                      {order.status !== 'cancelled' && (
                                         <button
                                           type="button"
                                           onClick={() => {
@@ -646,7 +677,7 @@ export function AdminOrders() {
                                             handleUpdateStatus(order.id, nextStatus)
                                           }}
                                           className={`w-full px-3.5 py-2 text-xs font-semibold flex items-center gap-2 transition-colors cursor-pointer ${
-                                            nextStatus === 'cancelled' 
+                                            nextStatus === 'cancelled'
                                               ? 'text-danger-600 hover:bg-danger-50'
                                               : nextStatus === 'delivered'
                                                 ? 'text-success-700 hover:bg-success-50'
@@ -700,7 +731,8 @@ export function AdminOrders() {
                                       </div>
                                     )}
                                   </div>
-                                </>
+                                </>,
+                                document.body
                               )}
                             </>
                           )}
@@ -717,13 +749,13 @@ export function AdminOrders() {
           <div className="md:hidden divide-y divide-surface-100">
             <AnimatePresence>
               {filteredOrders.map(order => (
-                <motion.div 
+                <motion.div
                   key={order.id}
                   layout
                   initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                   className="p-4 flex flex-col gap-3"
                 >
-                  <div className="flex items-start justify-between">
+                  <div className="flex cursor-pointer items-start justify-between" onClick={() => setViewOrder(order)}>
                     <div>
                       <p className="text-sm font-bold text-brand-600">{order.order_number}</p>
                       <p className="text-sm font-medium text-surface-900 mt-1">{order.customer_name}</p>
@@ -748,7 +780,7 @@ export function AdminOrders() {
                       <div className="w-5 h-5 border-2 border-brand-500/30 border-t-brand-500 rounded-full animate-spin" />
                     ) : (
                       <>
-                        {!['delivered', 'completed', 'cancelled'].includes(order.status) && (
+                        {order.status !== 'cancelled' && (
                           <button
                             onClick={() => openEditModal(order)}
                             className="text-xs font-bold px-3 py-1.5 rounded-lg border bg-surface-50 border-surface-200 text-surface-700 hover:border-brand-200 hover:bg-brand-50 hover:text-brand-700 transition-colors flex items-center gap-1"
@@ -761,7 +793,7 @@ export function AdminOrders() {
                             key={nextStatus}
                             onClick={() => handleUpdateStatus(order.id, nextStatus)}
                             className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition-colors flex items-center gap-1 ${
-                              nextStatus === 'cancelled' 
+                              nextStatus === 'cancelled'
                                 ? 'bg-white border-surface-200 text-danger-600 hover:border-danger-200 hover:bg-danger-50'
                                 : nextStatus === 'delivered'
                                   ? 'bg-success-50 border-success-200 text-success-700 hover:bg-success-100'
@@ -798,9 +830,9 @@ export function AdminOrders() {
         </div>
       )}
 
-        <AssignInstallerModal 
-          isOpen={!!assigningOrderId} 
-          onClose={() => setAssigningOrderId(null)} 
+        <AssignInstallerModal
+          isOpen={!!assigningOrderId}
+          onClose={() => setAssigningOrderId(null)}
           onSuccess={() => {
             if (assigningOrderId) setAssignedOrderIds(prev => new Set([...prev, assigningOrderId]))
             fetchData()
@@ -813,13 +845,13 @@ export function AdminOrders() {
         <AnimatePresence>
         {isEditModalOpen && editingOrder && (
           <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
-            <motion.div 
+            <motion.div
               key="edit-order-backdrop"
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm"
               onClick={() => !submitting && setIsEditModalOpen(false)}
             />
-            <motion.div 
+            <motion.div
               key="edit-order-modal"
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -867,7 +899,7 @@ export function AdminOrders() {
                     <label className="label">Product *</label>
                     <div className="relative">
                       <Package className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
-                      <select required className="input pl-10" value={editForm.product_id} onChange={e => {
+                      <select required className="input pl-10" disabled={['delivered', 'completed'].includes(editingOrder.status)} value={editForm.product_id} onChange={e => {
                         const p = products.find(prod => prod.id === e.target.value)
                         setEditForm({...editForm, product_id: e.target.value, total_amount: p ? p.retail_price * editForm.quantity : editForm.total_amount})
                       }}>
@@ -882,7 +914,7 @@ export function AdminOrders() {
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                       <label className="label">Quantity *</label>
-                      <input required type="number" min={1} className="input" value={editForm.quantity} onChange={e => {
+                      <input required type="number" min={1} className="input" disabled={['delivered', 'completed'].includes(editingOrder.status)} value={editForm.quantity} onChange={e => {
                         const qty = parseInt(e.target.value) || 1
                         const p = products.find(prod => prod.id === editForm.product_id)
                         setEditForm({...editForm, quantity: qty, total_amount: p ? p.retail_price * qty : editForm.total_amount})
@@ -896,11 +928,11 @@ export function AdminOrders() {
 
                   <div className="border-t border-surface-100 pt-4">
                     <div className="flex items-center gap-3 mb-3">
-                      <input 
-                        type="checkbox" 
+                      <input
+                        type="checkbox"
                         id="edit_install_needed"
-                        checked={editForm.installation_needed} 
-                        onChange={e => setEditForm({...editForm, installation_needed: e.target.checked})} 
+                        checked={editForm.installation_needed}
+                        onChange={e => setEditForm({...editForm, installation_needed: e.target.checked})}
                         className="w-5 h-5 rounded border-surface-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
                       />
                       <label htmlFor="edit_install_needed" className="label mb-0 cursor-pointer">Installation Needed</label>
@@ -972,12 +1004,12 @@ export function AdminOrders() {
       <AnimatePresence>
         {isModalOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm"
               onClick={() => !submitting && setIsModalOpen(false)}
             />
-            <motion.div 
+            <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95, y: 20 }}
@@ -996,10 +1028,10 @@ export function AdminOrders() {
                   <div className="flex items-center justify-between mb-2">
                     <label className="label mb-0">DSA In Charge (Optional)</label>
                     <label className="flex items-center gap-2 text-xs font-medium text-surface-600 cursor-pointer">
-                      <input 
-                        type="checkbox" 
-                        checked={!form.is_dsa_registered} 
-                        onChange={e => setForm({...form, is_dsa_registered: !e.target.checked})} 
+                      <input
+                        type="checkbox"
+                        checked={!form.is_dsa_registered}
+                        onChange={e => setForm({...form, is_dsa_registered: !e.target.checked})}
                         className="rounded border-surface-300 text-brand-600 focus:ring-brand-500"
                       />
                       Unregistered / External Agent
@@ -1017,13 +1049,13 @@ export function AdminOrders() {
                       </select>
                     </div>
                   ) : (
-                    <input 
-                      required 
-                      type="text" 
-                      className="input" 
-                      placeholder="Type the full name of the agent" 
-                      value={form.unregistered_dsa_name} 
-                      onChange={e => setForm({...form, unregistered_dsa_name: e.target.value})} 
+                    <input
+                      required
+                      type="text"
+                      className="input"
+                      placeholder="Type the full name of the agent"
+                      value={form.unregistered_dsa_name}
+                      onChange={e => setForm({...form, unregistered_dsa_name: e.target.value})}
                     />
                   )}
                 </div>
@@ -1032,7 +1064,7 @@ export function AdminOrders() {
                   <label className="label">Customer Name *</label>
                   <input required type="text" className="input" placeholder="e.g. John Smith" value={form.customer_name} onChange={e => setForm({...form, customer_name: e.target.value})} />
                 </div>
-                
+
                 <div>
                   <label className="label">Customer Phone *</label>
                   <input required type="tel" className="input" placeholder="080..." value={form.customer_phone} onChange={e => setForm({...form, customer_phone: e.target.value.replace(/[^\d+]/g, '')})} />
@@ -1093,16 +1125,16 @@ export function AdminOrders() {
 
                 <div className="border-t border-surface-100 pt-4">
                   <div className="flex items-center gap-3 mb-4">
-                    <input 
-                      type="checkbox" 
+                    <input
+                      type="checkbox"
                       id="install_needed_admin"
-                      checked={form.installation_needed} 
-                      onChange={e => setForm({...form, installation_needed: e.target.checked})} 
+                      checked={form.installation_needed}
+                      onChange={e => setForm({...form, installation_needed: e.target.checked})}
                       className="w-5 h-5 rounded border-surface-300 text-brand-600 focus:ring-brand-500 cursor-pointer"
                     />
                     <label htmlFor="install_needed_admin" className="label mb-0 cursor-pointer">Yes, Installation is Needed</label>
                   </div>
-                  
+
                   {form.installation_needed && (
                     <div className="mb-4 space-y-3">
                       <div>
