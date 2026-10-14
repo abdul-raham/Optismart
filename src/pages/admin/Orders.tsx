@@ -132,7 +132,7 @@ export function AdminOrders() {
         supabase.from('orders').select('*, dsa:users!orders_dsa_id_fkey(email, full_name)').order('created_at', { ascending: false }),
         supabase.from('products').select('*').eq('is_active', true),
         supabase.from('users').select('*').in('role', ['dsa', 'admin', 'super_admin']).eq('status', 'active'),
-        supabase.from('installer_jobs').select('id, order_id, installer_id, commission_amount, status, payout_id').neq('status', 'rejected'),
+        supabase.from('installer_jobs').select('id, order_id, installer_id, commission_amount, status, payout_id'),
         supabase.from('inventory_locations').select('id, name, address').eq('is_active', true).order('name'),
         supabase.from('product_inventory').select('product_id, location_id, quantity')
       ])

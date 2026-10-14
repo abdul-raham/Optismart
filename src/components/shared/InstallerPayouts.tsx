@@ -18,7 +18,7 @@ export function InstallerPayouts({ installers }: { installers: { id: string; ful
 
   const load = async () => {
     const [j, p] = await Promise.all([
-      supabase.from('installer_jobs').select('id, installer_id, status, commission_amount, payout_id, orders(order_number, installation_price, installer_commission_pct)').neq('status', 'rejected'),
+      supabase.from('installer_jobs').select('id, installer_id, status, commission_amount, payout_id, orders(order_number, installation_price, installer_commission_pct)'),
       supabase.from('installer_payouts').select('*').order('created_at', { ascending: false }).limit(50),
     ])
     setJobs(j.data ?? [])

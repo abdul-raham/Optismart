@@ -101,7 +101,7 @@ export function DSAOrders() {
       if (stockRes.data) setBranchStock(stockRes.data)
       const installIds = (ordersRes.data ?? []).filter((o: any) => o.installation_needed).map((o: any) => o.id)
       if (installIds.length) {
-        const { data: jobs } = await supabase.from('installer_jobs').select('order_id').in('order_id', installIds).neq('status', 'rejected')
+        const { data: jobs } = await supabase.from('installer_jobs').select('order_id').in('order_id', installIds)
         setWithInstaller(new Set((jobs ?? []).map(j => j.order_id)))
       }
     } catch (err) {

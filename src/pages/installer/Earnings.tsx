@@ -24,7 +24,7 @@ export function InstallerEarnings() {
       const [j, p] = await Promise.all([
         supabase.from('installer_jobs')
           .select('*, orders ( order_number, customer_name, installation_price, installer_commission_pct )')
-          .eq('installer_id', user?.id).neq('status', 'rejected')
+          .eq('installer_id', user?.id)
           .order('scheduled_date', { ascending: false }),
         supabase.from('installer_payouts').select('*').eq('installer_id', user?.id).order('created_at', { ascending: false }),
       ])
