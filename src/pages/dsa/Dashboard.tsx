@@ -44,10 +44,11 @@ export function DSADashboard() {
       const { data: { session } } = await supabase.auth.getSession()
       const authId = session?.user?.id
 
-      const { data: orders } = await supabase.from('orders').select('*')
-        .or(`dsa_id.eq.${userId},created_by_auth_id.eq.${authId}`)
-      const { data: leads } = await supabase.from('leads').select('*').eq('dsa_id', userId).neq('status', 'converted')
-      const { data: commissions } = await supabase.from('commissions').select('amount, status').eq('dsa_id', userId)
+      const [{ data: orders }, { data: leads }, { data: commissions }] = await Promise.all([
+        supabase.from('orders').select('*').or(`dsa_id.eq.${userId},created_by_auth_id.eq.${authId}`),
+        supabase.from('leads').select('*').eq('dsa_id', userId).neq('status', 'converted'),
+        supabase.from('commissions').select('amount, status').eq('dsa_id', userId),
+      ])
 
       if (orders) {
         const activeOrders = orders.filter(o => o.status !== 'cancelled')

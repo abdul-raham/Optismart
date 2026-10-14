@@ -1,112 +1,126 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
-import { UserPlus, Target, TrendingUp, MoreVertical, Search, Plus, X, Phone, Mail, MapPin, Calendar, Clock, Banknote, Edit2, Trash2, Bell } from 'lucide-react'
+import { Target, Search, Plus, X, Phone, Mail, MapPin, Clock, Trash2, Bell, MessageCircle, User, BellOff, StickyNote } from 'lucide-react'
 import { sendEmail } from '@/lib/email'
 import { sendWebPush } from '@/lib/push'
 import { formatDate } from '@/lib/utils'
-import type { Lead } from '@/types'
+
+const PAGE_SIZE = 50
+const STATUSES = ['new', 'contacted', 'converted', 'lost'] as const
+const STATUS_STYLE: Record<string, string> = {
+  new: 'bg-brand-50 text-brand-700',
+  contacted: 'bg-indigo-50 text-indigo-700',
+  converted: 'bg-emerald-50 text-emerald-700',
+  lost: 'bg-surface-100 text-surface-500',
+}
+const PRIORITY: Record<string, { label: string; dot: string }> = {
+  hot: { label: 'High', dot: 'bg-rose-500' },
+  warm: { label: 'Medium', dot: 'bg-amber-400' },
+  cold: { label: 'Low', dot: 'bg-sky-400' },
+}
+const today = () => new Date().toISOString().slice(0, 10)
+const waLink = (phone: string) => `https://wa.me/${phone.replace(/\D/g, '').replace(/^0/, '234')}`
+
+const EMPTY_FORM = { customer_name: '', phone: '', email: '', location: '', temperature: 'warm', notes: '', follow_up_date: '', follow_up_interval_days: 0 }
 
 export function DSALeads() {
   const { user, role } = useAuthStore()
   const location = useLocation()
+  const isAdmin = role !== 'dsa'
   const [leads, setLeads] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [priorityFilter, setPriorityFilter] = useState<string>('all')
+  const [dueOnly, setDueOnly] = useState(false)
+  const [dsaFilter, setDsaFilter] = useState('all')
+  const [dsas, setDsas] = useState<{ id: string; full_name: string }[]>([])
+  const [page, setPage] = useState(0)
+  const [matchCount, setMatchCount] = useState(0)
+  const [counts, setCounts] = useState<Record<string, number>>({})
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [submitting, setSubmitting] = useState(false)
-  const [openDropdownId, setOpenDropdownId] = useState<string | null>(null)
+  const [form, setForm] = useState(EMPTY_FORM)
+  const [openLead, setOpenLead] = useState<any | null>(null)
+  const sequence = useRef(0)
 
   useEffect(() => {
-    if (location.search.includes('new=true') || location.pathname.endsWith('/new-lead')) {
-      setIsModalOpen(true)
-    }
+    if (location.search.includes('new=true') || location.pathname.endsWith('/new-lead')) setIsModalOpen(true)
   }, [location])
 
-  const [form, setForm] = useState({
-    customer_name: '',
-    phone: '',
-    email: '',
-    location: '',
-    temperature: 'warm',
-    notes: '',
-    follow_up_date: '',
-    follow_up_interval_days: 0,
-  })
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300)
+    return () => clearTimeout(t)
+  }, [search])
+  useEffect(() => { setPage(0) }, [debouncedSearch, statusFilter, priorityFilter, dueOnly, dsaFilter])
 
   useEffect(() => {
-    if (user?.id) {
-      fetchLeads()
-    }
-  }, [user?.id])
+    if (isAdmin) supabase.from('users').select('id, full_name').eq('role', 'dsa').order('full_name').then(({ data }) => setDsas(data ?? []))
+  }, [isAdmin])
+
+  // Everything except status is applied here; status is added for the list only, so the tab counts stay right.
+  const withFilters = (q: any) => {
+    if (!isAdmin) q = q.eq('dsa_id', user?.id)
+    else if (dsaFilter !== 'all') q = q.eq('dsa_id', dsaFilter)
+    if (priorityFilter !== 'all') q = q.eq('temperature', priorityFilter)
+    if (dueOnly) q = q.lte('follow_up_date', today()).eq('follow_up_stopped', false).not('status', 'in', '(converted,lost)')
+    const term = debouncedSearch.replace(/[%,()*]/g, ' ').trim()
+    if (term) q = q.or(`customer_name.ilike.%${term}%,phone.ilike.%${term}%,location.ilike.%${term}%,email.ilike.%${term}%`)
+    return q
+  }
 
   const fetchLeads = async () => {
+    if (!user?.id) return
+    const seq = ++sequence.current
     try {
-      let query = supabase
-        .from('leads')
-        .select('*, dsa:users(full_name)')
-        .order('created_at', { ascending: false })
-        
-      if (role === 'dsa') {
-        query = query.eq('dsa_id', user?.id)
-      }
-      
-      const { data, error } = await query
-      
-      if (error) throw error
-      
-      if (data) setLeads(data)
+      const from = page * PAGE_SIZE
+      const head = () => withFilters(supabase.from('leads').select('id', { count: 'exact', head: true }))
+      let list = withFilters(supabase.from('leads').select('*, dsa:users(full_name)', { count: 'exact' }))
+      if (statusFilter !== 'all') list = list.eq('status', statusFilter)
+      const [res, all, ...per] = await Promise.all([
+        list.order('created_at', { ascending: false }).range(from, from + PAGE_SIZE - 1),
+        head(),
+        ...STATUSES.map(st => head().eq('status', st)),
+      ])
+      if (res.error) throw res.error
+      if (seq !== sequence.current) return
+      setLeads(res.data ?? [])
+      setMatchCount(res.count ?? 0)
+      setCounts(Object.fromEntries([['all', all.count ?? 0], ...STATUSES.map((st, i) => [st, per[i].count ?? 0])]))
     } catch (err) {
       console.error('Error fetching leads:', err)
     } finally {
-      setLoading(false)
+      if (seq === sequence.current) setLoading(false)
     }
+  }
+  useEffect(() => { fetchLeads() }, [user?.id, page, debouncedSearch, statusFilter, priorityFilter, dueOnly, dsaFilter])
+
+  const patchLead = (id: string, changes: any) => {
+    setLeads(ls => ls.map(l => l.id === id ? { ...l, ...changes } : l))
+    setOpenLead((o: any) => (o?.id === id ? { ...o, ...changes } : o))
   }
 
   const handleCreateLead = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user?.id) return
-    
     setSubmitting(true)
     try {
-      const { data, error } = await supabase
-        .from('leads')
-        .insert([{
-          dsa_id: user.id,
-          customer_name: form.customer_name,
-          phone: form.phone,
-          email: form.email,
-          location: form.location,
-          temperature: form.temperature,
-          notes: form.notes,
-          follow_up_date: form.follow_up_date || null,
-          follow_up_interval_days: form.follow_up_interval_days || 0,
-          status: 'new'
-        }])
-        .select()
-        .single()
-
+      const { data, error } = await supabase.from('leads').insert([{
+        dsa_id: user.id, customer_name: form.customer_name, phone: form.phone, email: form.email || null,
+        location: form.location || null, temperature: form.temperature, notes: form.notes || null,
+        follow_up_date: form.follow_up_date || null, follow_up_interval_days: form.follow_up_interval_days || 0, status: 'new',
+      }]).select().single()
       if (error) throw error
       if (data) {
-        // Trigger email notification in background
-        sendEmail('new_lead', {
-          dsaEmail: user.email,
-          dsaName: user.full_name,
-          customerName: form.customer_name
-        }, { onError: (e) => console.warn('Email failed:', e) })
-        
-        sendWebPush(
-          user.id,
-          'Lead Captured',
-          `Successfully saved ${form.customer_name} to your pipeline.`,
-          '/app/dsa/leads'
-        ).catch(console.warn)
-
-        setLeads([data, ...leads])
+        sendEmail('new_lead', { dsaEmail: user.email, dsaName: user.full_name, customerName: form.customer_name }, { onError: e => console.warn('Email failed:', e) })
+        sendWebPush(user.id, 'Lead Captured', `Successfully saved ${form.customer_name} to your pipeline.`, '/app/dsa/leads').catch(console.warn)
         setIsModalOpen(false)
-        setForm({ customer_name: '', phone: '', email: '', location: '', temperature: 'warm', notes: '', follow_up_date: '', follow_up_interval_days: 0 })
+        setForm(EMPTY_FORM)
+        fetchLeads()
       }
     } catch (err) {
       console.error('Error creating lead:', err)
@@ -116,395 +130,332 @@ export function DSALeads() {
     }
   }
 
-  const handleStopReminders = async (leadId: string) => {
-    try {
-      const { error } = await supabase.from('leads').update({ follow_up_stopped: true }).eq('id', leadId)
-      if (error) throw error
-      setLeads(leads.map(l => l.id === leadId ? { ...l, follow_up_stopped: true } : l))
-    } catch (err) {
-      console.error('Error stopping reminders:', err)
-      alert('Failed to stop reminders')
-    }
+  const setStatus = async (lead: any, status: string) => {
+    const prev = lead.status
+    patchLead(lead.id, { status })
+    const { error } = await supabase.from('leads').update({ status, updated_at: new Date().toISOString() }).eq('id', lead.id)
+    if (error) { patchLead(lead.id, { status: prev }); alert(`Could not change status: ${error.message}`) }
+    else fetchLeads()
   }
 
-  const handleRemindDSA = async (lead: any) => {
+  const stopReminders = async (lead: any) => {
+    const { error } = await supabase.from('leads').update({ follow_up_stopped: true }).eq('id', lead.id)
+    if (error) return alert('Failed to stop reminders')
+    patchLead(lead.id, { follow_up_stopped: true })
+  }
+
+  const remindDSA = async (lead: any) => {
     if (!lead.dsa_id) return
     try {
-      await sendWebPush(
-        lead.dsa_id,
-        'Lead Follow-up Reminder',
-        `Admin reminded you to follow up with ${lead.customer_name}. Please check your pending leads.`,
-        '/app/dsa/leads'
-      )
-      alert(`Reminder sent to ${lead.dsa?.full_name || 'DSA'}`)
-    } catch (err) {
-      console.error('Failed to send reminder:', err)
+      await sendWebPush(lead.dsa_id, 'Lead Follow-up Reminder',
+        `Admin reminded you to follow up with ${lead.customer_name}. Please check your pending leads.`, '/app/dsa/leads')
+      alert(`Reminder sent to ${lead.dsa?.full_name || 'the sales agent'}`)
+    } catch {
       alert('Failed to send reminder')
     }
   }
 
-  const handleDeleteLead = async (leadId: string) => {
-    if (!window.confirm('Are you sure you want to delete this lead?')) return
-    try {
-      const { error } = await supabase.from('leads').delete().eq('id', leadId)
-      if (error) throw error
-      setLeads(leads.filter(l => l.id !== leadId))
-    } catch (err) {
-      console.error('Failed to delete lead:', err)
-      alert('Failed to delete lead')
-    }
+  const deleteLead = async (lead: any) => {
+    if (!window.confirm(`Delete the lead for ${lead.customer_name}?`)) return
+    const { error } = await supabase.from('leads').delete().eq('id', lead.id)
+    if (error) return alert('Failed to delete lead')
+    setOpenLead(null)
+    fetchLeads()
   }
 
-  const filteredLeads = leads.filter(l => 
-    l.customer_name.toLowerCase().includes(search.toLowerCase()) || 
-    l.phone.includes(search)
+  const followUp = (lead: any) => {
+    if (!lead.follow_up_date) return null
+    if (lead.follow_up_stopped || ['converted', 'lost'].includes(lead.status)) return { text: formatDate(lead.follow_up_date), cls: 'text-surface-400' }
+    const d = lead.follow_up_date.slice(0, 10)
+    if (d < today()) return { text: `Overdue · ${formatDate(lead.follow_up_date)}`, cls: 'font-semibold text-rose-600' }
+    if (d === today()) return { text: 'Today', cls: 'font-semibold text-amber-700' }
+    return { text: formatDate(lead.follow_up_date), cls: 'text-surface-700' }
+  }
+
+  const filtersOn = !!search || statusFilter !== 'all' || priorityFilter !== 'all' || dueOnly || dsaFilter !== 'all'
+  const clearFilters = () => { setSearch(''); setStatusFilter('all'); setPriorityFilter('all'); setDueOnly(false); setDsaFilter('all') }
+  const pageFrom = page * PAGE_SIZE
+  const pageCount = Math.max(1, Math.ceil(matchCount / PAGE_SIZE))
+
+  const StatusSelect = ({ lead }: { lead: any }) => (
+    <select value={lead.status} onClick={e => e.stopPropagation()} onChange={e => setStatus(lead, e.target.value)}
+      className={`cursor-pointer appearance-none rounded-full border-0 py-1 pl-2.5 pr-6 text-xs font-bold capitalize outline-none focus:ring-2 focus:ring-brand-500/30 ${STATUS_STYLE[lead.status] || STATUS_STYLE.new}`}
+      style={{ backgroundImage: 'none' }} aria-label="Lead status">
+      {STATUSES.map(st => <option key={st} value={st}>{st}</option>)}
+    </select>
+  )
+  const Priority = ({ t }: { t: string }) => (
+    <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-surface-700">
+      <span className={`h-2 w-2 rounded-full ${PRIORITY[t]?.dot || 'bg-surface-300'}`} /> {PRIORITY[t]?.label || t}
+    </span>
   )
 
-  const getTempColor = (temp: string) => {
-    switch (temp) {
-      case 'hot': return 'bg-rose-100 text-rose-700 border-rose-200' // High
-      case 'warm': return 'bg-orange-100 text-orange-700 border-orange-200' // Medium
-      case 'cold': return 'bg-blue-100 text-blue-700 border-blue-200' // Low
-      default: return 'bg-surface-100 text-surface-700 border-surface-200'
-    }
-  }
-
-  const getPriorityLabel = (temp: string) => {
-    switch (temp) {
-      case 'hot': return 'High'
-      case 'warm': return 'Medium'
-      case 'cold': return 'Low'
-      default: return temp
-    }
-  }
-
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'new': return 'bg-brand-100 text-brand-700'
-      case 'contacted': return 'bg-purple-100 text-purple-700'
-      case 'converted': return 'bg-success-100 text-success-700'
-      case 'lost': return 'bg-surface-100 text-surface-700'
-      default: return 'bg-surface-100 text-surface-700'
-    }
-  }
-
   return (
-    <div className="space-y-6 relative">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div className="relative space-y-6">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-surface-900 tracking-tight">Lead Management</h1>
-          <p className="text-sm text-surface-500 mt-1">Track and convert your prospects into paying customers.</p>
+          <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-surface-900">
+            Leads <span className="rounded-full bg-surface-100 px-2.5 py-0.5 text-sm font-bold text-surface-600">{counts.all ?? 0}</span>
+          </h1>
+          <p className="mt-1 text-sm text-surface-500">{isAdmin ? 'Every prospect your sales agents are working on.' : 'Your prospects. Follow up and turn them into orders.'}</p>
         </div>
-        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
-          <div className="relative min-w-0 flex-1 sm:flex-none">
-            <Search className="w-4 h-4 text-surface-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input 
-              type="text" 
-              placeholder="Search leads..." 
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 pr-4 py-2 border border-surface-200 rounded-lg text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none w-full sm:w-64 transition-all"
-            />
-          </div>
-          <button onClick={() => setIsModalOpen(true)} className="btn-primary h-10 px-4 text-sm font-semibold flex items-center gap-2">
-            <Plus className="w-4 h-4" /> New Lead
+        <button onClick={() => setIsModalOpen(true)} className="btn-primary flex h-10 items-center gap-1.5 px-4 text-sm"><Plus className="h-4 w-4" /> New lead</button>
+      </div>
+
+      {/* Pipeline */}
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-5">
+        {(['all', ...STATUSES] as string[]).map(st => (
+          <button key={st} onClick={() => setStatusFilter(st)}
+            className={`rounded-2xl border p-3 text-left transition-colors ${statusFilter === st ? 'border-brand-500 bg-brand-50/60' : 'border-surface-200 bg-white hover:bg-surface-50'}`}>
+            <p className={`text-xs font-semibold capitalize ${statusFilter === st ? 'text-brand-700' : 'text-surface-500'}`}>{st === 'all' ? 'All leads' : st}</p>
+            <p className="mt-0.5 text-xl font-bold text-surface-900">{counts[st] ?? 0}</p>
           </button>
+        ))}
+      </div>
+
+      {/* Toolbar */}
+      <div className="glass-card space-y-3 p-3 sm:p-4">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-400" />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search name, phone, email or location…" className="input h-10 w-full pl-9 text-sm" />
+            {search && <button onClick={() => setSearch('')} aria-label="Clear search" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-surface-400 hover:text-surface-700"><X className="h-4 w-4" /></button>}
+          </div>
+          {isAdmin && (
+            <div className="relative sm:w-60">
+              <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-400" />
+              <select value={dsaFilter} onChange={e => setDsaFilter(e.target.value)} className="input h-10 w-full truncate pl-9 text-sm">
+                <option value="all">All sales agents</option>
+                {dsas.map(d => <option key={d.id} value={d.id}>{d.full_name}</option>)}
+              </select>
+            </div>
+          )}
+        </div>
+        <div className="-mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-0.5">
+          {(['all', 'hot', 'warm', 'cold'] as const).map(t => (
+            <button key={t} onClick={() => setPriorityFilter(t)}
+              className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${priorityFilter === t ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-surface-200 bg-white text-surface-600 hover:bg-surface-50'}`}>
+              {t !== 'all' && <span className={`h-2 w-2 rounded-full ${PRIORITY[t].dot}`} />} {t === 'all' ? 'Any priority' : PRIORITY[t].label}
+            </button>
+          ))}
+          <span className="mx-1 h-4 w-px shrink-0 bg-surface-200" />
+          <button onClick={() => setDueOnly(!dueOnly)}
+            className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${dueOnly ? 'border-rose-400 bg-rose-50 text-rose-700' : 'border-surface-200 bg-white text-surface-600 hover:bg-surface-50'}`}>
+            <Clock className="h-3.5 w-3.5" /> Follow-up due
+          </button>
+          {filtersOn && <button onClick={clearFilters} className="ml-auto shrink-0 px-2 text-xs font-semibold text-surface-500 hover:text-surface-800">Clear filters</button>}
         </div>
       </div>
 
       {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1,2,3].map(i => <div key={i} className="glass-card h-48 animate-pulse bg-surface-100/50" />)}
-        </div>
-      ) : filteredLeads.length === 0 ? (
-        <div className="glass-card p-12 flex flex-col items-center justify-center text-center">
-          <div className="w-16 h-16 rounded-2xl bg-brand-50 flex items-center justify-center mb-4">
-            <Target className="w-8 h-8 text-brand-600" />
-          </div>
-          <h3 className="text-lg font-bold text-surface-900 mb-2">No leads found</h3>
-          <p className="text-surface-500 max-w-md">You haven't added any prospects yet. Start building your pipeline by adding a new lead.</p>
-          <button onClick={() => setIsModalOpen(true)} className="btn-primary mt-6">Add Your First Lead</button>
+        <div className="glass-card space-y-3 p-5">{[1, 2, 3, 4].map(i => <div key={i} className="h-10 animate-pulse rounded-lg bg-surface-100" />)}</div>
+      ) : leads.length === 0 ? (
+        <div className="glass-card flex flex-col items-center justify-center p-12 text-center">
+          <div className="mb-4 grid h-14 w-14 place-items-center rounded-2xl bg-brand-50"><Target className="h-7 w-7 text-brand-600" /></div>
+          <h3 className="mb-1 text-lg font-bold text-surface-900">{filtersOn ? 'No leads match these filters' : 'No leads yet'}</h3>
+          <p className="max-w-md text-sm text-surface-500">{filtersOn ? 'Try another search or clear the filters.' : 'Add your first prospect to start building your pipeline.'}</p>
+          {filtersOn ? <button onClick={clearFilters} className="btn-outline mt-5 h-9 px-4 text-sm">Clear filters</button>
+            : <button onClick={() => setIsModalOpen(true)} className="btn-primary mt-5">Add your first lead</button>}
         </div>
       ) : (
-        <>
-          {/* Mobile/Tablet Grid View */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:hidden gap-4">
-            <AnimatePresence>
-              {filteredLeads.map((lead) => (
-                <motion.div
-                  key={lead.id}
-                  layout
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  className="glass-card p-5 group hover:border-brand-200 transition-colors"
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div>
-                      <div className="flex items-center gap-3">
-                        <h3 className="text-lg font-black text-surface-900 group-hover:text-brand-600 transition-colors">{lead.customer_name}</h3>
-                        {role !== 'dsa' && lead.dsa?.full_name && (
-                          <span className="px-2 py-0.5 rounded text-[10px] bg-purple-50 text-purple-700 font-bold ml-2">
-                            {lead.dsa.full_name}
-                          </span>
-                        )}
-                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase tracking-wider border ${getTempColor(lead.temperature)}`}>
-                          {getPriorityLabel(lead.temperature)}
-                        </span>
-                      </div>
-                      <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${getStatusColor(lead.status)} mt-1 inline-block`}>
-                          {lead.status}
-                      </span>
-                    </div>
-                    <div className="relative">
-                      <button 
-                        onClick={() => setOpenDropdownId(openDropdownId === lead.id ? null : lead.id)}
-                        className="text-surface-400 hover:text-surface-900 p-1 rounded-md hover:bg-surface-50 transition-colors"
-                      >
-                        <MoreVertical className="w-4 h-4" />
-                      </button>
-                      <AnimatePresence>
-                        {openDropdownId === lead.id && (
-                          <motion.div
-                            initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: 10 }}
-                            className="absolute right-0 top-full mt-2 w-48 bg-white rounded-xl shadow-xl border border-surface-100 z-10 py-1"
-                          >
-                            <a href={`tel:${lead.phone}`} className="w-full text-left px-4 py-2 text-sm text-surface-700 hover:bg-surface-50 hover:text-brand-600 transition-colors flex items-center gap-2">
-                              <Phone className="w-4 h-4" /> Call Customer
-                            </a>
-                            {role !== 'dsa' && lead.dsa_id && (
-                              <button onClick={() => { handleRemindDSA(lead); setOpenDropdownId(null); }} className="w-full text-left px-4 py-2 text-sm text-orange-600 hover:bg-orange-50 transition-colors flex items-center gap-2">
-                                <Bell className="w-4 h-4" /> Remind DSA
-                              </button>
-                            )}
-                            <button onClick={() => { handleDeleteLead(lead.id); setOpenDropdownId(null); }} className="w-full text-left px-4 py-2 text-sm text-danger-600 hover:bg-danger-50 transition-colors flex items-center gap-2">
-                              <Trash2 className="w-4 h-4" /> Delete Lead
-                            </button>
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 mb-4">
-                    <div className="flex items-center gap-2 text-sm text-surface-600">
-                      <Phone className="w-4 h-4 text-surface-400" />
-                      <span>{lead.phone}</span>
-                    </div>
-                    {lead.email && (
-                      <div className="flex items-center gap-2 text-sm text-surface-600">
-                        <Mail className="w-4 h-4 text-surface-400" />
-                        <span className="truncate">{lead.email}</span>
-                      </div>
-                    )}
-                    {lead.location && (
-                      <div className="flex items-center gap-2 text-sm text-surface-600">
-                        <MapPin className="w-4 h-4 text-surface-400" />
-                        <span className="truncate">{lead.location}</span>
-                      </div>
-                    )}
-                  </div>
-
-                  <div className="pt-4 border-t border-surface-100 flex items-center justify-between">
-                    <div className="flex items-center gap-1.5 text-xs text-surface-400 font-medium">
-                      <Calendar className="w-3.5 h-3.5" />
-                      Added {formatDate(lead.created_at)}
-                    </div>
-                    {lead.status !== 'converted' && (
-                      <div className="flex items-center gap-3">
-                        {lead.follow_up_date && !lead.follow_up_stopped && (
-                          <button onClick={() => handleStopReminders(lead.id)} className="text-[10px] font-bold text-danger-600 hover:text-danger-700 bg-danger-50 px-2 py-1 rounded transition-colors">
-                            Stop Reminders
-                          </button>
-                        )}
-                        <button className="text-xs font-bold text-brand-600 hover:text-brand-700 transition-colors">
-                          Convert to Order
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  {lead.follow_up_date && (
-                    <div className={`mt-3 pt-3 border-t border-surface-100 flex items-center justify-between text-xs ${lead.follow_up_stopped ? 'text-surface-400' : 'text-brand-600 font-medium'}`}>
-                      <div className="flex items-center gap-1.5">
-                        <Clock className="w-3.5 h-3.5" />
-                        Follow-up: {formatDate(lead.follow_up_date)}
-                      </div>
-                      {lead.follow_up_interval_days ? (
-                        <span>Every {lead.follow_up_interval_days} days</span>
-                      ) : null}
-                    </div>
-                  )}
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
-
-          <div className="hidden lg:block glass-card overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left min-w-[800px]">
-                <thead className="bg-surface-50/50 text-surface-500 font-semibold border-b border-surface-100">
-                  <tr>
-                    <th className="px-4 py-4">Customer</th>
-                    {role !== 'dsa' && <th className="px-4 py-4">DSA</th>}
-                    <th className="px-4 py-4">Contact</th>
-                    <th className="px-4 py-4">Priority</th>
-                    <th className="px-4 py-4">Follow-up</th>
-                    <th className="px-4 py-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-surface-100">
-                  {filteredLeads.map((lead) => (
-                    <tr key={lead.id} className="hover:bg-surface-50/50 transition-colors group">
-                      <td className="px-4 py-4">
-                        <div className="font-bold text-surface-900">{lead.customer_name}</div>
-                        <div className="text-xs text-surface-400 mt-0.5">{formatDate(lead.created_at)}</div>
+        <div className="glass-card overflow-hidden">
+          {/* Desktop */}
+          <div className="hidden max-h-[72vh] overflow-auto md:block">
+            <table className="w-full min-w-[860px] border-separate border-spacing-0 text-left text-sm">
+              <thead>
+                <tr className="text-[11px] font-bold uppercase tracking-wider text-surface-500">
+                  <th className="sticky left-0 top-0 z-30 border-b border-surface-200 bg-surface-50 px-4 py-3">Lead</th>
+                  {isAdmin && <th className="sticky top-0 z-20 border-b border-surface-200 bg-surface-50 px-4 py-3">Sales agent</th>}
+                  <th className="sticky top-0 z-20 border-b border-surface-200 bg-surface-50 px-4 py-3">Contact</th>
+                  <th className="sticky top-0 z-20 border-b border-surface-200 bg-surface-50 px-4 py-3">Priority</th>
+                  <th className="sticky top-0 z-20 border-b border-surface-200 bg-surface-50 px-4 py-3">Status</th>
+                  <th className="sticky top-0 z-20 border-b border-surface-200 bg-surface-50 px-4 py-3">Follow-up</th>
+                  <th className="sticky top-0 z-20 border-b border-surface-200 bg-surface-50 px-4 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {leads.map(lead => {
+                  const fu = followUp(lead)
+                  return (
+                    <tr key={lead.id} onClick={() => setOpenLead(lead)} className="group cursor-pointer hover:bg-surface-50 [&>td]:border-b [&>td]:border-surface-100">
+                      <td className="sticky left-0 z-10 max-w-[260px] bg-white px-4 py-3 group-hover:bg-surface-50">
+                        <p className="truncate font-bold text-surface-900">{lead.customer_name}</p>
+                        <p className="flex items-center gap-1 truncate text-xs text-surface-500">
+                          {lead.location && <><MapPin className="h-3 w-3 shrink-0" />{lead.location} · </>}Added {formatDate(lead.created_at)}
+                        </p>
                       </td>
-                      {role !== 'dsa' && (
-                        <td className="px-4 py-4">
-                          <span className="text-sm font-semibold text-purple-700 bg-purple-50 px-2 py-1 rounded">
-                            {lead.dsa?.full_name || 'Unknown'}
-                          </span>
-                        </td>
-                      )}
-                      <td className="px-4 py-4">
-                        <div className="flex items-center gap-1.5 text-surface-700 text-sm">
-                          <Phone className="w-3.5 h-3.5 text-surface-400 flex-shrink-0" /> {lead.phone}
-                        </div>
-                        {lead.email && (
-                          <div className="flex items-center gap-1.5 text-surface-500 text-xs mt-1 max-w-[180px] truncate">
-                            <Mail className="w-3.5 h-3.5 text-surface-400 flex-shrink-0" /> {lead.email}
-                          </div>
-                        )}
+                      {isAdmin && <td className="px-4 py-3 text-surface-700">{lead.dsa?.full_name || '—'}</td>}
+                      <td className="px-4 py-3">
+                        <p className="text-surface-800">{lead.phone}</p>
+                        {lead.email && <p className="max-w-[200px] truncate text-xs text-surface-500">{lead.email}</p>}
                       </td>
-                      <td className="px-4 py-4">
-                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold uppercase border ${getTempColor(lead.temperature)}`}>
-                          {getPriorityLabel(lead.temperature)}
-                        </span>
-                        <div className={`mt-1.5 px-2 py-0.5 rounded text-[10px] font-bold uppercase inline-block ${getStatusColor(lead.status)}`}>
-                          {lead.status}
-                        </div>
-                      </td>
-                      <td className="px-4 py-4">
-                        {lead.follow_up_date ? (
-                          <div className={lead.follow_up_stopped ? 'text-surface-400' : 'text-brand-600 font-medium'}>
-                            <div className="flex items-center gap-1.5 text-sm">
-                              <Clock className="w-3.5 h-3.5" /> {formatDate(lead.follow_up_date)}
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-surface-400 text-xs italic">None set</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-4 text-right">
-                        <div className="flex items-center justify-end gap-2 opacity-40 group-hover:opacity-100 transition-opacity">
-                          {lead.status !== 'converted' && role !== 'dsa' && lead.dsa_id && (
-                            <button onClick={() => handleRemindDSA(lead)} className="text-xs font-bold text-orange-600 hover:text-orange-700 transition-colors">Remind</button>
+                      <td className="px-4 py-3"><Priority t={lead.temperature} /></td>
+                      <td className="px-4 py-3"><StatusSelect lead={lead} /></td>
+                      <td className="px-4 py-3 text-xs">{fu ? <span className={`flex items-center gap-1 ${fu.cls}`}><Clock className="h-3 w-3" />{fu.text}</span> : <span className="text-surface-400">—</span>}</td>
+                      <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                        <div className="flex items-center justify-end gap-1">
+                          <a href={`tel:${lead.phone}`} title="Call" className="rounded-lg p-2 text-surface-400 hover:bg-brand-50 hover:text-brand-600"><Phone className="h-4 w-4" /></a>
+                          <a href={waLink(lead.phone)} target="_blank" rel="noopener noreferrer" title="WhatsApp" className="rounded-lg p-2 text-surface-400 hover:bg-emerald-50 hover:text-emerald-600"><MessageCircle className="h-4 w-4" /></a>
+                          {isAdmin && lead.dsa_id && !['converted', 'lost'].includes(lead.status) && (
+                            <button onClick={() => remindDSA(lead)} title="Remind the sales agent" className="rounded-lg p-2 text-surface-400 hover:bg-amber-50 hover:text-amber-600"><Bell className="h-4 w-4" /></button>
                           )}
-                          <a href={`tel:${lead.phone}`} className="p-1.5 text-surface-400 hover:text-brand-600 hover:bg-brand-50 rounded-md transition-colors">
-                            <Phone className="w-4 h-4" />
-                          </a>
-                          <button onClick={() => handleDeleteLead(lead.id)} className="p-1.5 text-surface-400 hover:text-danger-600 hover:bg-danger-50 rounded-md transition-colors">
-                            <Trash2 className="w-4 h-4" />
-                          </button>
+                          <button onClick={() => deleteLead(lead)} title="Delete" className="rounded-lg p-2 text-surface-400 hover:bg-danger-50 hover:text-danger-600"><Trash2 className="h-4 w-4" /></button>
                         </div>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Mobile */}
+          <ul className="divide-y divide-surface-100 md:hidden">
+            {leads.map(lead => {
+              const fu = followUp(lead)
+              return (
+                <li key={lead.id} className="p-4" onClick={() => setOpenLead(lead)}>
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="truncate font-bold text-surface-900">{lead.customer_name}</p>
+                      <p className="mt-0.5 truncate text-xs text-surface-500">{lead.phone}{lead.location ? ` · ${lead.location}` : ''}</p>
+                      {isAdmin && lead.dsa?.full_name && <p className="mt-0.5 text-xs text-surface-500">By {lead.dsa.full_name}</p>}
+                    </div>
+                    <StatusSelect lead={lead} />
+                  </div>
+                  <div className="mt-3 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-3 text-xs">
+                      <Priority t={lead.temperature} />
+                      {fu && <span className={`flex items-center gap-1 ${fu.cls}`}><Clock className="h-3 w-3" />{fu.text}</span>}
+                    </div>
+                    <div className="flex items-center gap-1" onClick={e => e.stopPropagation()}>
+                      <a href={`tel:${lead.phone}`} aria-label="Call" className="grid h-9 w-9 place-items-center rounded-lg border border-surface-200 text-surface-600"><Phone className="h-4 w-4" /></a>
+                      <a href={waLink(lead.phone)} target="_blank" rel="noopener noreferrer" aria-label="WhatsApp" className="grid h-9 w-9 place-items-center rounded-lg border border-surface-200 text-emerald-600"><MessageCircle className="h-4 w-4" /></a>
+                    </div>
+                  </div>
+                </li>
+              )
+            })}
+          </ul>
+
+          <div className="flex items-center justify-between gap-3 border-t border-surface-100 px-4 py-3 text-sm">
+            <span className="text-surface-500">{pageFrom + 1}–{Math.min(pageFrom + PAGE_SIZE, matchCount)} of <strong className="text-surface-800">{matchCount}</strong></span>
+            <div className="flex items-center gap-2">
+              <button disabled={page === 0} onClick={() => setPage(page - 1)} className="btn-outline h-9 px-3 text-sm disabled:opacity-40">Previous</button>
+              <span className="hidden text-xs text-surface-500 sm:inline">Page {page + 1} of {pageCount}</span>
+              <button disabled={page + 1 >= pageCount} onClick={() => setPage(page + 1)} className="btn-outline h-9 px-3 text-sm disabled:opacity-40">Next</button>
             </div>
           </div>
-        </>
+        </div>
       )}
 
-      {/* CREATE MODAL */}
+      {/* Lead details */}
+      <AnimatePresence>
+        {openLead && (
+          <div className="fixed inset-0 z-50 flex justify-end">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} onClick={() => setOpenLead(null)} className="absolute inset-0 bg-surface-950/40" />
+            <motion.aside initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }} transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+              className="relative flex h-full w-full max-w-md flex-col bg-white shadow-2xl">
+              <header className="flex items-start justify-between gap-3 border-b border-surface-100 px-5 py-4">
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold text-surface-500">Lead</p>
+                  <h2 className="truncate text-lg font-bold text-surface-900">{openLead.customer_name}</h2>
+                  <div className="mt-1.5 flex items-center gap-3"><StatusSelect lead={openLead} /><Priority t={openLead.temperature} /></div>
+                </div>
+                <button onClick={() => setOpenLead(null)} aria-label="Close" className="rounded-lg p-2 text-surface-400 hover:bg-surface-100"><X className="h-5 w-5" /></button>
+              </header>
+              <div className="flex-1 space-y-4 overflow-y-auto p-5 text-sm">
+                <div className="grid grid-cols-2 gap-2">
+                  <a href={`tel:${openLead.phone}`} className="btn-outline flex h-10 items-center justify-center gap-1.5 text-sm"><Phone className="h-4 w-4" /> Call</a>
+                  <a href={waLink(openLead.phone)} target="_blank" rel="noopener noreferrer" className="btn-outline flex h-10 items-center justify-center gap-1.5 text-sm text-emerald-700"><MessageCircle className="h-4 w-4" /> WhatsApp</a>
+                </div>
+                <dl className="divide-y divide-surface-100 rounded-2xl border border-surface-100 px-4">
+                  {[
+                    [Phone, 'Phone', openLead.phone],
+                    [Mail, 'Email', openLead.email],
+                    [MapPin, 'Location', openLead.location],
+                    [User, 'Sales agent', isAdmin ? openLead.dsa?.full_name : null],
+                    [Clock, 'Follow-up', followUp(openLead)?.text + (openLead.follow_up_interval_days ? ` · every ${openLead.follow_up_interval_days} day(s)` : '')],
+                  ].filter(([, , v]) => v && !String(v).startsWith('undefined')).map(([Icon, label, value]: any) => (
+                    <div key={label} className="flex items-start justify-between gap-4 py-2.5">
+                      <dt className="flex items-center gap-1.5 text-surface-500"><Icon className="h-3.5 w-3.5" /> {label}</dt>
+                      <dd className="break-all text-right font-semibold text-surface-900">{value}</dd>
+                    </div>
+                  ))}
+                  <div className="flex items-start justify-between gap-4 py-2.5">
+                    <dt className="text-surface-500">Added</dt><dd className="font-semibold text-surface-900">{formatDate(openLead.created_at)}</dd>
+                  </div>
+                </dl>
+                {openLead.notes && (
+                  <div className="rounded-2xl border border-surface-100 p-4">
+                    <p className="mb-1 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-surface-500"><StickyNote className="h-3.5 w-3.5" /> Notes</p>
+                    <p className="whitespace-pre-wrap text-surface-700">{openLead.notes}</p>
+                  </div>
+                )}
+              </div>
+              <footer className="flex flex-wrap gap-2 border-t border-surface-100 p-4">
+                {openLead.follow_up_date && !openLead.follow_up_stopped && !['converted', 'lost'].includes(openLead.status) && (
+                  <button onClick={() => stopReminders(openLead)} className="btn-outline flex h-10 items-center gap-1.5 px-3 text-sm"><BellOff className="h-4 w-4" /> Stop reminders</button>
+                )}
+                {isAdmin && openLead.dsa_id && !['converted', 'lost'].includes(openLead.status) && (
+                  <button onClick={() => remindDSA(openLead)} className="btn-outline flex h-10 items-center gap-1.5 px-3 text-sm"><Bell className="h-4 w-4" /> Remind agent</button>
+                )}
+                <button onClick={() => deleteLead(openLead)} className="ml-auto flex h-10 items-center gap-1.5 rounded-xl px-3 text-sm font-semibold text-danger-600 hover:bg-danger-50"><Trash2 className="h-4 w-4" /> Delete</button>
+              </footer>
+            </motion.aside>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* New lead */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-[100] overflow-y-auto p-4 sm:p-6 flex items-center justify-center">
-            <motion.div 
-              initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm"
-              onClick={() => !submitting && setIsModalOpen(false)}
-            />
-            <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white rounded-2xl shadow-card-xl w-full max-w-lg relative z-10 my-auto flex flex-col max-h-[calc(100vh-2rem)] sm:max-h-[90vh] overflow-hidden"
-            >
-              <div className="px-6 py-4 border-b border-surface-100 flex items-center justify-between bg-surface-50/50 shrink-0">
-                <h2 className="text-lg font-bold text-surface-900">Add New Lead</h2>
-                <button onClick={() => !submitting && setIsModalOpen(false)} className="text-surface-400 hover:text-surface-900 transition-colors p-1 rounded-md hover:bg-surface-100">
-                  <X className="w-5 h-5" />
-                </button>
+          <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-6">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm" onClick={() => !submitting && setIsModalOpen(false)} />
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }}
+              className="relative z-10 flex max-h-[92vh] w-full max-w-lg flex-col overflow-hidden rounded-t-3xl bg-white shadow-card-xl sm:rounded-2xl">
+              <div className="flex shrink-0 items-center justify-between border-b border-surface-100 px-6 py-4">
+                <h2 className="text-lg font-bold text-surface-900">New lead</h2>
+                <button onClick={() => !submitting && setIsModalOpen(false)} className="rounded-md p-1 text-surface-400 hover:bg-surface-100 hover:text-surface-900"><X className="h-5 w-5" /></button>
               </div>
-
-              <form onSubmit={handleCreateLead} className="p-6 space-y-4 overflow-y-auto flex-1 scrollbar-hide">
-                <div>
-                  <label className="label">Customer Name *</label>
-                  <input required type="text" className="input" placeholder="e.g. John Smith" value={form.customer_name} onChange={e => setForm({...form, customer_name: e.target.value})} />
-                </div>
-                
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <form onSubmit={handleCreateLead} className="flex flex-1 flex-col overflow-hidden">
+                <div className="flex-1 space-y-4 overflow-y-auto p-6">
                   <div>
-                    <label className="label">Phone Number *</label>
-                    <input required type="tel" className="input" placeholder="080..." value={form.phone} onChange={e => setForm({...form, phone: e.target.value.replace(/[^\d+]/g, '')})} />
+                    <label className="label">Customer name *</label>
+                    <input required className="input" placeholder="e.g. John Smith" value={form.customer_name} onChange={e => setForm({ ...form, customer_name: e.target.value })} />
                   </div>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div><label className="label">Phone *</label><input required type="tel" className="input" placeholder="080…" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value.replace(/[^\d+]/g, '') })} /></div>
+                    <div><label className="label">Email</label><input type="email" className="input" placeholder="john@example.com" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} /></div>
+                  </div>
+                  <div><label className="label">Location / address</label><input className="input" placeholder="e.g. Ikeja, Lagos" value={form.location} onChange={e => setForm({ ...form, location: e.target.value })} /></div>
                   <div>
-                    <label className="label">Email Address</label>
-                    <input type="email" className="input" placeholder="john@example.com" value={form.email} onChange={e => setForm({...form, email: e.target.value})} />
+                    <label className="label">Priority</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {(['hot', 'warm', 'cold'] as const).map(t => (
+                        <button key={t} type="button" onClick={() => setForm({ ...form, temperature: t })}
+                          className={`flex items-center justify-center gap-1.5 rounded-xl border py-2 text-sm font-semibold transition-colors ${form.temperature === t ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-surface-200 text-surface-600 hover:bg-surface-50'}`}>
+                          <span className={`h-2 w-2 rounded-full ${PRIORITY[t].dot}`} /> {PRIORITY[t].label}
+                        </button>
+                      ))}
+                    </div>
                   </div>
-                </div>
-
-                <div>
-                  <label className="label">Location / Address</label>
-                  <input type="text" className="input" placeholder="Lagos, Nigeria" value={form.location} onChange={e => setForm({...form, location: e.target.value})} />
-                </div>
-
-                <div>
-                  <label className="label">Lead Priority</label>
-                  <div className="grid grid-cols-3 gap-2">
-                    {['hot', 'warm', 'cold'].map(t => (
-                      <button
-                        key={t} type="button"
-                        onClick={() => setForm({...form, temperature: t})}
-                        className={`py-2 rounded-lg text-sm font-bold uppercase tracking-wider border-2 transition-all ${form.temperature === t ? 'border-brand-500 bg-brand-50 text-brand-700' : 'border-surface-100 text-surface-400 hover:border-surface-200'}`}
-                      >
-                        {getPriorityLabel(t)}
-                      </button>
-                    ))}
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div><label className="label">Next follow-up</label><input type="date" className="input" value={form.follow_up_date} onChange={e => setForm({ ...form, follow_up_date: e.target.value })} /></div>
+                    <div>
+                      <label className="label">Remind me</label>
+                      <select className="input" value={form.follow_up_interval_days} onChange={e => setForm({ ...form, follow_up_interval_days: parseInt(e.target.value) })}>
+                        <option value={0}>Once</option><option value={1}>Every day</option><option value={3}>Every 3 days</option>
+                        <option value={7}>Every week</option><option value={14}>Every 2 weeks</option><option value={30}>Every month</option>
+                      </select>
+                    </div>
                   </div>
+                  <div><label className="label">Notes</label><textarea rows={3} className="input resize-none" placeholder="What are they interested in?" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
                 </div>
-
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  <div>
-                    <label className="label">Next Follow-up Date</label>
-                    <input type="date" className="input" value={form.follow_up_date} onChange={e => setForm({...form, follow_up_date: e.target.value})} />
-                  </div>
-                  <div>
-                    <label className="label">Reminder Interval</label>
-                    <select className="input" value={form.follow_up_interval_days} onChange={e => setForm({...form, follow_up_interval_days: parseInt(e.target.value)})}>
-                      <option value={0}>One-time (No repeat)</option>
-                      <option value={1}>Every day</option>
-                      <option value={3}>Every 3 days</option>
-                      <option value={7}>Every week</option>
-                      <option value={14}>Every 2 weeks</option>
-                      <option value={30}>Every month</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="label">Notes</label>
-                  <textarea rows={3} className="input resize-none" placeholder="Any specific requirements?" value={form.notes} onChange={e => setForm({...form, notes: e.target.value})} />
-                </div>
-
-                <div className="pt-4 flex items-center justify-end gap-3 sticky bottom-0 bg-white border-t border-surface-100 pb-2 -mx-6 px-6 pt-3 mt-4 shrink-0 shadow-xs">
+                <div className="flex shrink-0 items-center justify-end gap-3 border-t border-surface-100 px-6 py-4">
                   <button type="button" onClick={() => setIsModalOpen(false)} disabled={submitting} className="btn-outline">Cancel</button>
-                  <button type="submit" disabled={submitting} className="btn-primary w-32 flex items-center justify-center shadow-brand">
-                    {submitting ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Save Lead'}
+                  <button type="submit" disabled={submitting} className="btn-primary flex w-32 items-center justify-center">
+                    {submitting ? <div className="h-5 w-5 animate-spin rounded-full border-2 border-white/30 border-t-white" /> : 'Save lead'}
                   </button>
                 </div>
               </form>

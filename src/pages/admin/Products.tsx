@@ -142,7 +142,7 @@ export function AdminProducts() {
       const [locRes, invRes, movRes] = await Promise.all([
         supabase.from('inventory_locations').select('*').order('name'),
         supabase.from('product_inventory').select('*, product:products(name, image_url), location:inventory_locations(name)'),
-        supabase.from('stock_movements').select('*, product:products(name), from_loc:inventory_locations!stock_movements_from_location_id_fkey(name), to_loc:inventory_locations!stock_movements_to_location_id_fkey(name)').order('created_at', { ascending: false }).limit(100),
+        supabase.from('stock_movements').select('*, product:products(name), from_loc:inventory_locations!stock_movements_from_location_id_fkey(name), to_loc:inventory_locations!stock_movements_to_location_id_fkey(name)').order('created_at', { ascending: false }).limit(300).limit(100),
       ])
 
       if (locRes.data) setLocations(locRes.data)
@@ -774,7 +774,7 @@ export function AdminProducts() {
           {/* Stock movements */}
           <div className="overflow-hidden rounded-2xl border border-surface-200 bg-white">
             <div className="border-b border-surface-100 px-4 py-3">
-              <h3 className="flex items-center gap-2 text-sm font-bold text-surface-900"><RefreshCw className="h-4 w-4 text-brand-600" /> Stock movements</h3>
+              <h3 className="flex items-center gap-2 text-sm font-bold text-surface-900"><RefreshCw className="h-4 w-4 text-brand-600" /> Stock movements <span className="text-xs font-normal text-surface-500">(latest 300)</span></h3>
             </div>
             <div className="max-h-[420px] overflow-auto">
               <table className="w-full min-w-[720px] border-separate border-spacing-0 text-left text-sm">

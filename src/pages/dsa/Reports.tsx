@@ -33,10 +33,11 @@ export function DSAReports() {
     try {
       const { data: { session } } = await supabase.auth.getSession()
       const authId = session?.user?.id
-      const { data: orders, error: ordersError } = await supabase.from('orders').select('*')
-        .or(`dsa_id.eq.${userId},created_by_auth_id.eq.${authId}`)
-      const { data: commissions, error: commissionsError } = await supabase.from('commissions').select('amount, status, triggered_at').eq('dsa_id', userId)
-      const { data: leads, error: leadsError } = await supabase.from('leads').select('*').eq('dsa_id', userId)
+      const [{ data: orders, error: ordersError }, { data: commissions, error: commissionsError }, { data: leads, error: leadsError }] = await Promise.all([
+        supabase.from('orders').select('*').or(`dsa_id.eq.${userId},created_by_auth_id.eq.${authId}`),
+        supabase.from('commissions').select('amount, status, triggered_at').eq('dsa_id', userId),
+        supabase.from('leads').select('*').eq('dsa_id', userId),
+      ])
 
       if (ordersError) throw ordersError
       if (commissionsError) throw commissionsError
