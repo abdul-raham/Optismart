@@ -19,12 +19,15 @@ export function AdminDeliveryAgents() {
   const [editing, setEditing] = useState<Agent | 'new' | null>(null)
   const [form, setForm] = useState(EMPTY)
   const [saving, setSaving] = useState(false)
+  const [branches, setBranches] = useState<string[]>([])
 
   const load = async () => {
-    const [a, o] = await Promise.all([
+    const [a, o, b] = await Promise.all([
       supabase.from('delivery_agents').select('*').order('full_name'),
       supabase.from('orders').select('delivery_agent_id, total_amount, delivery_fee, amount_remitted, status').not('delivery_agent_id', 'is', null),
+      supabase.from('inventory_locations').select('name').eq('is_active', true).order('name'),
     ])
+    setBranches((b.data ?? []).map((l: any) => l.name.trim()))
     if (a.error) console.error(a.error)
     setAgents(a.data ?? [])
     setOrders(o.data ?? [])
@@ -104,7 +107,7 @@ export function AdminDeliveryAgents() {
             <thead>
               <tr className="text-xs font-semibold uppercase tracking-wider text-surface-500">
                 <th className="sticky left-0 top-0 z-30 border-b border-surface-100 bg-surface-50 px-5 py-3">Agent</th>
-                <th className="sticky top-0 z-20 border-b border-surface-100 bg-surface-50 px-5 py-3">Area</th>
+                <th className="sticky top-0 z-20 border-b border-surface-100 bg-surface-50 px-5 py-3">Branch</th>
                 <th className="sticky top-0 z-20 border-b border-surface-100 bg-surface-50 px-5 py-3 text-right">Orders</th>
                 <th className="sticky top-0 z-20 border-b border-surface-100 bg-surface-50 px-5 py-3 text-right">Order value</th>
                 <th className="sticky top-0 z-20 border-b border-surface-100 bg-surface-50 px-5 py-3 text-right">Remitted</th>
@@ -161,7 +164,14 @@ export function AdminDeliveryAgents() {
               <div><label className="label">Full name *</label><input required className="input" value={form.full_name} onChange={e => setForm({ ...form, full_name: e.target.value })} /></div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <div><label className="label">Phone</label><input type="tel" className="input" value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value.replace(/[^\d+]/g, '') })} /></div>
-                <div><label className="label">Area</label><input className="input" placeholder="e.g. Ibadan" value={form.area} onChange={e => setForm({ ...form, area: e.target.value })} /></div>
+                <div>
+                  <label className="label">Branch</label>
+                  <select className="input" value={form.area} onChange={e => setForm({ ...form, area: e.target.value })}>
+                    <option value="">Any / not set</option>
+                    {branches.map(b => <option key={b} value={b}>{b}</option>)}
+                    {form.area && !branches.includes(form.area) && <option value={form.area}>{form.area}</option>}
+                  </select>
+                </div>
               </div>
               <div><label className="label">Notes</label><textarea rows={2} className="input resize-none" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
               {editing !== 'new' && (

@@ -18,7 +18,7 @@ export const PAGE_GUIDES: Record<string, { title: string; steps: string[] }> = {
   agents: {
     title: 'Adding delivery agents',
     steps: [
-      'Tap **Add agent**, then type their name and phone (area is optional).',
+      'Tap **Add agent**, then type their name and phone, and pick the branch they deliver for.',
       'They do **not** get a login or dashboard. This list is only so we can pick them on an order.',
       'On any order, choose them under **Delivered by** and enter the delivery fee.',
       'This page then adds up, per agent, how many orders they delivered, the fees we paid and the money they remitted.',
