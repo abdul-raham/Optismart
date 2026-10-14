@@ -35,15 +35,11 @@ export function AdminDashboard() {
   const fetchDashboardData = async () => {
     setLoading(true)
     try {
-      // Fetch Orders for revenue and count
-      const { data: orders } = await supabase.from('orders').select('*, dsa:users!orders_dsa_id_fkey(full_name)')
-      
-      // Fetch Users for counts
-      const { data: users } = await supabase.from('users').select('role, status')
-
-      // Fetch Low Stock Products (stock <= 5)
+      // Only the columns the dashboard shows (the full rows are ~1 MB and take many seconds on a slow line).
       // Stock alerts come from branch counts (a branch row exists once that product was stocked there).
-      const [{ data: prods }, { data: inv }, { data: locs }] = await Promise.all([
+      const [{ data: orders }, { data: users }, { data: prods }, { data: inv }, { data: locs }] = await Promise.all([
+        supabase.from('orders').select('id, order_number, customer_name, status, total_amount, quantity, created_at').limit(10000) as unknown as Promise<{ data: Order[] | null }>,
+        supabase.from('users').select('role, status'),
         supabase.from('products').select('id, name, min_stock_level, is_active').eq('is_active', true),
         supabase.from('product_inventory').select('product_id, location_id, quantity'),
         supabase.from('inventory_locations').select('id, name').eq('is_active', true),
@@ -65,7 +61,7 @@ export function AdminDashboard() {
         const activeOrders = orders.filter(o => o.status !== 'cancelled')
         const deliveredOrders = orders.filter(o => o.status === 'delivered')
         const revenue = deliveredOrders.reduce((sum, o) => sum + Number(o.total_amount), 0)
-        
+
         // Outstanding orders: pending, unassigned, in_progress, processing
         // Everything not finished yet, oldest first.
         const outstanding = orders.filter(o => !['delivered', 'completed', 'cancelled'].includes(o.status))
@@ -101,17 +97,24 @@ export function AdminDashboard() {
 
   useEffect(() => {
     fetchDashboardData()
+    let reloadTimer: ReturnType<typeof setTimeout> | undefined
 
     const channel = supabase
       .channel('admin-dashboard')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => fetchDashboardData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        // Several orders often change together: reload once, a moment after the last change.
+        clearTimeout(reloadTimer)
+        reloadTimer = setTimeout(fetchDashboardData, 2000)
+      })
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => { clearTimeout(reloadTimer); supabase.removeChannel(channel) }
   }, [])
 
-  const getExportData = () => {
-    return allOrders
+  // Exports need the full rows, so they are fetched only when someone exports.
+  const getExportData = async () => {
+    const { data } = await supabase.from('orders').select('*, dsa:users!orders_dsa_id_fkey(full_name)').limit(10000)
+    return (data ?? [])
       .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
       .map(o => ({
         'Order Number': o.order_number,
@@ -127,17 +130,18 @@ export function AdminDashboard() {
       }))
   }
 
-  const handleExportExcel = () => {
+  const handleExportExcel = async () => {
+    const data = await getExportData()
     exportToExcel({
       filename: 'optismart-orders-overview',
       sheetTitle: 'System Orders Overview',
-      reportSubHeading: `Total Orders: ${allOrders.length}`,
-      data: getExportData()
+      reportSubHeading: `Total Orders: ${data.length}`,
+      data
     })
   }
 
-  const handleExportCSV = () => {
-    exportToCSV(getExportData(), 'optismart-orders-overview')
+  const handleExportCSV = async () => {
+    exportToCSV(await getExportData(), 'optismart-orders-overview')
   }
 
   return (
@@ -349,7 +353,7 @@ export function AdminDashboard() {
             View All <ArrowUpRight className="w-4 h-4" />
           </button>
         </div>
-        
+
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] text-left border-collapse">
             <thead>

@@ -86,6 +86,13 @@ export function AdminOrders() {
   const [isBulkCleanupModalOpen, setIsBulkCleanupModalOpen] = useState(false)
   const [bulkProcessing, setBulkProcessing] = useState(false)
   const fetchSequence = useRef(0)
+  const [dsaFilter, setDsaFilter] = useState('all')
+  const [page, setPage] = useState(0)
+  const [matchCount, setMatchCount] = useState(0)
+  const [totalAll, setTotalAll] = useState(0)
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({})
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const [exporting, setExporting] = useState(false)
 
   const [editForm, setEditForm] = useState({
     customer_name: '', customer_email: '', customer_phone: '', customer_address: '',
@@ -126,53 +133,86 @@ export function AdminOrders() {
     cancelled: []
   }
 
-  const fetchData = async () => {
+  const PAGE_SIZE = 50
+  const ORDER_SELECT = '*, dsa:users!orders_dsa_id_fkey(email, full_name)'
+  const STATUS_ORDER = ['pending', 'paid', 'approved', 'confirmed', 'processing', 'dispatched', 'rescheduled', 'delivered', 'completed', 'cancelled']
+
+  // Search, sales agent and (optionally) status are applied by the database, so only one page is downloaded.
+  const withFilters = (q: any, includeStatus: boolean) => {
+    if (includeStatus && statusFilter !== 'all') q = q.eq('status', statusFilter)
+    if (dsaFilter === 'unregistered') q = q.is('dsa_id', null)
+    else if (dsaFilter !== 'all') q = q.eq('dsa_id', dsaFilter)
+    const term = debouncedSearch.replace(/[%,()*]/g, ' ').trim()
+    if (term) q = q.or(`order_number.ilike.%${term}%,customer_name.ilike.%${term}%,customer_phone.ilike.%${term}%,unregistered_dsa_name.ilike.%${term}%`)
+    return q
+  }
+
+  const fetchOrders = async () => {
     const sequence = ++fetchSequence.current
     try {
-      const [ordersRes, productsRes, dsasRes, jobsRes, locationsRes, inventoryRes] = await Promise.all([
-        supabase.from('orders').select('*, dsa:users!orders_dsa_id_fkey(email, full_name)').order('created_at', { ascending: false }),
+      const from = page * PAGE_SIZE
+      const head = () => supabase.from('orders').select('id', { count: 'exact', head: true })
+      const [list, matching, total, ...perStatus] = await Promise.all([
+        withFilters(supabase.from('orders').select(ORDER_SELECT, { count: 'exact' }), true)
+          .order('created_at', { ascending: false }).range(from, from + PAGE_SIZE - 1),
+        withFilters(head(), false),
+        head(),
+        ...STATUS_ORDER.map(st => withFilters(head(), false).eq('status', st)),
+      ])
+      if (list.error) throw list.error
+      if (sequence !== fetchSequence.current) return
+      setOrders(list.data ?? [])
+      setMatchCount(list.count ?? 0)
+      setTotalAll(total.count ?? 0)
+      setStatusCounts(Object.fromEntries([['all', matching.count ?? 0], ...STATUS_ORDER.map((st, i) => [st, perStatus[i].count ?? 0])]))
+    } catch (err) {
+      console.error('Error fetching admin orders:', err)
+    } finally {
+      if (sequence === fetchSequence.current) setLoading(false)
+    }
+  }
+
+  const fetchLookups = async () => {
+    try {
+      const [productsRes, dsasRes, jobsRes, locationsRes, inventoryRes, installersRes, agentsRes] = await Promise.all([
         supabase.from('products').select('*').eq('is_active', true),
         supabase.from('users').select('*').in('role', ['dsa', 'admin', 'super_admin']).eq('status', 'active'),
         supabase.from('installer_jobs').select('id, order_id, installer_id, commission_amount, status, payout_id'),
         supabase.from('inventory_locations').select('id, name, address').eq('is_active', true).order('name'),
-        supabase.from('product_inventory').select('product_id, location_id, quantity')
-      ])
-      const [installersRes, agentsRes] = await Promise.all([
+        supabase.from('product_inventory').select('product_id, location_id, quantity'),
         supabase.from('users').select('id, full_name').eq('role', 'installer').eq('status', 'active').order('full_name'),
         supabase.from('delivery_agents').select('id, full_name').eq('is_active', true).order('full_name'),
       ])
-
-      if (ordersRes.error) throw ordersRes.error
-      if (productsRes.error) throw productsRes.error
-      if (dsasRes.error) throw dsasRes.error
-      if (jobsRes.error) throw jobsRes.error
-      if (sequence !== fetchSequence.current) return
-
-      setOrders(ordersRes.data ?? [])
       setProducts(productsRes.data ?? [])
       setDsas(dsasRes.data ?? [])
       setAssignedOrderIds(new Set((jobsRes.data ?? []).map(j => j.order_id)))
       setJobsByOrder(new Map((jobsRes.data ?? []).map(j => [j.order_id, j])))
-      setInstallers(installersRes.data ?? [])
-      setAgents(agentsRes.data ?? [])
       setInventoryLocations(locationsRes.data ?? [])
       setLocationInventory(inventoryRes.data ?? [])
+      setInstallers(installersRes.data ?? [])
+      setAgents(agentsRes.data ?? [])
     } catch (err) {
-      console.error('Error fetching admin orders:', err)
-    } finally {
-      setLoading(false)
+      console.error('Error fetching order lookups:', err)
     }
   }
 
+  const fetchData = () => Promise.all([fetchOrders(), fetchLookups()])
+  const refresh = useRef(fetchData)
+  refresh.current = fetchData
+
   useEffect(() => {
-    fetchData()
+    const t = setTimeout(() => setDebouncedSearch(search.trim()), 300)
+    return () => clearTimeout(t)
+  }, [search])
+  useEffect(() => { setPage(0) }, [statusFilter, dsaFilter, debouncedSearch])
+  useEffect(() => { fetchOrders() }, [page, statusFilter, dsaFilter, debouncedSearch])
+
+  useEffect(() => {
+    fetchLookups()
 
     const channel = supabase
       .channel('admin-orders')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, payload => {
-        const newOrder = payload.new as Order
-        setOrders(current => current.some(order => order.id === newOrder.id) ? current : [newOrder, ...current])
-      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'orders' }, () => refresh.current())
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders' }, payload => {
         const updatedOrder = payload.new as Order
         setOrders(current => current.map(order => order.id === updatedOrder.id ? { ...order, ...updatedOrder } : order))
@@ -181,7 +221,7 @@ export function AdminOrders() {
         const deletedOrder = payload.old as Pick<Order, 'id'>
         setOrders(current => current.filter(order => order.id !== deletedOrder.id))
       })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'installer_jobs' }, () => fetchData())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'installer_jobs' }, () => fetchLookups())
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
@@ -434,35 +474,42 @@ export function AdminOrders() {
     }
   }
 
-  const [dsaFilter, setDsaFilter] = useState('all')
   const [menuPos, setMenuPos] = useState<{ top: number; right: number; up: boolean } | null>(null)
   const [viewOrder, setViewOrder] = useState<Order | null>(null)
 
-  const filteredOrders = orders.filter(order => {
-    const term = search.toLowerCase()
-    const matchesSearch = order.customer_name.toLowerCase().includes(term) ||
-      order.order_number.toLowerCase().includes(term) ||
-      (order.dsa?.full_name || order.unregistered_dsa_name || '').toLowerCase().includes(term)
-    const matchesStatus = statusFilter === 'all' || order.status === statusFilter
-    const matchesDsa = dsaFilter === 'all' ||
-      (dsaFilter === 'unregistered' ? !order.dsa_id : order.dsa_id === dsaFilter)
-    return matchesSearch && matchesStatus && matchesDsa
-  })
-
-  const STATUS_ORDER = ['pending', 'paid', 'approved', 'confirmed', 'processing', 'dispatched', 'rescheduled', 'delivered', 'completed', 'cancelled']
-  const statusCounts = orders.reduce((acc: Record<string, number>, order) => {
-    const term = search.toLowerCase()
-    const okSearch = order.customer_name.toLowerCase().includes(term) || order.order_number.toLowerCase().includes(term) ||
-      (order.dsa?.full_name || order.unregistered_dsa_name || '').toLowerCase().includes(term)
-    const okDsa = dsaFilter === 'all' || (dsaFilter === 'unregistered' ? !order.dsa_id : order.dsa_id === dsaFilter)
-    if (okSearch && okDsa) { acc.all = (acc.all || 0) + 1; acc[order.status] = (acc[order.status] || 0) + 1 }
-    return acc
-  }, {})
+  const filteredOrders = orders
   const filtersOn = search !== '' || statusFilter !== 'all' || dsaFilter !== 'all'
   const clearFilters = () => { setSearch(''); setStatusFilter('all'); setDsaFilter('all') }
+  const pageFrom = page * PAGE_SIZE
+  const pageCount = Math.max(1, Math.ceil(matchCount / PAGE_SIZE))
 
-  const getOrdersExportData = () => {
-    return filteredOrders.map(o => ({
+  // Exports cover every matching order, not just this page (fetched in chunks of 1000).
+  const fetchAllMatching = async () => {
+    const rows: Order[] = []
+    for (let from = 0; ; from += 1000) {
+      const { data, error } = await withFilters(supabase.from('orders').select(ORDER_SELECT), true)
+        .order('created_at', { ascending: false }).range(from, from + 999)
+      if (error) throw error
+      rows.push(...(data ?? []))
+      if (!data || data.length < 1000) break
+    }
+    return rows
+  }
+  const runExport = async (kind: 'excel' | 'csv') => {
+    setExporting(true)
+    try {
+      const data = getOrdersExportData(await fetchAllMatching())
+      if (kind === 'excel') exportToExcel({ filename: 'optismart-system-orders', sheetTitle: 'System Orders', reportSubHeading: `Status Filter: ${statusFilter.toUpperCase()} | Total Orders: ${data.length}`, data })
+      else exportToCSV(data, 'optismart-system-orders')
+    } catch (err: any) {
+      alert(`Export failed: ${err?.message || err}`)
+    } finally {
+      setExporting(false)
+    }
+  }
+
+  const getOrdersExportData = (rows: Order[]) => {
+    return rows.map(o => ({
       'Order Number': o.order_number,
       'Date': formatDate(o.created_at),
       'Customer Name': o.customer_name,
@@ -498,24 +545,18 @@ export function AdminOrders() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-surface-900">
-            Orders <span className="rounded-full bg-surface-100 px-2.5 py-0.5 text-sm font-bold text-surface-600">{orders.length}</span>
+            Orders <span className="rounded-full bg-surface-100 px-2.5 py-0.5 text-sm font-bold text-surface-600">{totalAll}</span>
           </h1>
           <p className="mt-1 text-sm text-surface-500">Every order, its money and where it is in delivery.</p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => exportToExcel({
-              filename: 'optismart-system-orders',
-              sheetTitle: 'System Orders',
-              reportSubHeading: `Status Filter: ${statusFilter.toUpperCase()} | Total Orders: ${filteredOrders.length}`,
-              data: getOrdersExportData()
-            })}
-            className="btn-outline flex h-10 items-center gap-1.5 px-3 text-sm" title="Export to Excel"
+          <button onClick={() => runExport('excel')} disabled={exporting}
+            className="btn-outline flex h-10 items-center gap-1.5 px-3 text-sm disabled:opacity-50" title="Export every matching order to Excel"
           >
             <FileSpreadsheet className="h-4 w-4 text-emerald-600" /> <span className="hidden sm:inline">Excel</span>
           </button>
-          <button onClick={() => exportToCSV(getOrdersExportData(), 'optismart-system-orders')}
-            className="btn-outline flex h-10 items-center gap-1.5 px-3 text-sm" title="Download CSV">
+          <button onClick={() => runExport('csv')} disabled={exporting}
+            className="btn-outline flex h-10 items-center gap-1.5 px-3 text-sm disabled:opacity-50" title="Download every matching order as CSV">
             <Download className="h-4 w-4" /> <span className="hidden sm:inline">CSV</span>
           </button>
           <button onClick={() => setIsModalOpen(true)} className="btn-primary flex h-10 items-center gap-1.5 px-4 text-sm">
@@ -528,7 +569,7 @@ export function AdminOrders() {
         <div className="flex flex-col gap-2 sm:flex-row">
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-400" />
-            <input type="text" placeholder="Search order number, customer or sales agent…" value={search}
+            <input type="text" placeholder="Search order number, customer or phone…" value={search}
               onChange={e => setSearch(e.target.value)} className="input h-10 w-full pl-9 text-sm" />
             {search && (
               <button onClick={() => setSearch('')} aria-label="Clear search" className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-surface-400 hover:text-surface-700">
@@ -566,14 +607,14 @@ export function AdminOrders() {
           <div className="w-16 h-16 rounded-2xl bg-surface-100 flex items-center justify-center mb-4">
             <ShoppingBag className="w-8 h-8 text-surface-400" />
           </div>
-          <h3 className="text-lg font-bold text-surface-900 mb-2">{orders.length ? 'No orders match these filters' : 'No orders yet'}</h3>
-          <p className="text-surface-500 max-w-md">{orders.length ? `There are ${orders.length} orders in total.` : 'Orders will appear here as soon as they are placed.'}</p>
+          <h3 className="text-lg font-bold text-surface-900 mb-2">{totalAll ? 'No orders match these filters' : 'No orders yet'}</h3>
+          <p className="text-surface-500 max-w-md">{totalAll ? `There are ${totalAll} orders in total.` : 'Orders will appear here as soon as they are placed.'}</p>
           {filtersOn && <button onClick={clearFilters} className="btn-outline mt-4 h-9 px-4 text-sm">Clear filters</button>}
         </div>
       ) : (
         <div className="glass-card overflow-hidden">
           {filtersOn && (
-            <p className="border-b border-surface-100 px-4 py-2 text-xs text-surface-500">Showing <strong className="text-surface-800">{filteredOrders.length}</strong> of {orders.length} orders</p>
+            <p className="border-b border-surface-100 px-4 py-2 text-xs text-surface-500"><strong className="text-surface-800">{matchCount}</strong> of {totalAll} orders match</p>
           )}
           <div className="hidden max-h-[72vh] overflow-auto md:block" onScroll={() => openDropdownId && (setOpenDropdownId(null), setMenuPos(null))}>
             <table className="w-full min-w-[820px] border-separate border-spacing-0 text-left">
@@ -826,6 +867,15 @@ export function AdminOrders() {
                 </motion.div>
               ))}
             </AnimatePresence>
+          </div>
+
+          <div className="flex items-center justify-between gap-3 border-t border-surface-100 px-4 py-3 text-sm">
+            <span className="text-surface-500">{pageFrom + 1}–{Math.min(pageFrom + PAGE_SIZE, matchCount)} of <strong className="text-surface-800">{matchCount}</strong></span>
+            <div className="flex items-center gap-2">
+              <button disabled={page === 0} onClick={() => setPage(page - 1)} className="btn-outline h-9 px-3 text-sm disabled:opacity-40">Previous</button>
+              <span className="hidden text-xs text-surface-500 sm:inline">Page {page + 1} of {pageCount}</span>
+              <button disabled={page + 1 >= pageCount} onClick={() => setPage(page + 1)} className="btn-outline h-9 px-3 text-sm disabled:opacity-40">Next</button>
+            </div>
           </div>
         </div>
       )}
