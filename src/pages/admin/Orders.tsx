@@ -10,6 +10,8 @@ import { formatDate, formatCurrency } from '@/lib/utils'
 import { exportToExcel, exportToCSV } from '@/utils/exportUtils'
 import { OrderStatusBadge } from '@/components/shared/Badges'
 import { AssignInstallerModal } from '@/components/shared/AssignInstallerModal'
+import { InstallerPicker, INSTALLER_NONE, type InstallerChoice } from '@/components/shared/InstallerPicker'
+import { GuideTip } from '@/components/shared/GuideTip'
 import { TableSkeleton } from '@/components/shared/Skeletons'
 import { sendEmail } from '@/lib/email'
 import { sendWebPush } from '@/lib/push'
@@ -40,6 +42,17 @@ const getWhatsAppShareUrl = (order: Order) => {
   return `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`
 }
 
+/** Remitted / installation / delivery under the order total, only for what has been filled in. */
+function MoneyLine({ order }: { order: Order }) {
+  const parts = [
+    order.amount_remitted != null && `Remitted ${formatCurrency(order.amount_remitted)}`,
+    order.installation_needed && Number(order.installation_price) > 0 && `Install ${formatCurrency(order.installation_price)}`,
+    Number(order.delivery_fee) > 0 && `Delivery ${formatCurrency(order.delivery_fee!)}`,
+  ].filter(Boolean)
+  if (!parts.length) return null
+  return <p className="mt-0.5 text-[11px] text-surface-500">{parts.join(' · ')}</p>
+}
+
 export function AdminOrders() {
   const [searchParams] = useSearchParams()
   const [orders, setOrders] = useState<Order[]>([])
@@ -63,6 +76,11 @@ export function AdminOrders() {
   const [deliveryLocationId, setDeliveryLocationId] = useState('')
   const [deliveryReason, setDeliveryReason] = useState('')
   const [sd, setSd] = useState<SdCardValue>(SD_DEFAULT)
+  const [installers, setInstallers] = useState<{ id: string; full_name: string }[]>([])
+  const [agents, setAgents] = useState<{ id: string; full_name: string }[]>([])
+  const [jobsByOrder, setJobsByOrder] = useState<Map<string, any>>(new Map())
+  const [newInstaller, setNewInstaller] = useState<InstallerChoice>(INSTALLER_NONE)
+  const [editInstaller, setEditInstaller] = useState<InstallerChoice>(INSTALLER_NONE)
   const [selectedOrderIds, setSelectedOrderIds] = useState<string[]>([])
   const [isBulkCleanupModalOpen, setIsBulkCleanupModalOpen] = useState(false)
   const [bulkProcessing, setBulkProcessing] = useState(false)
@@ -72,6 +90,7 @@ export function AdminOrders() {
     customer_name: '', customer_email: '', customer_phone: '', customer_address: '',
     product_id: '', quantity: 1, total_amount: 0, installation_needed: false,
     installation_price: 0, expected_delivery_date: '', notes: '',
+    amount_remitted: '' as number | '', delivery_fee: 0, delivery_agent_id: '',
   })
 
   const [form, setForm] = useState({
@@ -113,9 +132,13 @@ export function AdminOrders() {
         supabase.from('orders').select('*, dsa:users!orders_dsa_id_fkey(email, full_name)').order('created_at', { ascending: false }),
         supabase.from('products').select('*').eq('is_active', true),
         supabase.from('users').select('*').in('role', ['dsa', 'admin', 'super_admin']).eq('status', 'active'),
-        supabase.from('installer_jobs').select('order_id'),
+        supabase.from('installer_jobs').select('id, order_id, installer_id, commission_amount, status, payout_id').neq('status', 'rejected'),
         supabase.from('inventory_locations').select('id, name, address').eq('is_active', true).order('name'),
         supabase.from('product_inventory').select('product_id, location_id, quantity')
+      ])
+      const [installersRes, agentsRes] = await Promise.all([
+        supabase.from('users').select('id, full_name').eq('role', 'installer').eq('status', 'active').order('full_name'),
+        supabase.from('delivery_agents').select('id, full_name').eq('is_active', true).order('full_name'),
       ])
       
       if (ordersRes.error) throw ordersRes.error
@@ -128,6 +151,9 @@ export function AdminOrders() {
       setProducts(productsRes.data ?? [])
       setDsas(dsasRes.data ?? [])
       setAssignedOrderIds(new Set((jobsRes.data ?? []).map(j => j.order_id)))
+      setJobsByOrder(new Map((jobsRes.data ?? []).map(j => [j.order_id, j])))
+      setInstallers(installersRes.data ?? [])
+      setAgents(agentsRes.data ?? [])
       setInventoryLocations(locationsRes.data ?? [])
       setLocationInventory(inventoryRes.data ?? [])
     } catch (err) {
@@ -210,6 +236,13 @@ export function AdminOrders() {
         .single()
 
       if (error) throw error
+      if (data && form.installation_needed && newInstaller.installerId) {
+        const { error: jobError } = await supabase.rpc('set_order_installer', {
+          p_order_id: data.id, p_installer_id: newInstaller.installerId, p_amount: newInstaller.pay === '' ? null : newInstaller.pay,
+        })
+        if (jobError) alert(`Order created, but the installer was not assigned: ${jobError.message}`)
+        else fetchData()
+      }
       if (data) {
         if (form.customer_email) {
           sendEmail('new_order', {
@@ -229,6 +262,7 @@ export function AdminOrders() {
         setOrders(current => [createdOrder, ...current])
         setIsModalOpen(false)
         setSd(SD_DEFAULT)
+        setNewInstaller(INSTALLER_NONE)
         setForm({ is_dsa_registered: true, unregistered_dsa_name: '', dsa_id: '', customer_name: '', customer_email: '', customer_phone: '', customer_address: '', product_id: '', fulfillment_location_id: '', quantity: 1, amount: 0, installation_needed: false, installation_price: 0, expected_delivery_date: '', notes: '' })
       }
     } catch (err: any) {
@@ -335,7 +369,10 @@ export function AdminOrders() {
       product_id: order.product_id, quantity: order.quantity, total_amount: order.total_amount,
       installation_needed: order.installation_needed, installation_price: order.installation_price,
       expected_delivery_date: order.expected_delivery_date || '', notes: order.notes || '',
+      amount_remitted: order.amount_remitted ?? '', delivery_fee: Number(order.delivery_fee || 0), delivery_agent_id: order.delivery_agent_id || '',
     })
+    const job = jobsByOrder.get(order.id)
+    setEditInstaller(job ? { installerId: job.installer_id, pay: job.commission_amount ?? '' } : INSTALLER_NONE)
     setIsEditModalOpen(true)
   }
 
@@ -353,9 +390,24 @@ export function AdminOrders() {
         total_amount: editForm.total_amount, installation_needed: editForm.installation_needed,
         installation_price: editForm.installation_needed ? editForm.installation_price : 0,
         expected_delivery_date: editForm.expected_delivery_date || null, notes: editForm.notes,
+        amount_remitted: editForm.amount_remitted === '' ? null : editForm.amount_remitted,
+        remitted_at: editForm.amount_remitted === '' ? null : (editingOrder.remitted_at || new Date().toISOString()),
+        delivery_fee: editForm.delivery_fee || 0,
+        delivery_agent_id: editForm.delivery_agent_id || null,
         updated_at: new Date().toISOString(),
       }).eq('id', editingOrder.id).select().single()
       if (error) throw error
+      // Installer: assign, change, or remove (when installation was unticked).
+      const job = jobsByOrder.get(editingOrder.id)
+      const wantInstaller = editForm.installation_needed ? editInstaller.installerId : ''
+      const wantPay = editInstaller.pay === '' ? null : editInstaller.pay
+      if (!job?.payout_id && (wantInstaller !== (job?.installer_id || '') || (wantInstaller && wantPay !== (job?.commission_amount ?? null)))) {
+        const { error: jobError } = await supabase.rpc('set_order_installer', {
+          p_order_id: editingOrder.id, p_installer_id: wantInstaller || null, p_amount: wantPay,
+        })
+        if (jobError) throw new Error(`Order saved, but the installer was not updated: ${jobError.message}`)
+        fetchData()
+      }
       if (data) {
         setOrders(current => current.map(order => order.id === editingOrder.id ? { ...order, ...data } : order))
         setIsEditModalOpen(false)
@@ -405,6 +457,9 @@ export function AdminOrders() {
       'Product': (o as any).product?.name || 'Camera',
       'Quantity': o.quantity,
       'Total Amount (₦)': o.total_amount,
+      'Remitted (₦)': o.amount_remitted ?? '',
+      'Installation Fee (₦)': o.installation_price || 0,
+      'Delivery Fee (₦)': o.delivery_fee || 0,
       'Status': o.status,
       'DSA': (o as any).dsa?.full_name || o.unregistered_dsa_name || 'System',
       'Expected Delivery': o.expected_delivery_date || '—',
@@ -414,6 +469,7 @@ export function AdminOrders() {
 
   return (
     <div className="space-y-6">
+      <GuideTip guideKey="money" />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-surface-900 tracking-tight">System Orders</h1>
@@ -532,6 +588,7 @@ export function AdminOrders() {
                       <td className="py-3 px-4">
                         <p className="text-sm font-bold text-surface-900">{formatCurrency(order.total_amount)}</p>
                         <p className="text-xs text-surface-500 mt-0.5">Qty: {order.quantity}</p>
+                        <MoneyLine order={order} />
                       </td>
                       <td className="py-3 px-4">
                         <OrderStatusBadge status={order.status} />
@@ -675,6 +732,7 @@ export function AdminOrders() {
                     <div className="text-right">
                       <p className="text-sm font-bold text-surface-900">{formatCurrency(order.total_amount)}</p>
                       <p className="text-xs text-surface-500 mt-0.5">Qty: {order.quantity}</p>
+                      <MoneyLine order={order} />
                     </div>
                   </div>
 
@@ -848,11 +906,41 @@ export function AdminOrders() {
                       <label htmlFor="edit_install_needed" className="label mb-0 cursor-pointer">Installation Needed</label>
                     </div>
                     {editForm.installation_needed && (
-                      <div>
-                        <label className="label">Installation Price (₦)</label>
-                        <input type="number" min={0} className="input" value={editForm.installation_price} onChange={e => setEditForm({...editForm, installation_price: Number(e.target.value)})} />
+                      <div className="space-y-3">
+                        <div>
+                          <label className="label">Installation fee (₦)</label>
+                          <input type="number" min={0} className="input" value={editForm.installation_price} onChange={e => setEditForm({...editForm, installation_price: Number(e.target.value)})} />
+                        </div>
+                        <InstallerPicker installers={installers} fee={editForm.installation_price} pct={editingOrder.installer_commission_pct}
+                          value={editInstaller} onChange={setEditInstaller} locked={!!jobsByOrder.get(editingOrder.id)?.payout_id} />
                       </div>
                     )}
+                  </div>
+
+                  <div className="border-t border-surface-100 pt-4">
+                    <p className="label mb-2">Money</p>
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="label">Amount remitted (₦)</label>
+                        <input type="number" min={0} className="input" placeholder="Not remitted yet" value={editForm.amount_remitted}
+                          onChange={e => setEditForm({...editForm, amount_remitted: e.target.value === '' ? '' : Number(e.target.value)})} />
+                        <p className="mt-1 text-[11px] text-surface-500">What the delivery agent handed back. Order total is {formatCurrency(editForm.total_amount)}.</p>
+                      </div>
+                      <div>
+                        <label className="label">Delivery fee (₦)</label>
+                        <input type="number" min={0} className="input" value={editForm.delivery_fee}
+                          onChange={e => setEditForm({...editForm, delivery_fee: Number(e.target.value)})} />
+                        <p className="mt-1 text-[11px] text-surface-500">What we paid for delivery.</p>
+                      </div>
+                      <div className="sm:col-span-2">
+                        <label className="label">Delivered by</label>
+                        <select className="input" value={editForm.delivery_agent_id} onChange={e => setEditForm({...editForm, delivery_agent_id: e.target.value})}>
+                          <option value="">Not set</option>
+                          {agents.map(a => <option key={a.id} value={a.id}>{a.full_name}</option>)}
+                        </select>
+                        {agents.length === 0 && <p className="mt-1 text-[11px] text-surface-500">No delivery agents yet. Add them from <a href="/app/admin/delivery-agents" className="font-semibold text-brand-600">Delivery agents</a>.</p>}
+                      </div>
+                    </div>
                   </div>
 
                   <div>
@@ -1016,9 +1104,12 @@ export function AdminOrders() {
                   </div>
                   
                   {form.installation_needed && (
-                    <div className="mb-4">
-                      <label className="label">Installation Price (₦) *</label>
-                      <input required type="number" min={0} className="input" value={form.installation_price} onChange={e => setForm({...form, installation_price: Number(e.target.value)})} />
+                    <div className="mb-4 space-y-3">
+                      <div>
+                        <label className="label">Installation fee (₦) *</label>
+                        <input required type="number" min={0} className="input" value={form.installation_price} onChange={e => setForm({...form, installation_price: Number(e.target.value)})} />
+                      </div>
+                      <InstallerPicker installers={installers} fee={form.installation_price} value={newInstaller} onChange={setNewInstaller} />
                     </div>
                   )}
                 </div>

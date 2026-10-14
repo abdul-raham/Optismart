@@ -1,29 +1,35 @@
 import { useState, useEffect } from 'react'
-import { motion } from 'framer-motion'
-import { Banknote, CheckCircle2, Clock, Wrench, Calendar } from 'lucide-react'
+import { Banknote, CheckCircle2, Clock, Wrench, Calendar, History } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { StatCard } from '@/components/shared/StatCard'
 import { formatCurrency, formatDate } from '@/lib/utils'
+import { jobPay } from '@/components/shared/InstallerPayouts'
+
+const DONE = ['installed', 'completed']
 
 export function InstallerEarnings() {
   const { user } = useAuthStore()
   const [jobs, setJobs] = useState<any[]>([])
+  const [payouts, setPayouts] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (user?.id) fetchEarnings()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id])
 
   const fetchEarnings = async () => {
     try {
-      const { data } = await supabase
-        .from('installer_jobs')
-        .select('*, orders ( order_number, customer_name, total_amount )')
-        .eq('installer_id', user?.id)
-        .order('scheduled_date', { ascending: false })
-
-      if (data) setJobs(data)
+      const [j, p] = await Promise.all([
+        supabase.from('installer_jobs')
+          .select('*, orders ( order_number, customer_name, installation_price, installer_commission_pct )')
+          .eq('installer_id', user?.id).neq('status', 'rejected')
+          .order('scheduled_date', { ascending: false }),
+        supabase.from('installer_payouts').select('*').eq('installer_id', user?.id).order('created_at', { ascending: false }),
+      ])
+      setJobs(j.data ?? [])
+      setPayouts(p.data ?? [])
     } catch (err) {
       console.error('Error fetching installer earnings:', err)
     } finally {
@@ -31,100 +37,87 @@ export function InstallerEarnings() {
     }
   }
 
-  const completedJobs = jobs.filter(j => j.status === 'completed')
-  const pendingJobs = jobs.filter(j => j.status !== 'completed' && j.status !== 'cancelled')
+  const owedJobs = jobs.filter(j => DONE.includes(j.status) && !j.payout_id)
+  const openJobs = jobs.filter(j => !DONE.includes(j.status))
+  const owed = owedJobs.reduce((s, j) => s + jobPay(j), 0)
+  const upcoming = openJobs.reduce((s, j) => s + jobPay(j), 0)
+  const paidToDate = payouts.reduce((s, p) => s + Number(p.amount), 0)
 
-  // Calculate earnings (₦15,000 installation fee per completed job, or custom payout)
-  const totalEarned = completedJobs.reduce((sum, j) => sum + (j.payout_amount || 15000), 0)
-  const pendingEarned = pendingJobs.reduce((sum, j) => sum + (j.payout_amount || 15000), 0)
+  const tag = (j: any) => j.payout_id ? ['Paid', 'bg-surface-100 text-surface-600']
+    : DONE.includes(j.status) ? ['Owed', 'bg-emerald-50 text-emerald-700']
+    : ['In progress', 'bg-amber-50 text-amber-800']
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-surface-900 tracking-tight">Installer Earnings & Payouts</h1>
-          <p className="text-sm text-surface-500 mt-1">Track your installation fees and payout records.</p>
-        </div>
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight text-surface-900">Earnings</h1>
+        <p className="mt-1 text-sm text-surface-500">Each finished job adds to <strong className="text-surface-800">Owed</strong>. When admin pays you, it goes back to ₦0 and the payment shows below.</p>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <StatCard
-          title="Total Payout Earned"
-          value={formatCurrency(totalEarned)}
-          icon={Banknote}
-          color="brand"
-        />
-        <StatCard
-          title="Completed Installations"
-          value={completedJobs.length}
-          icon={CheckCircle2}
-          color="success"
-        />
-        <StatCard
-          title="Pending Payout Value"
-          value={formatCurrency(pendingEarned)}
-          icon={Clock}
-          color="warning"
-        />
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <StatCard title="Owed to you now" value={formatCurrency(owed)} icon={Banknote} color="success" />
+        <StatCard title={`In progress (${openJobs.length} job${openJobs.length === 1 ? '' : 's'})`} value={formatCurrency(upcoming)} icon={Clock} color="warning" />
+        <StatCard title="Paid to date" value={formatCurrency(paidToDate)} icon={CheckCircle2} color="brand" />
       </div>
 
       <div className="glass-card overflow-hidden">
-        <div className="p-5 border-b border-surface-100 flex items-center justify-between">
-          <h2 className="text-base font-bold text-surface-900 flex items-center gap-2">
-            <Wrench className="w-5 h-5 text-brand-600" /> Installation Job Payout Log
-          </h2>
+        <div className="flex items-center justify-between border-b border-surface-100 p-5">
+          <h2 className="flex items-center gap-2 text-base font-bold text-surface-900"><Wrench className="h-5 w-5 text-brand-600" /> Jobs and pay</h2>
         </div>
-
         {loading ? (
-          <div className="p-8 text-center text-surface-400">Loading payout records...</div>
+          <div className="p-8 text-center text-surface-400">Loading…</div>
         ) : jobs.length === 0 ? (
           <div className="p-12 text-center">
-            <Banknote className="mx-auto w-12 h-12 text-surface-300 mb-3" />
-            <h3 className="text-lg font-bold text-surface-900 mb-1">No Payout Records Found</h3>
-            <p className="text-surface-500 text-sm">Completed field jobs will populate your earnings history here.</p>
+            <Banknote className="mx-auto mb-3 h-12 w-12 text-surface-300" />
+            <h3 className="mb-1 text-lg font-bold text-surface-900">No jobs yet</h3>
+            <p className="text-sm text-surface-500">Jobs admin gives you appear here with what you get for each.</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm border-collapse">
+          <div className="max-h-[70vh] overflow-auto">
+            <table className="w-full min-w-[560px] border-separate border-spacing-0 text-left text-sm">
               <thead>
-                <tr className="bg-surface-50/70 text-surface-500 text-xs uppercase tracking-wider border-b border-surface-100">
-                  <th className="py-3.5 px-5 font-bold">Order #</th>
-                  <th className="py-3.5 px-5 font-bold">Customer</th>
-                  <th className="py-3.5 px-5 font-bold">Scheduled Date</th>
-                  <th className="py-3.5 px-5 font-bold">Status</th>
-                  <th className="py-3.5 px-5 font-bold text-right">Fee Earned</th>
+                <tr className="text-xs uppercase tracking-wider text-surface-500">
+                  <th className="sticky left-0 top-0 z-30 border-b border-surface-100 bg-surface-50 px-5 py-3 font-bold">Order</th>
+                  <th className="sticky top-0 z-20 border-b border-surface-100 bg-surface-50 px-5 py-3 font-bold">Customer</th>
+                  <th className="sticky top-0 z-20 border-b border-surface-100 bg-surface-50 px-5 py-3 font-bold">Date</th>
+                  <th className="sticky top-0 z-20 border-b border-surface-100 bg-surface-50 px-5 py-3 font-bold">Pay status</th>
+                  <th className="sticky top-0 z-20 border-b border-surface-100 bg-surface-50 px-5 py-3 text-right font-bold">You get</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-surface-100">
-                {jobs.map(job => (
-                  <tr key={job.id} className="hover:bg-surface-50/50 transition-colors">
-                    <td className="py-3.5 px-5 font-bold text-surface-900">
-                      {job.orders?.order_number || 'N/A'}
-                    </td>
-                    <td className="py-3.5 px-5 font-medium text-surface-700">
-                      {job.orders?.customer_name || 'Customer'}
-                    </td>
-                    <td className="py-3.5 px-5 text-surface-600 flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-surface-400" />
-                      {formatDate(job.scheduled_date || job.created_at)}
-                    </td>
-                    <td className="py-3.5 px-5">
-                      <span className={`px-2.5 py-1 rounded-full text-xs font-bold uppercase tracking-wider ${
-                        job.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
-                      }`}>
-                        {job.status}
-                      </span>
-                    </td>
-                    <td className="py-3.5 px-5 text-right font-black text-brand-700">
-                      {formatCurrency(job.payout_amount || 15000)}
-                    </td>
-                  </tr>
-                ))}
+              <tbody>
+                {jobs.map(job => {
+                  const [label, cls] = tag(job)
+                  return (
+                    <tr key={job.id} className="group hover:bg-surface-50">
+                      <td className="sticky left-0 z-10 border-b border-surface-100 bg-white px-5 py-3 font-bold text-surface-900 group-hover:bg-surface-50">{job.orders?.order_number || '—'}</td>
+                      <td className="border-b border-surface-100 px-5 py-3 text-surface-700">{job.orders?.customer_name || 'Customer'}</td>
+                      <td className="border-b border-surface-100 px-5 py-3 text-surface-600">
+                        <span className="flex items-center gap-1.5"><Calendar className="h-3.5 w-3.5 text-surface-400" />{formatDate(job.completed_at || job.scheduled_date || job.created_at)}</span>
+                      </td>
+                      <td className="border-b border-surface-100 px-5 py-3"><span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${cls}`}>{label}</span></td>
+                      <td className="border-b border-surface-100 px-5 py-3 text-right font-bold text-surface-900">{formatCurrency(jobPay(job))}</td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
         )}
       </div>
+
+      {payouts.length > 0 && (
+        <div className="glass-card overflow-hidden">
+          <h2 className="flex items-center gap-2 border-b border-surface-100 p-5 text-base font-bold text-surface-900"><History className="h-5 w-5 text-brand-600" /> Payments received</h2>
+          <ul className="divide-y divide-surface-100">
+            {payouts.map(p => (
+              <li key={p.id} className="flex items-center justify-between gap-3 px-5 py-3 text-sm">
+                <span className="text-surface-600">{formatDate(p.created_at)} · {p.jobs_count} job{p.jobs_count === 1 ? '' : 's'}{p.note ? ` · ${p.note}` : ''}</span>
+                <strong className="text-surface-900">{formatCurrency(p.amount)}</strong>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }

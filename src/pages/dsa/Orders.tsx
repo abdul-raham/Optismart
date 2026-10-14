@@ -38,6 +38,13 @@ const getWhatsAppShareUrl = (order: Order, currentDsaName?: string) => {
   return `https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`
 }
 
+/** Installation orders: has admin assigned an installer yet? */
+function InstallerBadge({ assigned }: { assigned: boolean }) {
+  return assigned
+    ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700">Installer assigned</span>
+    : <span title="Admin hasn't picked an installer yet. Contact admin if the delivery date is close." className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800">No installer yet</span>
+}
+
 export function DSAOrders() {
   const { user } = useAuthStore()
   const [orders, setOrders] = useState<Order[]>([])
@@ -51,6 +58,7 @@ export function DSAOrders() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingOrder, setEditingOrder] = useState<Order | null>(null)
+  const [withInstaller, setWithInstaller] = useState<Set<string>>(new Set())
   const [submitting, setSubmitting] = useState(false)
 
   const [form, setForm] = useState({
@@ -91,6 +99,11 @@ export function DSAOrders() {
       if (dsasRes.data) setDsas(dsasRes.data)
       if (branchesRes.data) setBranches(branchesRes.data)
       if (stockRes.data) setBranchStock(stockRes.data)
+      const installIds = (ordersRes.data ?? []).filter((o: any) => o.installation_needed).map((o: any) => o.id)
+      if (installIds.length) {
+        const { data: jobs } = await supabase.from('installer_jobs').select('order_id').in('order_id', installIds).neq('status', 'rejected')
+        setWithInstaller(new Set((jobs ?? []).map(j => j.order_id)))
+      }
     } catch (err) {
       console.error('Error fetching data:', err)
     } finally {
@@ -303,11 +316,7 @@ export function DSAOrders() {
                               <Edit2 className="h-3.5 w-3.5" /> Edit
                             </button>
                           )}
-                          {order.installation_needed && (
-                            <span className="inline-flex items-center gap-1 text-xs font-bold text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full">
-                              Installer Needed
-                            </span>
-                          )}
+                          {order.installation_needed && <InstallerBadge assigned={withInstaller.has(order.id)} />}
                         </div>
                       </td>
                     </motion.tr>
@@ -364,9 +373,7 @@ export function DSAOrders() {
 
                   {order.installation_needed && (
                     <div className="flex justify-end pt-2">
-                      <span className="inline-flex items-center gap-1 text-xs font-bold text-orange-600 bg-orange-50 px-2.5 py-1 rounded-full">
-                        Installer Needed
-                      </span>
+                      <InstallerBadge assigned={withInstaller.has(order.id)} />
                     </div>
                   )}
                 </motion.div>

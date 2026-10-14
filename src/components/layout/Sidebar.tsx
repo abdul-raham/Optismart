@@ -4,7 +4,7 @@ import {
   LayoutDashboard, Target, ShoppingBag, Users, Package,
   CreditCard, Receipt, TrendingUp, Wrench, BookOpen,
   FileText, Award, Settings, ChevronLeft, ChevronRight,
-  CalendarDays, Banknote, BarChart3, UserCheck, Bell,
+  CalendarDays, Banknote, BarChart3, UserCheck, Bell, Truck,
 } from 'lucide-react'
 import { useAuthStore } from '@/stores/authStore'
 import { useUIStore } from '@/stores/uiStore'
@@ -29,6 +29,7 @@ export const NAV_ITEMS: Record<UserRole, NavItem[]> = {
     { label: 'Profit/Loss', href: '/app/admin/finance',   icon: TrendingUp },
     { label: 'Users',      href: '/app/admin/users',      icon: Users },
     { label: 'Installers', href: '/app/admin/installers', icon: Wrench },
+    { label: 'Delivery agents', href: '/app/admin/delivery-agents', icon: Truck },
     { label: 'Analytics',  href: '/app/admin/analytics',  icon: BarChart3 },
     { label: 'Reports',    href: '/app/admin/reports',    icon: FileText },
     { label: 'Training',   href: '/app/admin/training',   icon: BookOpen },
@@ -44,6 +45,7 @@ export const NAV_ITEMS: Record<UserRole, NavItem[]> = {
     { label: 'Profit/Loss', href: '/app/admin/finance',   icon: TrendingUp },
     { label: 'Users',      href: '/app/admin/users',      icon: Users },
     { label: 'Installers', href: '/app/admin/installers', icon: Wrench },
+    { label: 'Delivery agents', href: '/app/admin/delivery-agents', icon: Truck },
     { label: 'Analytics',  href: '/app/admin/analytics',  icon: BarChart3 },
     { label: 'Reports',    href: '/app/admin/reports',    icon: FileText },
     { label: 'My Commissions', href: '/app/admin/commissions', icon: Banknote },

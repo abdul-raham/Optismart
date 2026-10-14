@@ -130,6 +130,11 @@ export interface Order {
   status: OrderStatus
   installation_needed: boolean
   installation_price: number
+  installer_commission_pct?: number | null
+  amount_remitted?: number | null
+  remitted_at?: string | null
+  delivery_fee?: number
+  delivery_agent_id?: string | null
   expected_delivery_date: string | null
   notes: string | null
   payment_confirmed_at: string | null

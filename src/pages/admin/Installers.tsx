@@ -7,6 +7,8 @@ import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
 import { formatDate } from '@/lib/utils'
 import { TableSkeleton } from '@/components/shared/Skeletons'
+import { GuideTip } from '@/components/shared/GuideTip'
+import { InstallerPayouts } from '@/components/shared/InstallerPayouts'
 
 delete (L.Icon.Default.prototype as any)._getIconUrl
 L.Icon.Default.mergeOptions({
@@ -167,7 +169,7 @@ export function AdminInstallers() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-surface-900 tracking-tight">Installers</h1>
-        <p className="text-sm text-surface-500 mt-1">Manage and view all registered installers.</p>
+        <p className="text-sm text-surface-500 mt-1">Who installs for us, what each one is owed, and where they are.</p>
       </div>
 
       {!loading && (
@@ -180,6 +182,10 @@ export function AdminInstallers() {
           </span>
         </div>
       )}
+
+      <GuideTip guideKey="payouts" />
+
+      {!loading && <InstallerPayouts installers={installers} />}
 
       <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="glass-card overflow-hidden flex flex-col">
         <div className="p-5 border-b border-surface-100 flex flex-col sm:flex-row gap-4 items-center justify-between">
