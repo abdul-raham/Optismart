@@ -192,17 +192,17 @@ export function SystemUpdateModal() {
   if (state === 'paused') {
     return (
       <motion.button initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} onClick={() => setState('open')}
-        className="fixed bottom-20 right-4 z-50 flex items-center gap-2 rounded-full bg-surface-900 py-2.5 pl-3 pr-4 text-xs font-bold text-white shadow-xl hover:bg-surface-800 md:bottom-6">
+        className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-3 z-[60] flex items-center gap-1.5 rounded-full bg-surface-900/95 py-2 pl-2.5 pr-3 text-[11px] font-bold text-white shadow-xl hover:bg-surface-800 md:bottom-6 md:right-6 md:text-xs">
         <Sparkles className="h-4 w-4 text-amber-300" /> What&apos;s new · continue {step + 1}/{cards.length} <ArrowRight className="h-3.5 w-3.5" />
       </motion.button>
     )
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-surface-950/60 p-0 backdrop-blur-sm sm:items-center sm:p-4">
+    <div className="fixed inset-0 z-[70] flex items-center justify-center bg-surface-950/60 px-4 py-[max(1rem,env(safe-area-inset-top))] backdrop-blur-sm">
       <motion.div initial={{ opacity: 0, y: 24 }} animate={{ opacity: 1, y: 0 }}
-        className="w-full max-w-md overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:rounded-3xl">
-        <div className="flex items-center justify-between px-6 pt-5">
+        className="flex max-h-[min(640px,calc(100dvh-2rem))] w-full max-w-md flex-col overflow-hidden rounded-3xl bg-white shadow-2xl">
+        <div className="flex shrink-0 items-center justify-between px-5 pt-5 sm:px-6">
           <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-brand-600">
             <Sparkles className="h-3.5 w-3.5" /> {title}
           </span>
@@ -211,9 +211,9 @@ export function SystemUpdateModal() {
 
         <AnimatePresence mode="wait">
           <motion.div key={step} initial={{ opacity: 0, x: 24 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -24 }}
-            transition={{ duration: 0.18 }} className="px-6 pb-2 pt-4">
-            <span className={`grid h-12 w-12 place-items-center rounded-2xl ${card.tone}`}><Icon className="h-6 w-6" /></span>
-            <h2 className="mt-4 text-xl font-bold tracking-tight text-surface-900">{card.title}</h2>
+            transition={{ duration: 0.18 }} className="min-h-0 flex-1 overflow-y-auto px-5 pb-2 pt-4 sm:px-6">
+            <span className={`grid h-11 w-11 place-items-center rounded-2xl ${card.tone}`}><Icon className="h-5 w-5" /></span>
+            <h2 className="mt-3 text-lg font-bold tracking-tight text-surface-900 sm:text-xl">{card.title}</h2>
             <div className="mt-3 space-y-2.5">
               {card.lines.map((line, i) => (
                 <p key={i} className="text-sm leading-relaxed text-surface-600"><GuideText text={line} /></p>
@@ -228,7 +228,7 @@ export function SystemUpdateModal() {
           </motion.div>
         </AnimatePresence>
 
-        <div className="mt-4 flex items-center justify-between gap-3 border-t border-surface-100 px-6 py-4">
+        <div className="mt-3 flex shrink-0 items-center justify-between gap-3 border-t border-surface-100 px-5 py-3.5 sm:px-6">
           <div className="flex gap-1.5">
             {cards.map((_, i) => (
               <button key={i} onClick={() => go(i)} aria-label={`Card ${i + 1}`}

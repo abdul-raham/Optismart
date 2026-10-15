@@ -201,9 +201,10 @@ export function DSAOrders() {
         setSd(SD_DEFAULT)
         setForm({ is_dsa_registered: true, unregistered_dsa_name: '', dsa_id: user?.id || '', customer_name: '', customer_email: '', customer_phone: '', customer_address: '', product_id: '', fulfillment_location_id: '', quantity: 1, amount: 0, installation_needed: false, installation_price: 0, expected_delivery_date: '', notes: '' })
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error creating order:', err)
-      alert('Failed to create order')
+      alert(`The order was not saved: ${err?.message || 'please try again'}.
+If this keeps happening, send this message to admin.`)
     } finally {
       setSubmitting(false)
     }
