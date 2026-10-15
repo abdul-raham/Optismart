@@ -1,21 +1,43 @@
+import { pushState, registerPush } from '@/lib/pushSubscription'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
 import { User, Lock, Save, Bell, Building2 } from 'lucide-react'
+
+function PushStatus() {
+  const [state, setState] = useState(pushState())
+  const [busy, setBusy] = useState(false)
+  const label = { granted: 'On for this device', default: 'Not turned on yet', denied: 'Blocked in your browser settings', unsupported: 'Not supported on this browser', 'needs-install': 'Add OptiSmart to your Home Screen first' }[state]
+  return (
+    <div className="rounded-xl border border-surface-200 p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-sm font-medium text-surface-800">Phone notifications</p>
+          <p className={`text-xs ${state === 'granted' ? 'text-emerald-700' : 'text-amber-700'}`}>{label}</p>
+        </div>
+        {state !== 'unsupported' && state !== 'needs-install' && (
+          <button disabled={busy} onClick={async () => { setBusy(true); await registerPush(true); setState(pushState()); setBusy(false) }}
+            className="btn-outline h-8 shrink-0 px-3 text-xs">{busy ? '…' : state === 'granted' ? 'Refresh' : 'Turn on'}</button>
+        )}
+      </div>
+      {state === 'denied' && <p className="mt-2 text-[11px] text-surface-500">Open the site settings (🔒 next to the address), set Notifications to Allow, then reload.</p>}
+    </div>
+  )
+}
 
 export function SettingsPage() {
   const { user } = useAuthStore()
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
-  
+
   const [form, setForm] = useState({
     fullName: user?.full_name || '',
     currentPassword: '',
     newPassword: '',
     confirmPassword: ''
   })
-  
+
   const [systemSettings, setSystemSettings] = useState({
     moniepointAccountName: '',
     moniepointAccountNumber: ''
@@ -134,7 +156,7 @@ export function SettingsPage() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        
+
         {/* Profile Settings */}
         <div className="lg:col-span-2 space-y-6">
           <div className="glass-card p-6">
@@ -144,9 +166,9 @@ export function SettingsPage() {
             <form onSubmit={handleUpdateProfile} className="space-y-4">
               <div>
                 <label className="label">Full Name</label>
-                <input 
-                  type="text" 
-                  className="input" 
+                <input
+                  type="text"
+                  className="input"
                   value={form.fullName}
                   onChange={e => setForm({...form, fullName: e.target.value})}
                   placeholder="e.g. John Doe"
@@ -155,9 +177,9 @@ export function SettingsPage() {
               </div>
               <div>
                 <label className="label">Email Address (Read-only)</label>
-                <input 
-                  type="email" 
-                  className="input bg-surface-50 text-surface-500 cursor-not-allowed" 
+                <input
+                  type="email"
+                  className="input bg-surface-50 text-surface-500 cursor-not-allowed"
                   value={user?.email || ''}
                   disabled
                 />
@@ -179,9 +201,9 @@ export function SettingsPage() {
             <form onSubmit={handleUpdatePassword} className="space-y-4">
               <div>
                 <label className="label">New Password</label>
-                <input 
-                  type="password" 
-                  className="input" 
+                <input
+                  type="password"
+                  className="input"
                   value={form.newPassword}
                   onChange={e => setForm({...form, newPassword: e.target.value})}
                   placeholder="Enter new password"
@@ -191,9 +213,9 @@ export function SettingsPage() {
               </div>
               <div>
                 <label className="label">Confirm New Password</label>
-                <input 
-                  type="password" 
-                  className="input" 
+                <input
+                  type="password"
+                  className="input"
                   value={form.confirmPassword}
                   onChange={e => setForm({...form, confirmPassword: e.target.value})}
                   placeholder="Confirm new password"
@@ -219,9 +241,9 @@ export function SettingsPage() {
               <form onSubmit={handleUpdateSystemSettings} className="space-y-4">
                 <div>
                   <label className="label">Moniepoint Account Name</label>
-                  <input 
-                    type="text" 
-                    className="input" 
+                  <input
+                    type="text"
+                    className="input"
                     value={systemSettings.moniepointAccountName}
                     onChange={e => setSystemSettings({...systemSettings, moniepointAccountName: e.target.value})}
                     placeholder="e.g. Optismart Networks Ltd"
@@ -230,9 +252,9 @@ export function SettingsPage() {
                 </div>
                 <div>
                   <label className="label">Moniepoint Account Number</label>
-                  <input 
-                    type="text" 
-                    className="input" 
+                  <input
+                    type="text"
+                    className="input"
                     value={systemSettings.moniepointAccountNumber}
                     onChange={e => setSystemSettings({...systemSettings, moniepointAccountNumber: e.target.value})}
                     placeholder="e.g. 1234567890"
@@ -264,14 +286,8 @@ export function SettingsPage() {
                 </div>
                 <span className="text-sm font-medium text-surface-700 group-hover:text-surface-900">Email Alerts</span>
               </label>
-              
-              <label className="flex items-center gap-3 cursor-pointer group">
-                <div className="relative">
-                  <input type="checkbox" className="sr-only peer" defaultChecked />
-                  <div className="w-10 h-6 bg-surface-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-surface-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-brand-600"></div>
-                </div>
-                <span className="text-sm font-medium text-surface-700 group-hover:text-surface-900">Push Notifications</span>
-              </label>
+
+              <PushStatus />
             </div>
             <p className="text-xs text-surface-400 mt-4 leading-relaxed">
               We'll let you know about important account updates and new commissions.

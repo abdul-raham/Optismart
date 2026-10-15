@@ -6,6 +6,7 @@ import { Users, Search, Mail, Ban, CheckCircle2, User, Phone, ExternalLink, Aler
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { TableSkeleton } from '@/components/shared/Skeletons'
+import { PushCoverage } from '@/components/shared/PushCoverage'
 import { checkDSAPerformanceWindows } from '@/lib/performanceWatcher'
 
 interface SystemUser {
@@ -149,6 +150,8 @@ export function AdminUsers() {
           <p className="text-sm text-surface-500 mt-1">Manage accounts, performance probation status, and target settings.</p>
         </div>
       </div>
+
+      <PushCoverage />
 
       {/* Search & Filter Bar */}
       <div className="glass-card p-4 flex flex-col lg:flex-row gap-4 items-center justify-between">

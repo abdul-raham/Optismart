@@ -3,16 +3,15 @@ import { Bell } from 'lucide-react'
 import { useNotifications } from '@/hooks/useNotifications'
 import { motion } from 'framer-motion'
 
-// Add your VAPID public key here once generated on your backend
-const VAPID_PUBLIC_KEY = 'YOUR_VAPID_PUBLIC_KEY' 
+import { registerPush } from '@/lib/pushSubscription'
 
 export function NotificationBell() {
-  const { unreadCount, subscribeToWebPush } = useNotifications()
+  const { unreadCount } = useNotifications()
   const [isSubscribing, setIsSubscribing] = useState(false)
 
   const handleSubscribe = async () => {
     setIsSubscribing(true)
-    const success = await subscribeToWebPush(VAPID_PUBLIC_KEY)
+    const success = await registerPush(true)
     if (success) {
       alert("Push notifications enabled successfully!")
     } else {
