@@ -1,4 +1,5 @@
 import { Fragment, useState, useEffect } from 'react'
+import * as Dialog from '@radix-ui/react-dialog'
 import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -19,6 +20,7 @@ export function AdminProducts() {
 
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
+  const [summaryView, setSummaryView] = useState<'products' | 'memory' | 'stock' | null>(null)
   const [search, setSearch] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -26,7 +28,7 @@ export function AdminProducts() {
   const [syncing, setSyncing] = useState(false)
   const [isUploading, setIsUploading] = useState(false)
 
-  const [activeTab, setActiveTab] = useState<'products' | 'promos' | 'inventory'>(searchParams.get('tab') === 'inventory' ? 'inventory' : 'products')
+  const [activeTab, setActiveTab] = useState<'products' | 'memory' | 'promos' | 'inventory'>(searchParams.get('tab') === 'inventory' ? 'inventory' : 'products')
   const [locations, setLocations] = useState<any[]>([])
   const [inventoryList, setInventoryList] = useState<any[]>([])
   const [movementsList, setMovementsList] = useState<any[]>([])
@@ -135,7 +137,6 @@ export function AdminProducts() {
     }
   }, [searchParams, locations])
 
-  const lowStockProducts = products.filter(p => p.stock_quantity <= (p.min_stock_level || 5))
 
   const fetchInventoryData = async () => {
     try {
@@ -401,9 +402,12 @@ export function AdminProducts() {
     }
   }
 
-  const CATEGORY_LABEL = { camera: 'Cameras', sd_card: 'SD cards', accessory: 'Accessories' } as const
-  const categoryOf = (p: Product) => p.category || 'camera'
-  const filteredProducts = products
+  const CATEGORY_LABEL = { camera: 'Cameras', sd_card: 'Memory cards', accessory: 'Accessories' } as const
+  const categoryOf = (p: Product) => p.category || (/memory card|sd card|micro ?sd/i.test(p.name) ? 'sd_card' : 'camera')
+  const mainProducts = products.filter(p => categoryOf(p) !== 'sd_card')
+  const memoryCards = products.filter(p => categoryOf(p) === 'sd_card')
+  const tabProducts = activeTab === 'products' ? mainProducts : activeTab === 'memory' ? memoryCards : products
+  const filteredProducts = tabProducts
     .filter(p => p.name.toLowerCase().includes(search.toLowerCase()))
     .filter(p => categoryFilter === 'all' || categoryOf(p) === categoryFilter)
     .sort((a, b) => ['camera', 'sd_card', 'accessory'].indexOf(categoryOf(a)) - ['camera', 'sd_card', 'accessory'].indexOf(categoryOf(b)) || a.name.localeCompare(b.name))
@@ -412,12 +416,14 @@ export function AdminProducts() {
     Number(inventoryList.find(i => i.product_id === productId && i.location_id === locationId)?.quantity || 0)
   const totalStock = (productId: string) => locations.reduce((sum, loc) => sum + stockAt(productId, loc.id), 0)
   const branchesHolding = (productId: string) => locations.filter(loc => stockAt(productId, loc.id) > 0).length
-  const isLow = (p: Product) => totalStock(p.id) <= (p.min_stock_level || 5)
-  const totalUnits = products.reduce((sum, p) => sum + totalStock(p.id), 0)
+  const isLow = (p: Product) => totalStock(p.id) <= (p.min_stock_level ?? 5)
+  const lowStockProducts = tabProducts.filter(p => p.is_active && isLow(p))
+  const memoryUnits = memoryCards.reduce((sum, p) => sum + totalStock(p.id), 0)
+  const totalUnits = mainProducts.reduce((sum, p) => sum + totalStock(p.id), 0)
   const stockValue = products.reduce((sum, p) => sum + totalStock(p.id) * Number(p.cost_price || 0), 0)
   const lowCount = products.filter(p => p.is_active && isLow(p)).length
   const branchTotals = locations
-    .map(loc => ({ ...loc, units: inventoryList.filter(i => i.location_id === loc.id).reduce((s, i) => s + (i.quantity || 0), 0) }))
+    .map(loc => ({ ...loc, units: mainProducts.reduce((sum, p) => sum + stockAt(p.id, loc.id), 0), memoryUnits: memoryCards.reduce((sum, p) => sum + stockAt(p.id, loc.id), 0) }))
     .sort((a, b) => b.units - a.units)
   const startEdit = (product: Product) => {
     setEditingId(product.id)
@@ -425,7 +431,7 @@ export function AdminProducts() {
       name: product.name, description: product.description || '', retail_price: product.retail_price,
       wholesale_price: product.wholesale_price, cost_price: product.cost_price || 0, stock_quantity: product.stock_quantity,
       min_stock_level: product.min_stock_level, source_url: product.source_url || '', image_url: product.image_url || '',
-      category: product.category || 'camera',
+      category: categoryOf(product),
     })
     setIsModalOpen(true)
   }
@@ -434,7 +440,8 @@ export function AdminProducts() {
     return retail > 0 && cost > 0 ? (retail - cost) / retail : null
   }
   const TABS = [
-    { id: 'products' as const, label: 'Products', count: products.length },
+    { id: 'products' as const, label: 'Products', count: mainProducts.length },
+    { id: 'memory' as const, label: 'Memory cards', count: memoryCards.length },
     { id: 'inventory' as const, label: 'Branch stock', count: locations.length },
     { id: 'promos' as const, label: 'Promo packages', count: promoPackages.length },
   ]
@@ -460,10 +467,12 @@ export function AdminProducts() {
       </div>
 
       {/* Summary */}
-      <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
         {[
-          { label: 'Products', value: products.filter(p => p.is_active).length, sub: `${products.length - products.filter(p => p.is_active).length} draft` },
-          { label: 'Units in stock', value: totalUnits.toLocaleString(), sub: `across ${locations.length} branches` },
+          { label: 'Products', value: mainProducts.filter(p => p.is_active).length, sub: `${mainProducts.filter(p => !p.is_active).length} draft; excludes memory cards`, view: 'products' as const },
+          { label: 'Memory cards', value: memoryCards.filter(p => p.is_active).length, sub: `${memoryCards.filter(p => !p.is_active).length} draft`, view: 'memory' as const },
+          { label: 'Product units in stock', value: totalUnits.toLocaleString(), sub: `across ${locations.length} branches; excludes memory cards`, view: 'stock' as const },
+          { label: 'Memory-card units in stock', value: memoryUnits.toLocaleString(), sub: `across ${locations.length} branches`, view: 'memory' as const },
           { label: 'Low stock', value: lowCount, sub: lowCount ? 'need topping up' : 'all healthy', warn: lowCount > 0 },
           { label: 'Stock value (cost)', value: formatCurrency(stockValue), sub: 'units × cost price' },
         ].map(k => (
@@ -471,15 +480,30 @@ export function AdminProducts() {
             <p className="text-[11px] font-bold uppercase tracking-wider text-surface-500">{k.label}</p>
             <p className={`mt-1 text-xl font-black tracking-tight ${k.warn ? 'text-amber-800' : 'text-surface-900'}`}>{k.value}</p>
             <p className="mt-0.5 text-xs text-surface-500">{k.sub}</p>
+            {k.view && <button type="button" onClick={() => setSummaryView(k.view!)} className="mt-3 text-xs font-bold text-brand-600 hover:underline" aria-label={`View all ${k.label.toLowerCase()}`}>View all</button>}
           </div>
         ))}
       </div>
+
+      <Dialog.Root open={summaryView !== null} onOpenChange={open => { if (!open) setSummaryView(null) }}>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-[9998] bg-surface-900/40 backdrop-blur-sm" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-[9999] max-h-[85dvh] w-[calc(100%_-_2rem)] max-w-4xl -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-2xl bg-white p-5 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div><Dialog.Title className="text-lg font-bold text-surface-900">{summaryView === 'memory' ? 'Memory cards & stock' : summaryView === 'stock' ? 'Stock by branch' : 'All products'}</Dialog.Title>
+              <Dialog.Description className="mt-1 text-sm text-surface-500">Products and memory cards are counted separately. Quantities come from branch inventory.</Dialog.Description></div>
+              <Dialog.Close className="rounded-lg p-2 hover:bg-surface-100" aria-label="Close stock details"><X className="h-5 w-5" /></Dialog.Close>
+            </div>
+            {loading ? <p className="py-8 text-sm text-surface-500">Loading stock...</p> : summaryView === 'stock' ? <div className="mt-5 overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b"><th className="p-3">Branch</th><th className="p-3 text-right">Product units</th><th className="p-3 text-right">Memory-card units</th></tr></thead><tbody>{branchTotals.map(b => <tr key={b.id} className="border-b border-surface-100"><td className="p-3">{b.name}</td><td className="p-3 text-right tabular-nums">{b.units}</td><td className="p-3 text-right tabular-nums">{b.memoryUnits}</td></tr>)}</tbody><tfoot><tr className="font-bold"><td className="p-3">Total</td><td className="p-3 text-right">{totalUnits}</td><td className="p-3 text-right">{memoryUnits}</td></tr></tfoot></table>{!locations.length && <p className="p-3 text-surface-500">No branches yet.</p>}</div> : <div className="mt-5 grid gap-3 sm:grid-cols-2">{(summaryView === 'memory' ? memoryCards : mainProducts).map(p => <article key={p.id} className="rounded-xl border border-surface-200 p-4"><h3 className="font-bold text-surface-900">{p.name}</h3><p className="mt-1 text-xs text-surface-500">{p.is_active ? 'Active' : 'Draft'} / {CATEGORY_LABEL[categoryOf(p)]}</p><p className="mt-3 text-lg font-bold">{totalStock(p.id).toLocaleString()} <span className="text-xs font-normal text-surface-500">units in stock</span></p><p className="text-xs text-surface-500">Stock held at {branchesHolding(p.id)} branches</p><details className="mt-3 text-xs"><summary className="cursor-pointer font-semibold text-brand-600">Branch quantities</summary><ul className="mt-2 space-y-1">{locations.map(loc => <li key={loc.id} className="flex justify-between gap-3"><span>{loc.name}</span><span className="tabular-nums">{stockAt(p.id, loc.id)}</span></li>)}</ul></details></article>)}{!(summaryView === 'memory' ? memoryCards : mainProducts).length && <p className="py-6 text-sm text-surface-500">No {summaryView === 'memory' ? 'memory cards' : 'products'} added yet.</p>}</div>}
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
 
       {/* Toolbar: tabs, search, actions */}
       <div className="flex flex-col gap-3 rounded-2xl border border-surface-200 bg-white p-2.5 lg:flex-row lg:items-center">
         <div className="flex shrink-0 gap-1 overflow-x-auto rounded-xl bg-surface-100 p-1 hide-scrollbar">
           {TABS.map(t => (
-            <button key={t.id} onClick={() => setActiveTab(t.id)}
+            <button key={t.id} onClick={() => { setActiveTab(t.id); setCategoryFilter('all') }}
               className={`flex items-center gap-2 whitespace-nowrap rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${activeTab === t.id ? 'bg-white text-surface-900 shadow-sm' : 'text-surface-500 hover:text-surface-800'}`}>
               {t.label}
               <span className={`rounded-full px-1.5 text-[10px] ${activeTab === t.id ? 'bg-brand-100 text-brand-700' : 'bg-surface-200 text-surface-600'}`}>{t.count}</span>
@@ -493,10 +517,10 @@ export function AdminProducts() {
             className="w-full rounded-xl border border-surface-200 bg-surface-50/60 py-2 pl-10 pr-4 text-sm outline-none transition-all focus:border-brand-500 focus:bg-white focus:ring-2 focus:ring-brand-500/20" />
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {activeTab === 'products' && (
-            <button onClick={() => { setEditingId(null); setForm({ name: '', description: '', retail_price: 0, wholesale_price: 0, cost_price: 0, stock_quantity: 0, min_stock_level: 5, source_url: '', image_url: '', category: 'camera' }); setIsModalOpen(true) }}
+          {(activeTab === 'products' || activeTab === 'memory') && (
+            <button onClick={() => { setEditingId(null); setForm({ name: '', description: '', retail_price: 0, wholesale_price: 0, cost_price: 0, stock_quantity: 0, min_stock_level: 5, source_url: '', image_url: '', category: activeTab === 'memory' ? 'sd_card' : 'camera' }); setIsModalOpen(true) }}
               className="btn-primary flex h-9 items-center gap-1.5 rounded-xl px-4 text-xs font-bold">
-              <Plus className="h-4 w-4" /> Add product
+              <Plus className="h-4 w-4" /> {activeTab === 'memory' ? 'Add memory card' : 'Add product'}
             </button>
           )}
           {activeTab === 'promos' && (
@@ -530,7 +554,7 @@ export function AdminProducts() {
       {activeTab !== 'promos' && (
         <div className="flex flex-wrap gap-1.5">
           {(['all', 'camera', 'sd_card', 'accessory'] as const).map(c => {
-            const n = c === 'all' ? products.length : products.filter(p => categoryOf(p) === c).length
+            const n = c === 'all' ? tabProducts.length : tabProducts.filter(p => categoryOf(p) === c).length
             if (c !== 'all' && n === 0) return null
             return (
               <button key={c} onClick={() => setCategoryFilter(c)}
@@ -548,8 +572,8 @@ export function AdminProducts() {
           <div className="flex min-w-0 items-start gap-3">
             <span className="grid h-8 w-8 shrink-0 place-items-center rounded-xl bg-amber-500 text-white"><AlertTriangle className="h-4 w-4" /></span>
             <div className="min-w-0">
-              <p className="text-sm font-bold text-amber-950">{lowStockProducts.length} product{lowStockProducts.length > 1 ? 's are' : ' is'} low on stock</p>
-              <p className="truncate text-xs text-amber-800">{lowStockProducts.map(p => `${p.name} (${p.stock_quantity})`).join(' · ')}</p>
+              <p className="text-sm font-bold text-amber-950">{lowStockProducts.length} item{lowStockProducts.length > 1 ? 's are' : ' is'} low on stock</p>
+              <p className="truncate text-xs text-amber-800">{lowStockProducts.map(p => `${p.name} (${totalStock(p.id)})`).join(' · ')}</p>
             </div>
           </div>
           <button onClick={() => openStockInForProduct(lowStockProducts[0].id)} className="btn-primary flex h-9 shrink-0 items-center gap-1.5 rounded-xl bg-amber-600 px-4 text-xs font-bold text-white hover:bg-amber-700">
@@ -558,7 +582,7 @@ export function AdminProducts() {
         </div>
       )}
 
-      {activeTab === 'products' ? (
+      {(activeTab === 'products' || activeTab === 'memory') ? (
         loading ? <CardGridSkeleton count={6} /> : filteredProducts.length === 0 ? (
           <div className="glass-card flex flex-col items-center justify-center p-12 text-center">
             <div className="mb-4 grid h-16 w-16 place-items-center rounded-2xl bg-surface-100"><Package className="h-8 w-8 text-surface-400" /></div>
@@ -708,7 +732,9 @@ export function AdminProducts() {
               <div key={b.id} className="min-w-[132px] shrink-0 rounded-xl border border-surface-200 bg-white px-3 py-2.5">
                 <p className="truncate text-[11px] font-bold uppercase tracking-wider text-surface-500" title={b.address || b.name}>{b.name}</p>
                 <p className={`mt-0.5 text-lg font-black ${b.units === 0 ? 'text-surface-300' : 'text-surface-900'}`}>{b.units}</p>
-                <p className="text-[10px] text-surface-400">units</p>
+                <p className="text-[10px] text-surface-500">product units</p>
+                <p className="mt-1 text-xs text-surface-600">{b.memoryUnits} memory-card units</p>
+                <button type="button" onClick={() => setSummaryView('stock')} className="mt-2 text-xs font-bold text-brand-600 hover:underline">View all</button>
               </div>
             ))}
           </div>
@@ -958,7 +984,7 @@ export function AdminProducts() {
                     <label className="label">Product *</label>
                     <select required className="input bg-white text-sm" value={stockInForm.product_id} onChange={e => setStockInForm({...stockInForm, product_id: e.target.value})}>
                       <option value="">Select product...</option>
-                      {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      {[mainProducts, memoryCards].map((group, index) => <optgroup key={index} label={index === 0 ? 'Products' : 'Memory cards'}>{group.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</optgroup>)}
                     </select>
                   </div>
                   <div>
@@ -996,10 +1022,10 @@ export function AdminProducts() {
                 </div>
                 <form onSubmit={handleStockTransfer} className="p-6 space-y-4 overflow-y-auto flex-1 scrollbar-hide">
                   <div>
-                    <label className="label">Select Camera Product *</label>
+                    <label className="label">Select product or memory card *</label>
                     <select required className="input bg-white text-sm" value={transferForm.product_id} onChange={e => setTransferForm({...transferForm, product_id: e.target.value})}>
                       <option value="">Select product...</option>
-                      {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      {[mainProducts, memoryCards].map((group, index) => <optgroup key={index} label={index === 0 ? 'Products' : 'Memory cards'}>{group.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</optgroup>)}
                     </select>
                   </div>
                   <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1049,10 +1075,10 @@ export function AdminProducts() {
                     Use this tool to align database inventory directly with the actual physical count sitting on your branch shelves.
                   </p>
                   <div>
-                    <label className="label">Select Camera Product *</label>
+                    <label className="label">Select product or memory card *</label>
                     <select required className="input bg-white text-sm" value={physicalCountForm.product_id} onChange={e => setPhysicalCountForm({...physicalCountForm, product_id: e.target.value})}>
                       <option value="">Select product...</option>
-                      {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                      {[mainProducts, memoryCards].map((group, index) => <optgroup key={index} label={index === 0 ? 'Products' : 'Memory cards'}>{group.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}</optgroup>)}
                     </select>
                   </div>
                   <div>
@@ -1102,7 +1128,7 @@ export function AdminProducts() {
               >
                 {/* Sticky header with X always visible */}
                 <div className="px-5 py-4 border-b border-surface-100 flex items-center justify-between bg-surface-50/50 shrink-0 rounded-t-2xl sm:rounded-t-2xl">
-                  <h2 className="text-lg font-bold text-surface-900">{editingId ? 'Edit Product' : 'Add Product'}</h2>
+                  <h2 className="text-lg font-bold text-surface-900">{form.category === 'sd_card' ? (editingId ? 'Edit memory card' : 'Add memory card') : (editingId ? 'Edit product' : 'Add product')}</h2>
                   <button onClick={() => !submitting && closeModal()} className="text-surface-400 hover:text-surface-900 transition-colors p-2 rounded-md hover:bg-surface-100">
                     <X className="w-5 h-5" />
                   </button>
