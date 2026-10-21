@@ -35,7 +35,7 @@ const recipients = (process.env.DAILY_REPORT_EMAILS
   ? process.env.DAILY_REPORT_EMAILS.split(',').map(s => s.trim()).filter(Boolean)
   : [
       'aadeyemiak@gmail.com',
-      'abdulahmanbakare001@gmail.com'
+      'abdulrahmanbakare001@gmail.com'
     ]
 )
 

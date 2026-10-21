@@ -17,7 +17,7 @@ const cronSecret = process.env.CRON_SECRET || process.env.DAILY_REPORT_SECRET
 // Target recipients (as requested)
 const DEFAULT_RECIPIENTS = [
   'aadeyemiak@gmail.com',
-  'abdulahmanbakare001@gmail.com'
+  'abdulrahmanbakare001@gmail.com'
 ]
 
 const transporter = nodemailer.createTransport(
@@ -379,7 +379,7 @@ export function generateDailyReportHtml(metrics) {
           <!-- FOOTER -->
           <tr>
             <td style="background: #f8fafc; padding: 24px; text-align: center; font-size: 12px; color: #64748b; border-top: 1px solid #e2e8f0;">
-              This automated daily report is sent every day to <strong style="color: #334155;">aadeyemiak@gmail.com</strong> and <strong style="color: #334155;">abdulahmanbakare001@gmail.com</strong>.<br>
+              This automated daily report is sent every day to <strong style="color: #334155;">aadeyemiak@gmail.com</strong> and <strong style="color: #334155;">abdulrahmanbakare001@gmail.com</strong>.<br>
               &copy; ${new Date().getFullYear()} ${escapeHtml(fromName)}. All rights reserved.
             </td>
           </tr>
