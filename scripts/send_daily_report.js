@@ -3,7 +3,13 @@ import { createClient } from '@supabase/supabase-js'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { fetchDailyMetrics, generateDailyReportHtml, generateDailyReportPlainText } from '../api/daily-report.js'
+import {
+  fetchReportMetrics,
+  generateReportHtml,
+  generateReportPlainText,
+  formatNaira,
+  getPeriodBounds
+} from '../api/daily-report.js'
 
 // Load .env.local if present
 const __filename = fileURLToPath(import.meta.url)
@@ -43,15 +49,23 @@ const recipients = (process.env.DAILY_REPORT_EMAILS
 // Parse CLI arguments
 const args = process.argv.slice(2)
 let targetDate = null
+let period = 'daily'
 let isDryRun = false
 
 args.forEach(arg => {
   if (arg.startsWith('--date=')) {
     targetDate = arg.split('=')[1]
+  } else if (arg.startsWith('--period=')) {
+    period = arg.split('=')[1].toLowerCase()
   } else if (arg === '--dry-run') {
     isDryRun = true
   }
 })
+
+if (!['daily', 'weekly', 'monthly'].includes(period)) {
+  console.error(`Invalid period: "${period}". Allowed values are: daily, weekly, monthly`)
+  process.exit(1)
+}
 
 if (!targetDate) {
   const formatter = new Intl.DateTimeFormat('en-CA', {
@@ -63,9 +77,12 @@ if (!targetDate) {
   targetDate = formatter.format(new Date())
 }
 
+const bounds = getPeriodBounds(period, targetDate)
+
 console.log(`\n========================================`)
-console.log(`OptiSmart Daily Report Generator`)
-console.log(`Target Date: ${targetDate} (Africa/Lagos)`)
+console.log(`OptiSmart Executive Report Generator`)
+console.log(`Period: ${bounds.periodLabel.toUpperCase()}`)
+console.log(`Date Range: ${bounds.periodTitle}`)
 console.log(`Recipients: ${recipients.join(', ')}`)
 console.log(`Mode: ${isDryRun ? 'DRY RUN (no email will be sent)' : 'LIVE DISPATCH'}`)
 console.log(`========================================\n`)
@@ -77,21 +94,41 @@ async function run() {
   }
 
   const supabase = createClient(supabaseUrl, supabaseKey)
-  console.log('Fetching metrics from Supabase database...')
-  const metrics = await fetchDailyMetrics(supabase, targetDate)
+  console.log(`Fetching metrics from Supabase database for ${period} report...`)
+  const metrics = await fetchReportMetrics(supabase, period, targetDate)
 
-  console.log(`\nResults for ${targetDate}:`)
+  console.log(`\n--- RESULTS: ${metrics.periodLabel} (${metrics.periodTitle}) ---`)
+  console.log(`[Sales & Profit]`)
   console.log(`- Delivered Orders: ${metrics.deliveredOrdersCount}`)
-  console.log(`- Cameras Sold: ${metrics.deliveredCameras}`)
-  console.log(`- Gross Delivered Revenue: ₦${metrics.grossRevenue.toLocaleString()}`)
-  console.log(`- Product Cost (COGS): ₦${metrics.cameraCost.toLocaleString()}`)
-  console.log(`- Operating Expenses: ₦${metrics.operatingExpenses.toLocaleString()}`)
-  console.log(`- Total Costs: ₦${metrics.totalCost.toLocaleString()}`)
-  console.log(`- Net Profit: ₦${metrics.netProfit.toLocaleString()} (${metrics.profitMargin.toFixed(1)}% margin)`)
-  console.log(`- Pipeline: ${metrics.newOrdersCount} new orders, ${metrics.pendingOrdersCount} pending, ${metrics.newLeadsCount} new leads`)
+  console.log(`- Cameras Sold: ${metrics.deliveredCameras} units`)
+  console.log(`- Gross Delivered Revenue: ${formatNaira(metrics.grossRevenue)}`)
+  console.log(`- Product Cost (COGS): ${formatNaira(metrics.cameraCost)}`)
+  console.log(`- Total Ad Spend: ${formatNaira(metrics.totalAdSpend)}`)
+  console.log(`- Total Waybill & Delivery: ${formatNaira(metrics.totalWaybillAndDelivery)}`)
+  console.log(`- Total Costs: ${formatNaira(metrics.totalCosts)}`)
+  console.log(`- Net Profit: ${formatNaira(metrics.netProfit)} (${metrics.profitMargin.toFixed(1)}% margin)`)
 
-  const text = generateDailyReportPlainText(metrics)
-  const html = generateDailyReportHtml(metrics)
+  console.log(`\n[Ads & Marketing]`)
+  console.log(`- Total Ad Spend: ${formatNaira(metrics.totalAdSpend)}`)
+  console.log(`- ROAS: ${metrics.roas.toFixed(2)}x`)
+  console.log(`- Cost Per Camera (CAC): ${formatNaira(metrics.costPerCamera)}`)
+  console.log(`- Ad Spend Share of Revenue: ${metrics.adSpendShare.toFixed(1)}%`)
+  console.log(`- Ad Expense Records: ${metrics.adExpenses.length} entries`)
+
+  console.log(`\n[Waybill, Delivery & Couriers]`)
+  console.log(`- Total Waybill & Delivery Cost: ${formatNaira(metrics.totalWaybillAndDelivery)}`)
+  console.log(`- Courier Order Value Handled: ${formatNaira(metrics.totalCourierOrderValue)}`)
+  console.log(`- Cash Remitted by Couriers: ${formatNaira(metrics.totalCourierRemitted)}`)
+  console.log(`- Outstanding Cash Pending Remittance: ${formatNaira(metrics.totalCourierPendingRemittance)}`)
+  console.log(`- Active Couriers: ${metrics.courierBreakdown.length} agents`)
+
+  console.log(`\n[Pipeline]`)
+  console.log(`- New Orders: ${metrics.newOrdersCount} (${formatNaira(metrics.newOrdersValue)})`)
+  console.log(`- Pending Fulfillment Pipeline: ${metrics.pendingOrdersCount} orders`)
+  console.log(`- New Leads: ${metrics.newLeadsCount} leads`)
+
+  const text = generateReportPlainText(metrics)
+  const html = generateReportHtml(metrics)
 
   if (isDryRun) {
     console.log('\n--- Plain text preview ---')
@@ -111,11 +148,12 @@ async function run() {
     auth: { user: emailUser, pass: emailPass },
   })
 
-  const subject = `OptiSmart Daily Report - ${targetDate}: ${metrics.deliveredCameras} Cameras Sold | NGN ${Math.round(metrics.netProfit).toLocaleString()} Net Profit`
+  const subject = `OptiSmart ${metrics.periodLabel} - ${metrics.periodTitle}: ${metrics.deliveredCameras} Cameras | NGN ${Math.round(metrics.netProfit).toLocaleString()} Profit`
 
+  console.log(`\nDispatching individual emails...`)
   for (const recipient of recipients) {
     try {
-      console.log(`Dispatching report email to ${recipient}...`)
+      console.log(`Sending to ${recipient}...`)
       const info = await transporter.sendMail({
         from: `"${String(fromName).replace(/["\r\n]/g, '')}" <${emailUser}>`,
         to: recipient,
@@ -125,7 +163,7 @@ async function run() {
         html,
         headers: {
           'X-Mailer': 'OptiSmart Portal Service',
-          'X-Entity-Ref-ID': `daily-report-${targetDate}-${Date.now()}`,
+          'X-Entity-Ref-ID': `${period}-report-${targetDate}-${Date.now()}`,
         }
       })
       console.log(`-> Delivered to ${recipient}! Message ID: ${info.messageId}`)
@@ -133,10 +171,11 @@ async function run() {
       console.error(`-> FAILED for ${recipient}:`, err.message)
     }
   }
+
+  console.log('\nAll report deliveries completed!\n')
 }
 
 run().catch(err => {
-  console.error('Failed to run daily report:', err)
+  console.error('Failed to run report:', err)
   process.exit(1)
 })
-
