@@ -35,7 +35,8 @@ const recipients = (process.env.DAILY_REPORT_EMAILS
   ? process.env.DAILY_REPORT_EMAILS.split(',').map(s => s.trim()).filter(Boolean)
   : [
       'aadeyemiak@gmail.com',
-      'abdulrahmanbakare001@gmail.com'
+      'abdulrahmanbakare001@gmail.com',
+      'bakareabdulrahman001@gmail.com'
     ]
 )
 
@@ -110,16 +111,28 @@ async function run() {
     auth: { user: emailUser, pass: emailPass },
   })
 
-  console.log(`\nDispatching report email to ${recipients.join(', ')}...`)
-  const info = await transporter.sendMail({
-    from: `"${String(fromName).replace(/["\r\n]/g, '')}" <${emailUser}>`,
-    to: recipients.join(', '),
-    subject: `OptiSmart Daily Report — ${targetDate}: ${metrics.deliveredCameras} Cameras Sold | ₦${metrics.netProfit.toLocaleString()} Net Profit`,
-    text,
-    html,
-  })
+  const subject = `OptiSmart Daily Report - ${targetDate}: ${metrics.deliveredCameras} Cameras Sold | NGN ${Math.round(metrics.netProfit).toLocaleString()} Net Profit`
 
-  console.log(`Email successfully delivered! Message ID: ${info.messageId}\n`)
+  for (const recipient of recipients) {
+    try {
+      console.log(`Dispatching report email to ${recipient}...`)
+      const info = await transporter.sendMail({
+        from: `"${String(fromName).replace(/["\r\n]/g, '')}" <${emailUser}>`,
+        to: recipient,
+        replyTo: emailUser,
+        subject,
+        text,
+        html,
+        headers: {
+          'X-Mailer': 'OptiSmart Portal Service',
+          'X-Entity-Ref-ID': `daily-report-${targetDate}-${Date.now()}`,
+        }
+      })
+      console.log(`-> Delivered to ${recipient}! Message ID: ${info.messageId}`)
+    } catch (err) {
+      console.error(`-> FAILED for ${recipient}:`, err.message)
+    }
+  }
 }
 
 run().catch(err => {

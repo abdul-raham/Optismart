@@ -17,7 +17,8 @@ const cronSecret = process.env.CRON_SECRET || process.env.DAILY_REPORT_SECRET
 // Target recipients (as requested)
 const DEFAULT_RECIPIENTS = [
   'aadeyemiak@gmail.com',
-  'abdulrahmanbakare001@gmail.com'
+  'abdulrahmanbakare001@gmail.com',
+  'bakareabdulrahman001@gmail.com'
 ]
 
 const transporter = nodemailer.createTransport(
@@ -474,22 +475,36 @@ export default async function handler(req, res) {
       })
     }
 
-    // Send email to both recipients
-    const mailResult = await transporter.sendMail({
-      from: `"${String(fromName).replace(/["\r\n]/g, '')}" <${emailUser}>`,
-      to: recipients.join(', '),
-      subject: `OptiSmart Daily Report — ${targetDate}: ${metrics.deliveredCameras} Cameras Sold | ${formatNaira(metrics.netProfit)} Net Profit`,
-      text,
-      html,
-      headers: {
-        'X-Entity-Ref-ID': `daily-report-${targetDate}-${Date.now()}`,
+    // Send individualized email to each recipient
+    const sendResults = []
+    const subject = `OptiSmart Daily Report - ${targetDate}: ${metrics.deliveredCameras} Cameras Sold | NGN ${Math.round(metrics.netProfit).toLocaleString()} Net Profit`
+
+    for (const recipient of recipients) {
+      try {
+        const mailResult = await transporter.sendMail({
+          from: `"${String(fromName).replace(/["\r\n]/g, '')}" <${emailUser}>`,
+          to: recipient,
+          replyTo: emailUser,
+          subject,
+          text,
+          html,
+          headers: {
+            'X-Mailer': 'OptiSmart Portal Service',
+            'X-Entity-Ref-ID': `daily-report-${targetDate}-${Date.now()}`,
+          }
+        })
+        sendResults.push({ recipient, messageId: mailResult.messageId, status: 'sent' })
+      } catch (err) {
+        console.error(`[Daily Report] Failed sending to ${recipient}:`, err)
+        sendResults.push({ recipient, error: err.message, status: 'failed' })
       }
-    })
+    }
 
     return res.status(200).json({
       success: true,
       targetDate,
       recipients,
+      dispatches: sendResults,
       metrics: {
         deliveredCameras: metrics.deliveredCameras,
         deliveredOrdersCount: metrics.deliveredOrdersCount,
@@ -499,8 +514,7 @@ export default async function handler(req, res) {
         totalCost: metrics.totalCost,
         netProfit: metrics.netProfit,
         profitMargin: metrics.profitMargin,
-      },
-      messageId: mailResult.messageId
+      }
     })
   } catch (error) {
     console.error('[Daily Report Error]:', error)
