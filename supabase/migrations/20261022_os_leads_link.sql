@@ -4,6 +4,8 @@
 
 ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'portal';
 ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS os_lead_id UUID;
-CREATE UNIQUE INDEX IF NOT EXISTS leads_os_lead_id_key ON public.leads(os_lead_id) WHERE os_lead_id IS NOT NULL;
+-- A plain unique index (NULLs never clash) so OS can upsert on os_lead_id.
+DROP INDEX IF EXISTS public.leads_os_lead_id_key;
+CREATE UNIQUE INDEX IF NOT EXISTS leads_os_lead_id_key ON public.leads(os_lead_id);
 
 NOTIFY pgrst, 'reload schema';
