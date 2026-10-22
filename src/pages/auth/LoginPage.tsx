@@ -34,7 +34,6 @@ export function LoginPage() {
     <AuthLayout
       title="Welcome back"
       subtitle="Sign in to your OptiSmart account"
-      activeTab="login"
     >
       <form onSubmit={handleLogin} className="space-y-4">
         <AnimatePresence mode="wait">
