@@ -279,7 +279,7 @@ export function DSALeads() {
                   return (
                     <tr key={lead.id} onClick={() => setOpenLead(lead)} className="group cursor-pointer hover:bg-surface-50 [&>td]:border-b [&>td]:border-surface-100">
                       <td className="sticky left-0 z-10 max-w-[260px] bg-white px-4 py-3 group-hover:bg-surface-50">
-                        <p className="truncate font-bold text-surface-900">{lead.customer_name}</p>
+                        <p className="truncate font-bold text-surface-900">{lead.customer_name}{lead.source === 'whatsapp' && <span className="ml-1.5 rounded-md bg-emerald-50 px-1.5 py-0.5 align-middle text-[10px] font-bold uppercase text-emerald-700">WhatsApp</span>}</p>
                         <p className="flex items-center gap-1 truncate text-xs text-surface-500">
                           {lead.location && <><MapPin className="h-3 w-3 shrink-0" />{lead.location} · </>}Added {formatDate(lead.created_at)}
                         </p>
@@ -317,7 +317,7 @@ export function DSALeads() {
                 <li key={lead.id} className="p-4" onClick={() => setOpenLead(lead)}>
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <p className="truncate font-bold text-surface-900">{lead.customer_name}</p>
+                      <p className="truncate font-bold text-surface-900">{lead.customer_name}{lead.source === 'whatsapp' && <span className="ml-1.5 rounded-md bg-emerald-50 px-1.5 py-0.5 align-middle text-[10px] font-bold uppercase text-emerald-700">WhatsApp</span>}</p>
                       <p className="mt-0.5 truncate text-xs text-surface-500">{lead.phone}{lead.location ? ` · ${lead.location}` : ''}</p>
                       {isAdmin && lead.dsa?.full_name && <p className="mt-0.5 text-xs text-surface-500">By {lead.dsa.full_name}</p>}
                     </div>
