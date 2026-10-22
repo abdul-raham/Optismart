@@ -38,11 +38,11 @@ export function ForgotPasswordPage() {
 
   return (
     <AuthLayout
-      title={success ? 'Check your inbox' : 'Reset password'}
+      title={success ? 'Check your inbox' : 'Forgot password?'}
       subtitle={
         success
-          ? 'Recovery email has been dispatched'
-          : 'Enter your registered email to receive a secure login link'
+          ? 'We sent you a password reset link'
+          : "Enter your email and we'll send you a reset link"
       }
     >
       <AnimatePresence mode="wait">

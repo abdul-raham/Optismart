@@ -6,7 +6,7 @@ import authBg from '@/assets/auth-bg.webp'
 
 // 32px blurred preview (~180 bytes) shown instantly while the full background loads
 const AUTH_BG_PLACEHOLDER =
-  'data:image/webp;base64,UklGRtIAAABXRUJQVlA4IMYAAAAQBgCdASogABUAPu1irFAppSQisBgIATAdiWkAEgB9fGRVgNcrw+FSBjWkKWOuWpZaOjnI6GNL3ywA/V8jeuCC7WtPSBfG/Tt9wjzzzKMkZPnJxY/xCV3HrUoxIxVnJERm7+A2C4jwt8673H5gsg8HOkblt/mKtJ9Z4Mhk02u/Fvu8O98ktWrVSfkzlq0rtOuNkimOUxVXRm9pjP2M0VnmuRbMv1cgto/bw2A+avRRa6MUEy9W10MYg5y+PccLcbTwBpgAAAA='
+  'data:image/webp;base64,UklGRrwAAABXRUJQVlA4ILAAAADwBACdASogABUAPu1krE4ppaSiKA1RMB2JaACdMoM+XYZgJsdgZkvEhSg4piC4qqAA/CRwvnmBRcD9YezUEUgq4MJP8SUns1bKZpYgLpUSS3s/3MWlVTeee85lU0TsFvrTln4JBMWwajZqcNG/+beee+8DgH2VOYjbz75fuSiApoNUs2QWqZykN/E3K8bHwRbbotuP1MH0pU3u5hJYD3Dgb/y0FGwN51zv3FzGjYFAAA=='
 
 // Start fetching the background as soon as this module is evaluated
 if (typeof window !== 'undefined') {
@@ -24,10 +24,10 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
   const [bgLoaded, setBgLoaded] = useState(false)
 
   return (
-    <div className="fixed inset-0 h-screen w-screen overflow-hidden flex items-center justify-center p-4 sm:p-6 bg-slate-950 select-none">
+    <div className="fixed inset-0 h-screen w-screen overflow-hidden flex items-center justify-center lg:justify-end p-4 sm:p-6 lg:pr-[8vw] bg-slate-900 select-none">
       
       {/* ============================================================
-          FULL-SCREEN BACKGROUND IMAGE WITH CINEMATIC VIGNETTE
+          FULL-SCREEN BACKGROUND IMAGE (camera left, card right on desktop)
           ============================================================ */}
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
         {/* Instant blurred placeholder */}
@@ -35,7 +35,7 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
           src={AUTH_BG_PLACEHOLDER}
           alt=""
           aria-hidden="true"
-          className="absolute inset-0 w-full h-full object-cover object-center scale-110 blur-xl filter brightness-[0.7]"
+          className="absolute inset-0 w-full h-full object-cover object-[30%_center] scale-110 blur-xl"
         />
         <img
           src={authBg}
@@ -43,14 +43,14 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
           decoding="async"
           fetchPriority="high"
           onLoad={() => setBgLoaded(true)}
-          className={`relative w-full h-full object-cover object-center filter brightness-[0.75] contrast-[1.1] transition-opacity duration-500 ${bgLoaded ? 'opacity-100' : 'opacity-0'}`}
+          className={`relative w-full h-full object-cover object-[30%_center] transition-opacity duration-500 ${bgLoaded ? 'opacity-100' : 'opacity-0'}`}
         />
-        {/* Light vignette so the card stands out while the cameras stay crisp */}
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(2,6,23,0.55)_0%,_rgba(2,6,23,0.15)_60%,_rgba(2,6,23,0.45)_100%)]" />
+        {/* Subtle shading: keeps the camera crisp and adds depth behind the card */}
+        <div className="absolute inset-0 bg-slate-950/30 lg:bg-transparent lg:bg-gradient-to-r lg:from-transparent lg:via-slate-950/10 lg:to-slate-950/50" />
       </div>
 
       {/* ============================================================
-          CENTER FLOATING CARD (FITS 100% IN VIEWPORT, NO WINDOW SCROLL)
+          FLOATING CARD (FITS 100% IN VIEWPORT, NO WINDOW SCROLL)
           ============================================================ */}
       <div className="relative z-10 w-full max-w-[420px] max-h-[calc(100vh-2rem)] flex flex-col rounded-3xl border border-white/25 bg-white/95 sm:bg-white/90 p-6 sm:p-8 shadow-[0_25px_60px_-15px_rgba(0,0,0,0.6)] backdrop-blur-2xl ring-1 ring-black/5 animate-fade-up">
         
