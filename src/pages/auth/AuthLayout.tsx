@@ -6,7 +6,7 @@ import authBg from '@/assets/auth-bg.webp'
 
 // 32px blurred preview (~180 bytes) shown instantly while the full background loads
 const AUTH_BG_PLACEHOLDER =
-  'data:image/webp;base64,UklGRq4AAABXRUJQVlA4IKIAAAAwBQCdASogABUAPu1krU+ppSQiMBgIATAdiWkAEgAEaA9zZuWG8VKdJAzjluaex2w1wAD9/ztJn3RdxoWEM8Jgp16cPEXxHCfuVW5eZ2z5gbQnlNCOWMatfHN+3LhNpZMcpFTG+pQ84sbDwXpxogP67ZqIOoNvf57gZh2JJlq85jh8I0E9C67dpS2vV9ZXYW3OPvmVlRw5Ou5aAb4EgvSAAAA='
+  'data:image/webp;base64,UklGRtIAAABXRUJQVlA4IMYAAAAQBgCdASogABUAPu1irFAppSQisBgIATAdiWkAEgB9fGRVgNcrw+FSBjWkKWOuWpZaOjnI6GNL3ywA/V8jeuCC7WtPSBfG/Tt9wjzzzKMkZPnJxY/xCV3HrUoxIxVnJERm7+A2C4jwt8673H5gsg8HOkblt/mKtJ9Z4Mhk02u/Fvu8O98ktWrVSfkzlq0rtOuNkimOUxVXRm9pjP2M0VnmuRbMv1cgto/bw2A+avRRa6MUEy9W10MYg5y+PccLcbTwBpgAAAA='
 
 // Start fetching the background as soon as this module is evaluated
 if (typeof window !== 'undefined') {
@@ -35,7 +35,7 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
           src={AUTH_BG_PLACEHOLDER}
           alt=""
           aria-hidden="true"
-          className="absolute inset-0 w-full h-full object-cover object-center scale-110 blur-xl filter brightness-[0.4]"
+          className="absolute inset-0 w-full h-full object-cover object-center scale-110 blur-xl filter brightness-[0.7]"
         />
         <img
           src={authBg}
@@ -43,11 +43,10 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
           decoding="async"
           fetchPriority="high"
           onLoad={() => setBgLoaded(true)}
-          className={`relative w-full h-full object-cover object-center scale-105 filter brightness-[0.4] contrast-[1.1] transition-opacity duration-500 ${bgLoaded ? 'opacity-100' : 'opacity-0'}`}
+          className={`relative w-full h-full object-cover object-center filter brightness-[0.75] contrast-[1.1] transition-opacity duration-500 ${bgLoaded ? 'opacity-100' : 'opacity-0'}`}
         />
-        {/* Soft vignette overlays to ensure depth and contrast */}
-        <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-slate-950/75" />
-        <div className="absolute inset-0 bg-brand-950/20 backdrop-blur-[2px]" />
+        {/* Light vignette so the card stands out while the cameras stay crisp */}
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_rgba(2,6,23,0.55)_0%,_rgba(2,6,23,0.15)_60%,_rgba(2,6,23,0.45)_100%)]" />
       </div>
 
       {/* ============================================================
