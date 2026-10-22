@@ -1,8 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { CheckCircle2, Lock, Eye, EyeOff, ArrowRight, AlertCircle, ArrowLeft, Check } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { CheckCircle2, Lock, Eye, EyeOff, ArrowRight, AlertCircle, ArrowLeft, Check, Mail } from 'lucide-react'
+import { supabase, authUrlState } from '@/lib/supabase'
+import { requestPasswordResetEmail } from '@/lib/email'
 import { AuthLayout, InputShell } from './AuthLayout'
 
 type LinkState = 'checking' | 'valid' | 'invalid'
@@ -15,36 +16,61 @@ export function UpdatePasswordPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
   const [linkState, setLinkState] = useState<LinkState>('checking')
+  const [tokenHash, setTokenHash] = useState<string | null>(authUrlState.tokenHash)
+
+  // Inline resend state if link is expired
+  const [resendEmail, setResendEmail] = useState('')
+  const [resendLoading, setResendLoading] = useState(false)
+  const [resendSent, setResendSent] = useState(false)
+
   const navigate = useNavigate()
 
-  // Verify the recovery link produced a session before showing the form
   useEffect(() => {
     let settled = false
-    const settle = (state: LinkState, message?: string) => {
+    const settle = (state: LinkState, message?: string | null) => {
       if (settled) return
       settled = true
       setLinkState(state)
       if (message) setError(message)
     }
 
-    const hashParams = new URLSearchParams(window.location.hash.substring(1))
     const queryParams = new URLSearchParams(window.location.search)
-    const errorDesc = hashParams.get('error_description') || queryParams.get('error_description')
+    const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+
+    const urlTokenHash = queryParams.get('token_hash') || hashParams.get('token_hash') || authUrlState.tokenHash
+    if (urlTokenHash) {
+      setTokenHash(urlTokenHash)
+      settle('valid')
+      return
+    }
+
+    const errorDesc =
+      hashParams.get('error_description') ||
+      queryParams.get('error_description') ||
+      authUrlState.error
     if (errorDesc) {
       settle('invalid', errorDesc.replace(/\+/g, ' '))
       return
     }
 
+    if (authUrlState.isRecovery) {
+      settle('valid')
+      return
+    }
+
     const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
-      if ((event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') && session) settle('valid')
+      if ((event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN') && session) {
+        settle('valid')
+      }
     })
 
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) settle('valid')
     })
 
-    // Give the client time to exchange the URL tokens before declaring the link invalid
-    const timer = setTimeout(() => settle('invalid', 'This reset link is invalid or has expired.'), 4000)
+    const timer = setTimeout(() => {
+      settle('invalid', 'This reset link is invalid or has expired.')
+    }, 3500)
 
     return () => {
       clearTimeout(timer)
@@ -73,11 +99,29 @@ export function UpdatePasswordPage() {
 
     setLoading(true)
     try {
+      // If arrived via direct ?token_hash=... link, verify the OTP right when saving
+      if (tokenHash) {
+        const { data: sessionData } = await supabase.auth.getSession()
+        if (!sessionData.session) {
+          const { error: otpError } = await supabase.auth.verifyOtp({
+            token_hash: tokenHash,
+            type: 'recovery',
+          })
+          if (otpError) {
+            setTokenHash(null)
+            setLinkState('invalid')
+            setError('This reset link has expired or was already used. Request a fresh link below.')
+            setLoading(false)
+            return
+          }
+        }
+      }
+
       const { error: updateError } = await supabase.auth.updateUser({ password })
       if (updateError) throw updateError
 
       setSuccess(true)
-      setTimeout(() => navigate('/app'), 2500)
+      setTimeout(() => navigate('/app'), 2000)
     } catch (err: any) {
       setError(err.message || 'Failed to update password. Please try again.')
     } finally {
@@ -85,11 +129,35 @@ export function UpdatePasswordPage() {
     }
   }
 
-  const title = success ? 'Password updated' : linkState === 'invalid' ? 'Link expired' : 'Set new password'
+  const handleInlineResend = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!resendEmail.trim()) return
+    setResendLoading(true)
+    setError(null)
+    try {
+      await requestPasswordResetEmail(resendEmail)
+      setResendSent(true)
+    } catch (err: any) {
+      setError(err.message || 'Could not send reset link.')
+    } finally {
+      setResendLoading(false)
+    }
+  }
+
+  const title = success
+    ? 'Password updated'
+    : linkState === 'invalid'
+      ? resendSent
+        ? 'Check your inbox'
+        : 'Link expired'
+      : 'Set new password'
+
   const subtitle = success
     ? 'Your new password has been saved'
     : linkState === 'invalid'
-      ? 'Request a fresh reset link to continue'
+      ? resendSent
+        ? `We sent a fresh link to ${resendEmail}`
+        : 'Enter your email below to get a fresh reset link'
       : 'Choose a strong password for your account'
 
   return (
@@ -134,19 +202,48 @@ export function UpdatePasswordPage() {
             exit={{ opacity: 0 }}
             className="space-y-4"
           >
-            <div className="flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50 p-3.5 text-xs font-semibold text-rose-700">
-              <AlertCircle className="h-4 w-4 flex-shrink-0 text-rose-500 mt-0.5" />
-              <div className="flex-1 leading-relaxed">
-                {error || 'This reset link is invalid or has expired.'} Reset links can only be used once and expire after a short time.
+            {resendSent ? (
+              <div className="text-center py-2 space-y-3">
+                <div className="mx-auto flex h-13 w-13 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-600 ring-4 ring-brand-500/10">
+                  <Mail className="h-6 w-6" />
+                </div>
+                <p className="text-xs text-slate-600 font-medium leading-relaxed">
+                  A new password reset link has been sent to <strong className="text-slate-900">{resendEmail}</strong>. Please open the newest email in your inbox.
+                </p>
               </div>
-            </div>
-            <Link
-              to="/auth/forgot-password"
-              className="flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-brand-600 to-brand-500 font-bold text-sm text-white shadow-brand"
-            >
-              Request a new link <ArrowRight className="h-4 w-4" />
-            </Link>
-            <div className="text-center">
+            ) : (
+              <form onSubmit={handleInlineResend} className="space-y-3.5">
+                <div className="flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs font-semibold text-amber-800">
+                  <AlertCircle className="h-4 w-4 flex-shrink-0 text-amber-600 mt-0.5" />
+                  <div className="flex-1 leading-relaxed">
+                    {error || 'This reset link has expired or was already used.'}
+                  </div>
+                </div>
+
+                <InputShell label="Your Registered Email" icon={Mail}>
+                  <input
+                    type="email"
+                    required
+                    value={resendEmail}
+                    onChange={(e) => setResendEmail(e.target.value)}
+                    placeholder="name@company.com"
+                    className="h-11 w-full bg-transparent pl-11 pr-4 text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 placeholder:font-normal"
+                    disabled={resendLoading}
+                  />
+                </InputShell>
+
+                <button
+                  type="submit"
+                  disabled={resendLoading}
+                  className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand-600 to-brand-500 font-bold text-sm text-white shadow-brand disabled:opacity-50 cursor-pointer"
+                >
+                  {resendLoading ? 'Sending new link...' : 'Send Fresh Reset Link'}
+                  {!resendLoading && <ArrowRight className="h-4 w-4" />}
+                </button>
+              </form>
+            )}
+
+            <div className="text-center pt-1">
               <Link
                 to="/auth/login"
                 className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 hover:text-brand-600 transition-colors"
@@ -185,14 +282,14 @@ export function UpdatePasswordPage() {
                 autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="h-12 w-full bg-transparent pl-12 pr-12 text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 placeholder:font-normal"
+                className="h-11 w-full bg-transparent pl-11 pr-11 text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 placeholder:font-normal"
                 placeholder="At least 8 characters"
                 disabled={loading}
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3.5 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700 transition-colors"
                 aria-label={showPassword ? 'Hide password' : 'Show password'}
               >
                 {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -206,7 +303,7 @@ export function UpdatePasswordPage() {
                 autoComplete="new-password"
                 value={confirm}
                 onChange={(e) => setConfirm(e.target.value)}
-                className="h-12 w-full bg-transparent pl-12 pr-4 text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 placeholder:font-normal"
+                className="h-11 w-full bg-transparent pl-11 pr-4 text-sm font-semibold text-slate-900 outline-none placeholder:text-slate-400 placeholder:font-normal"
                 placeholder="Re-enter password"
                 disabled={loading}
               />
@@ -225,7 +322,7 @@ export function UpdatePasswordPage() {
               whileTap={{ scale: 0.985 }}
               type="submit"
               disabled={loading}
-              className="relative flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-brand-600 to-brand-500 font-bold text-sm text-white shadow-brand transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+              className="relative flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-brand-600 to-brand-500 font-bold text-sm text-white shadow-brand transition-all disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
               {loading ? (
                 <div className="flex items-center gap-2">

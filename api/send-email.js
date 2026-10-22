@@ -1,4 +1,5 @@
 import nodemailer from 'nodemailer'
+import { createClient } from '@supabase/supabase-js'
 
 const emailUser = process.env.SMTP_USER || process.env.GMAIL_USER
 const emailPass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD
@@ -7,7 +8,9 @@ const smtpPort = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 465
 const smtpSecure = process.env.SMTP_SECURE !== 'false'
 const fromName = process.env.EMAIL_FROM_NAME || 'OptiSmart Portal'
 const supportEmail = process.env.EMAIL_SUPPORT_ADDRESS || emailUser
-const appUrl = process.env.APP_URL || 'http://localhost:5173'
+const appUrl = process.env.APP_URL || 'https://sales.optismart.com.ng'
+const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 const allowedOrigins = new Set(
   String(process.env.EMAIL_ALLOWED_ORIGINS || appUrl)
     .split(',')
@@ -265,6 +268,73 @@ export default async function handler(req, res) {
 
   try {
     const { type, data } = req.body || {}
+
+    if (type === 'password_reset') {
+      const cleanEmail = String(data?.email || '').trim().toLowerCase()
+      if (!cleanEmail) {
+        return res.status(400).json({ error: 'Email address is required' })
+      }
+      if (!supabaseUrl || !supabaseServiceKey) {
+        return res.status(500).json({ error: 'Supabase admin credentials are not configured on server' })
+      }
+
+      const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
+        auth: { autoRefreshToken: false, persistSession: false },
+      })
+
+      const reqOrigin = String(data?.origin || req.headers.origin || '').trim().replace(/\/$/, '')
+      const baseOrigin = /^https?:\/\/(localhost:\d+|([a-z0-9-]+\.)*optismart\.com\.ng)$/i.test(reqOrigin)
+        ? reqOrigin
+        : appUrl.replace(/\/$/, '')
+
+      const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+        type: 'recovery',
+        email: cleanEmail,
+        options: {
+          redirectTo: `${baseOrigin}/auth/update-password`,
+        },
+      })
+
+      if (linkError) {
+        return res.status(400).json({ error: linkError.message || 'Could not generate reset link' })
+      }
+
+      const hashedToken = linkData?.properties?.hashed_token
+      const actionLink = linkData?.properties?.action_link
+      const resetUrl = hashedToken
+        ? `${baseOrigin}/auth/update-password?token_hash=${encodeURIComponent(hashedToken)}&type=recovery`
+        : actionLink
+
+      if (!resetUrl) {
+        return res.status(500).json({ error: 'Failed to build password reset URL' })
+      }
+
+      const html = layout('Password Recovery', `
+        <h2>Reset Your OptiSmart Password</h2>
+        <p>We received a request to reset the password for your OptiSmart Portal account (<strong>${escapeHtml(cleanEmail)}</strong>).</p>
+        <p>Click the button below to choose a new password. This link goes directly to the secure password reset page:</p>
+        ${button(resetUrl, 'Set New Password')}
+        <p style="font-size: 13px; color: #64748b; margin-top: 24px;">If the button above does not open, copy and paste this link into your browser:</p>
+        <p style="font-size: 12px; word-break: break-all; background: #f8fafc; padding: 12px; border-radius: 8px; border: 1px solid #e2e8f0; color: #0f172a;">${escapeHtml(resetUrl)}</p>
+        <p style="font-size: 13px; color: #64748b; margin-top: 24px;">If you did not request a password reset, you can safely ignore this email.</p>
+      `)
+
+      await transporter.sendMail({
+        from: `"${String(fromName).replace(/["\r\n]/g, '')}" <${emailUser}>`,
+        to: cleanEmail,
+        replyTo: supportEmail,
+        subject: `Reset your ${fromName} password`,
+        text: `Reset your ${fromName} password by opening this link:\n\n${resetUrl}\n\nIf you did not request this, you can safely ignore this email.`,
+        html,
+        headers: {
+          'X-Mailer': 'OptiSmart Portal Service',
+          'X-Entity-Ref-ID': Date.now().toString(),
+        },
+      })
+
+      return res.status(200).json({ success: true })
+    }
+
     const createEmail = templates[type]
     if (!createEmail) return res.status(400).json({ error: `Unknown email type: ${type}` })
 

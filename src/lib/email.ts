@@ -10,7 +10,7 @@ export interface SendEmailOptions {
  * For non-critical mail, omit await and pass an onError callback.
  */
 export async function sendEmail(
-  type: 'welcome' | 'new_lead' | 'new_order' | 'order_status_update' | 'commission_paid' | 'job_assigned' | 'account_approved' | 'dsa_day4_warning' | 'admin_day5_alert' | 'admin_day7_eviction_prompt' | 'portal_update_dsa' | 'portal_update_admin',
+  type: 'welcome' | 'new_lead' | 'new_order' | 'order_status_update' | 'commission_paid' | 'job_assigned' | 'account_approved' | 'dsa_day4_warning' | 'admin_day5_alert' | 'admin_day7_eviction_prompt' | 'portal_update_dsa' | 'portal_update_admin' | 'password_reset',
   data: Record<string, any>,
   options: SendEmailOptions = {}
 ) {
@@ -115,5 +115,43 @@ export async function notifyAllUsersPortalUpdate() {
     return { count: 0, error: err }
   }
 }
+
+/**
+ * Send a direct password-reset link via /api/send-email (using Supabase Admin generateLink + Gmail SMTP),
+ * falling back to supabase.auth.resetPasswordForEmail only in local Vite-only dev.
+ */
+export async function requestPasswordResetEmail(email: string): Promise<void> {
+  const cleanEmail = email.trim().toLowerCase()
+  const origin = window.location.origin
+
+  try {
+    const res = await fetch('/api/send-email', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'password_reset',
+        data: { email: cleanEmail, origin },
+      }),
+    })
+
+    if (res.ok) return
+
+    // If running local Vite dev server without /api, fall back to client Supabase call
+    if (res.status === 404 && window.location.hostname === 'localhost') {
+      const { supabase } = await import('@/lib/supabase')
+      const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
+        redirectTo: `${origin}/auth/update-password`,
+      })
+      if (error) throw error
+      return
+    }
+
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.error || 'Failed to send password reset link.')
+  } catch (err: any) {
+    throw new Error(err?.message || 'Failed to send password reset link.')
+  }
+}
+
 
 

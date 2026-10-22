@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ArrowLeft, ArrowRight, CheckCircle2, Mail, AlertCircle, ShieldCheck } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
+import { ArrowLeft, ArrowRight, Mail, AlertCircle } from 'lucide-react'
+import { requestPasswordResetEmail } from '@/lib/email'
 import { AuthLayout, InputShell } from './AuthLayout'
 
 export function ForgotPasswordPage() {
@@ -15,19 +15,14 @@ export function ForgotPasswordPage() {
     e.preventDefault()
     setError(null)
 
-    if (!email) {
+    if (!email.trim()) {
       setError('Please enter your email address.')
       return
     }
 
     setLoading(true)
-
     try {
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-        redirectTo: `${window.location.origin}/auth/update-password`,
-      })
-
-      if (resetError) throw resetError
+      await requestPasswordResetEmail(email)
       setSuccess(true)
     } catch (err: any) {
       setError(err.message || 'Failed to send reset link. Please try again.')
@@ -41,7 +36,7 @@ export function ForgotPasswordPage() {
       title={success ? 'Check your inbox' : 'Forgot password?'}
       subtitle={
         success
-          ? 'We sent you a password reset link'
+          ? 'We sent you a direct password reset link'
           : "Enter your email and we'll send you a reset link"
       }
     >
@@ -51,26 +46,33 @@ export function ForgotPasswordPage() {
             key="success"
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="text-center py-4 space-y-4"
+            className="text-center py-3 space-y-4"
           >
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl bg-brand-500/10 text-brand-600 ring-8 ring-brand-500/5">
-              <Mail className="h-8 w-8" />
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-500/10 text-brand-600 ring-4 ring-brand-500/10">
+              <Mail className="h-7 w-7" />
             </div>
 
             <div className="space-y-1.5">
-              <h3 className="text-xl font-black text-slate-900">Recovery Link Sent</h3>
+              <h3 className="text-lg font-black text-slate-900">Recovery Link Sent</h3>
               <p className="text-xs text-slate-500 font-medium max-w-sm mx-auto leading-relaxed">
-                We've sent a secure password reset link to <strong className="text-slate-800">{email}</strong>. Please check your inbox and spam folder.
+                We've sent a direct password reset link to <strong className="text-slate-800">{email}</strong>. Please open the newest email in your inbox or spam folder.
               </p>
             </div>
 
-            <div className="pt-2">
+            <div className="pt-1 space-y-2">
               <Link
                 to="/auth/login"
-                className="inline-flex h-11 items-center justify-center rounded-2xl bg-slate-900 px-6 font-bold text-xs text-white shadow-sm hover:bg-slate-800 transition-colors w-full"
+                className="inline-flex h-11 items-center justify-center rounded-xl bg-slate-900 px-6 font-bold text-xs text-white shadow-xs hover:bg-slate-800 transition-colors w-full"
               >
                 Return to Sign In
               </Link>
+              <button
+                type="button"
+                onClick={() => setSuccess(false)}
+                className="text-xs font-bold text-brand-600 hover:text-brand-700 hover:underline cursor-pointer"
+              >
+                Didn't get it? Send again
+              </button>
             </div>
           </motion.div>
         ) : (
@@ -87,7 +89,7 @@ export function ForgotPasswordPage() {
                 <motion.div
                   initial={{ opacity: 0, y: -6 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="flex items-start gap-2.5 rounded-2xl border border-rose-200/90 bg-rose-50/80 p-3.5 text-xs font-semibold text-rose-700 shadow-xs"
+                  className="flex items-start gap-2.5 rounded-xl border border-rose-200 bg-rose-50 p-3.5 text-xs font-semibold text-rose-700"
                 >
                   <AlertCircle className="h-4 w-4 flex-shrink-0 text-rose-500 mt-0.5" />
                   <div className="flex-1 leading-relaxed">{error}</div>
