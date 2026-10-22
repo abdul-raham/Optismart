@@ -1,8 +1,18 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ShieldCheck, Lock } from 'lucide-react'
 import optismartLogo from '@/assets/optismart-logo.png'
-import authBg from '@/assets/auth-bg.png'
+import authBg from '@/assets/auth-bg.webp'
+
+// 32px blurred preview (~180 bytes) shown instantly while the full background loads
+const AUTH_BG_PLACEHOLDER =
+  'data:image/webp;base64,UklGRq4AAABXRUJQVlA4IKIAAAAwBQCdASogABUAPu1krU+ppSQiMBgIATAdiWkAEgAEaA9zZuWG8VKdJAzjluaex2w1wAD9/ztJn3RdxoWEM8Jgp16cPEXxHCfuVW5eZ2z5gbQnlNCOWMatfHN+3LhNpZMcpFTG+pQ84sbDwXpxogP67ZqIOoNvf57gZh2JJlq85jh8I0E9C67dpS2vV9ZXYW3OPvmVlRw5Ou5aAb4EgvSAAAA='
+
+// Start fetching the background as soon as this module is evaluated
+if (typeof window !== 'undefined') {
+  const preload = new Image()
+  preload.src = authBg
+}
 
 interface AuthLayoutProps {
   children: React.ReactNode
@@ -11,6 +21,8 @@ interface AuthLayoutProps {
 }
 
 export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
+  const [bgLoaded, setBgLoaded] = useState(false)
+
   return (
     <div className="fixed inset-0 h-screen w-screen overflow-hidden flex items-center justify-center p-4 sm:p-6 bg-slate-950 select-none">
       
@@ -18,10 +30,20 @@ export function AuthLayout({ children, title, subtitle }: AuthLayoutProps) {
           FULL-SCREEN BACKGROUND IMAGE WITH CINEMATIC VIGNETTE
           ============================================================ */}
       <div className="absolute inset-0 z-0 overflow-hidden pointer-events-none">
+        {/* Instant blurred placeholder */}
+        <img
+          src={AUTH_BG_PLACEHOLDER}
+          alt=""
+          aria-hidden="true"
+          className="absolute inset-0 w-full h-full object-cover object-center scale-110 blur-xl filter brightness-[0.4]"
+        />
         <img
           src={authBg}
           alt="OptiSmart Surveillance"
-          className="w-full h-full object-cover object-center scale-105 filter brightness-[0.4] contrast-[1.1] transition-transform duration-1000"
+          decoding="async"
+          fetchPriority="high"
+          onLoad={() => setBgLoaded(true)}
+          className={`relative w-full h-full object-cover object-center scale-105 filter brightness-[0.4] contrast-[1.1] transition-opacity duration-500 ${bgLoaded ? 'opacity-100' : 'opacity-0'}`}
         />
         {/* Soft vignette overlays to ensure depth and contrast */}
         <div className="absolute inset-0 bg-gradient-to-t from-slate-950/90 via-slate-950/40 to-slate-950/75" />
