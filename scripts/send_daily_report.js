@@ -8,7 +8,8 @@ import {
   generateReportHtml,
   generateReportPlainText,
   formatNaira,
-  getPeriodBounds
+  getPeriodBounds,
+  getPreviousNigeriaDate
 } from '../api/daily-report.js'
 
 // Load .env.local if present
@@ -68,13 +69,7 @@ if (!['daily', 'weekly', 'monthly'].includes(period)) {
 }
 
 if (!targetDate) {
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone: 'Africa/Lagos',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  })
-  targetDate = formatter.format(new Date())
+  targetDate = getPreviousNigeriaDate()
 }
 
 const bounds = getPeriodBounds(period, targetDate)
@@ -144,13 +139,16 @@ async function run() {
   }
 
   const transporter = nodemailer.createTransport({
+    connectionTimeout: 15000,
+    socketTimeout: 30000,
     service: 'gmail',
     auth: { user: emailUser, pass: emailPass },
   })
 
-  const subject = `OptiSmart ${metrics.periodLabel} - ${metrics.periodTitle}: ${metrics.deliveredCameras} Cameras | NGN ${Math.round(metrics.netProfit).toLocaleString()} Profit`
+  const subject = `OptiSmart ${metrics.periodLabel} - ${metrics.periodTitle}: ${metrics.deliveredCameras} Cameras | NGN ${Math.round(metrics.netProfit).toLocaleString()} Recorded Profit Estimate`
 
   console.log(`\nDispatching individual emails...`)
+  let failures = 0
   for (const recipient of recipients) {
     try {
       console.log(`Sending to ${recipient}...`)
@@ -166,13 +164,16 @@ async function run() {
           'X-Entity-Ref-ID': `${period}-report-${targetDate}-${Date.now()}`,
         }
       })
-      console.log(`-> Delivered to ${recipient}! Message ID: ${info.messageId}`)
+      console.log(`-> SMTP accepted for ${recipient}! Message ID: ${info.messageId}`)
     } catch (err) {
+      failures += 1
       console.error(`-> FAILED for ${recipient}:`, err.message)
     }
   }
 
-  console.log('\nAll report deliveries completed!\n')
+  transporter.close()
+  if (failures) throw new Error(`${failures} report deliveries failed`)
+  console.log('All reports accepted by SMTP.')
 }
 
 run().catch(err => {

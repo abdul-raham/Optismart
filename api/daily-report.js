@@ -64,6 +64,14 @@ export function getNigeriaDate(dateInput) {
   return formatter.format(new Date())
 }
 
+// Both scheduled daily sends cover the last completed Nigeria calendar day.
+export function getPreviousNigeriaDate(now = new Date()) {
+  const today = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Lagos', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(now)
+  return new Date(new Date(`${today}T12:00:00Z`).getTime() - 86400000).toISOString().slice(0, 10)
+}
+
 /**
  * Calculates start and end bounds depending on report period:
  * - 'daily': 1 day (targetDate)
@@ -195,6 +203,9 @@ export async function fetchReportMetrics(supabase, period = 'daily', targetDate)
       .select('id, full_name, email')
   ])
 
+  for (const result of [courierOrdersRes, pendingRes, leadsRes, productsRes, deliveryAgentsRes, usersRes]) {
+    if (result.error) throw result.error
+  }
   if (deliveredRes.error) throw deliveredRes.error
   if (newOrdersRes.error) throw newOrdersRes.error
   if (expensesRes.error) throw expensesRes.error
@@ -327,6 +338,7 @@ export async function fetchReportMetrics(supabase, period = 'daily', targetDate)
     grossRevenue,
     cameraCost,
     totalCosts,
+    missingCostOrders: deliveredOrders.filter(o => !(Number(o.unit_cost || productMap.get(o.product_id)?.cost_price || 0) > 0)).length,
     netProfit,
     profitMargin,
     // Ads Section
@@ -483,8 +495,8 @@ export function generateReportHtml(metrics) {
                   <td width="4%"></td>
                   <!-- NET PROFIT -->
                   <td width="48%" style="padding: 16px; background: ${profitBg}; border: 1px solid ${profitBorder}; border-radius: 14px; vertical-align: top;">
-                    <p style="margin: 0; font-size: 11px; text-transform: uppercase; font-weight: 800; letter-spacing: 1px; color: ${profitColor};">Net Profit</p>
-                    <p style="margin: 6px 0 0 0; font-size: 24px; font-weight: 900; color: ${profitColor};">${formatNaira(metrics.netProfit)}</p>
+                    <p style="margin: 0; font-size: 11px; text-transform: uppercase; font-weight: 800; letter-spacing: 1px; color: ${profitColor};">Recorded profit estimate</p>
+                    <p style="margin: 6px 0 0 0; font-size: 24px; font-weight: 900; color: ${profitColor};">${formatNaira(metrics.netProfit)}</p><p style="font-size:12px;color:#92400e">${metrics.missingCostOrders ? `${metrics.missingCostOrders} delivered orders have no positive acquisition cost recorded. This is not final net profit.` : 'Based on recorded costs and expenses only.'}</p>
                     <p style="margin: 4px 0 0 0; font-size: 12px; font-weight: 700; color: ${profitColor};">${metrics.profitMargin.toFixed(1)}% profit margin</p>
                   </td>
                 </tr>
@@ -685,7 +697,9 @@ Total Ad Spend: ${formatNaira(metrics.totalAdSpend)}
 Waybill & Delivery Costs: ${formatNaira(metrics.totalWaybillAndDelivery)}
 Other Operating Expenses: ${formatNaira(metrics.totalOtherExpenses)}
 Total Costs: ${formatNaira(metrics.totalCosts)}
-Net Profit: ${formatNaira(metrics.netProfit)} (${metrics.profitMargin.toFixed(1)}% margin) [${isProfitable ? 'PROFIT' : 'LOSS'}]
+Recorded profit estimate: ${formatNaira(metrics.netProfit)} (${metrics.profitMargin.toFixed(1)}% margin) [${isProfitable ? 'PROFIT' : 'LOSS'}]
+
+Cost completeness: ${metrics.missingCostOrders || 0} delivered orders have no positive acquisition cost recorded. Profit is provisional and excludes unrecorded costs.
 
 === ADS & MARKETING PERFORMANCE ===
 Total Ad Spend: ${formatNaira(metrics.totalAdSpend)}
@@ -728,7 +742,7 @@ export default async function handler(req, res) {
     secretQuery === cronSecret
   )
 
-  if (cronSecret && !isVercelCron && process.env.NODE_ENV === 'production') {
+  if (!cronSecret || !isVercelCron) {
     return res.status(401).json({ error: 'Unauthorized: invalid or missing cron secret' })
   }
 
@@ -742,7 +756,7 @@ export default async function handler(req, res) {
   try {
     const supabase = createClient(supabaseUrl, supabaseKey)
     const period = (req.query?.period || req.body?.period || 'daily').toLowerCase()
-    const targetDate = getNigeriaDate(req.query?.date || req.body?.date)
+    const targetDate = req.query?.date || req.body?.date || getPreviousNigeriaDate()
     const isDryRun = req.query?.dryRun === 'true' || req.body?.dryRun === true
 
     const metrics = await fetchReportMetrics(supabase, period, targetDate)
@@ -768,7 +782,7 @@ export default async function handler(req, res) {
     }
 
     const sendResults = []
-    const subject = `OptiSmart ${metrics.periodLabel} - ${metrics.periodTitle}: ${metrics.deliveredCameras} Cameras | NGN ${Math.round(metrics.netProfit).toLocaleString()} Profit`
+    const subject = `OptiSmart ${metrics.periodLabel} - ${metrics.periodTitle}: ${metrics.deliveredCameras} Cameras | NGN ${Math.round(metrics.netProfit).toLocaleString()} Recorded Profit Estimate`
 
     for (const recipient of recipients) {
       try {

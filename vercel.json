@@ -1,16 +1,20 @@
 {
   "crons": [
     {
-      "path": "/api/daily-report?period=daily",
-      "schedule": "0 21 * * *"
+      "path": "/api/daily-report?period=daily&slot=midnight",
+      "schedule": "0 23 * * *"
+    },
+    {
+      "path": "/api/daily-report?period=daily&slot=morning",
+      "schedule": "0 6 * * *"
     },
     {
       "path": "/api/daily-report?period=weekly",
-      "schedule": "0 21 * * 0"
+      "schedule": "0 6 * * 1"
     },
     {
       "path": "/api/daily-report?period=monthly",
-      "schedule": "0 21 1 * *"
+      "schedule": "0 6 1 * *"
     }
   ],
   "rewrites": [
