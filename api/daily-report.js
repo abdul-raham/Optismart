@@ -3,7 +3,8 @@ import { createClient } from '@supabase/supabase-js'
 
 // Environment variables
 const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL
-const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_ANON_KEY
+// Must be the service key: the public key can't read orders, which made reports silently show 0 for everything.
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
 const emailUser = process.env.SMTP_USER || process.env.GMAIL_USER
 const emailPass = process.env.SMTP_PASS || process.env.GMAIL_APP_PASSWORD
@@ -758,6 +759,12 @@ export default async function handler(req, res) {
     const period = (req.query?.period || req.body?.period || 'daily').toLowerCase()
     const targetDate = req.query?.date || req.body?.date || getPreviousNigeriaDate()
     const isDryRun = req.query?.dryRun === 'true' || req.body?.dryRun === true
+
+    // Refuse to send a report that can't see the data (wrong key) instead of emailing zeros.
+    const probe = await supabase.from('orders').select('id', { count: 'exact', head: true })
+    if (probe.error || !probe.count) {
+      return res.status(500).json({ error: 'Report cannot read orders: check SUPABASE_SERVICE_ROLE_KEY' })
+    }
 
     const metrics = await fetchReportMetrics(supabase, period, targetDate)
 
