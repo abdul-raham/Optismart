@@ -1,4 +1,5 @@
-import { pushState, registerPush } from '@/lib/pushSubscription'
+import { device, pushState, registerPush } from '@/lib/pushSubscription'
+import { NotificationHelp } from '@/components/shared/NotificationHelp'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
@@ -7,7 +8,7 @@ import { User, Lock, Save, Bell, Building2 } from 'lucide-react'
 function PushStatus() {
   const [state, setState] = useState(pushState())
   const [busy, setBusy] = useState(false)
-  const label = { granted: 'On for this device', default: 'Not turned on yet', denied: 'Blocked in your browser settings', unsupported: 'Not supported on this browser', 'needs-install': 'Add OptiSmart to your Home Screen first' }[state]
+  const label = { granted: 'On for this device', default: 'Not turned on yet', denied: 'Blocked in your browser settings', unsupported: 'Not supported on this browser', 'needs-install': 'Add OptiSmart to your Home Screen first', 'in-app': 'Open OptiSmart in Chrome or Safari' }[state]
   return (
     <div className="rounded-xl border border-surface-200 p-3">
       <div className="flex items-center justify-between gap-3">
@@ -15,12 +16,12 @@ function PushStatus() {
           <p className="text-sm font-medium text-surface-800">Phone notifications</p>
           <p className={`text-xs ${state === 'granted' ? 'text-emerald-700' : 'text-amber-700'}`}>{label}</p>
         </div>
-        {state !== 'unsupported' && state !== 'needs-install' && (
+        {(state === 'default' || state === 'granted') && (
           <button disabled={busy} onClick={async () => { setBusy(true); await registerPush(true); setState(pushState()); setBusy(false) }}
             className="btn-outline h-8 shrink-0 px-3 text-xs">{busy ? '…' : state === 'granted' ? 'Refresh' : 'Turn on'}</button>
         )}
       </div>
-      {state === 'denied' && <p className="mt-2 text-[11px] text-surface-500">Open the site settings (🔒 next to the address), set Notifications to Allow, then reload.</p>}
+      {state !== 'default' && state !== 'granted' && <div className="mt-3 rounded-lg bg-surface-50 p-3"><NotificationHelp state={state} device={device()} /></div>}
     </div>
   )
 }

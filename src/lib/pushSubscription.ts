@@ -2,13 +2,25 @@ import { supabase } from '@/lib/supabase'
 
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined
 
-export type PushState = 'unsupported' | 'needs-install' | 'default' | 'denied' | 'granted'
+export type PushState = 'unsupported' | 'in-app' | 'needs-install' | 'default' | 'denied' | 'granted'
+export type Device = 'android' | 'iphone-app' | 'iphone-safari' | 'in-app' | 'computer'
 
 const isIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent)
 const isStandalone = () => window.matchMedia?.('(display-mode: standalone)').matches || (navigator as any).standalone === true
 
+// Browsers built into other apps (WhatsApp, Facebook, Instagram…) can't show notifications.
+const isInAppBrowser = () => /FBAN|FBAV|Instagram|WhatsApp|Line\/|; wv\)/i.test(navigator.userAgent)
+
+export function device(): Device {
+  if (isInAppBrowser()) return 'in-app'
+  if (isIos()) return isStandalone() ? 'iphone-app' : 'iphone-safari'
+  if (/android/i.test(navigator.userAgent)) return 'android'
+  return 'computer'
+}
+
 /** Can this phone get push notifications, and has the person allowed them? */
 export function pushState(): PushState {
+  if (isInAppBrowser()) return 'in-app'
   // iPhones only allow web push once the portal is added to the Home Screen.
   if (isIos() && !isStandalone()) return 'needs-install'
   if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) return 'unsupported'
