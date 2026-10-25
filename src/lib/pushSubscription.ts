@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase'
 const VAPID_PUBLIC_KEY = import.meta.env.VITE_VAPID_PUBLIC_KEY as string | undefined
 
 export type PushState = 'unsupported' | 'in-app' | 'needs-install' | 'default' | 'denied' | 'granted'
-export type Device = 'android' | 'iphone-app' | 'iphone-safari' | 'in-app' | 'computer'
+export type Device = 'android' | 'android-app' | 'samsung' | 'iphone-app' | 'iphone-safari' | 'in-app' | 'computer'
 
 const isIos = () => /iphone|ipad|ipod/i.test(navigator.userAgent)
 const isStandalone = () => window.matchMedia?.('(display-mode: standalone)').matches || (navigator as any).standalone === true
@@ -14,7 +14,8 @@ const isInAppBrowser = () => /FBAN|FBAV|Instagram|WhatsApp|Line\/|; wv\)/i.test(
 export function device(): Device {
   if (isInAppBrowser()) return 'in-app'
   if (isIos()) return isStandalone() ? 'iphone-app' : 'iphone-safari'
-  if (/android/i.test(navigator.userAgent)) return 'android'
+  if (/SamsungBrowser/i.test(navigator.userAgent)) return 'samsung'
+  if (/android/i.test(navigator.userAgent)) return isStandalone() ? 'android-app' : 'android'
   return 'computer'
 }
 
