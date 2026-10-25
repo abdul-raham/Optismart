@@ -55,7 +55,7 @@ function MoneyLine({ order }: { order: Order }) {
 }
 
 export function AdminOrders() {
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [orders, setOrders] = useState<Order[]>([])
   const [assignedOrderIds, setAssignedOrderIds] = useState<Set<string>>(new Set())
   const [loading, setLoading] = useState(true)
@@ -66,6 +66,7 @@ export function AdminOrders() {
   const [assigningOrderId, setAssigningOrderId] = useState<string | null>(null)
   const [products, setProducts] = useState<Product[]>([])
   const [dsas, setDsas] = useState<AppUser[]>([])
+  const [leads, setLeads] = useState<any[]>([])
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [isEditModalOpen, setIsEditModalOpen] = useState(false)
   const [editingOrder, setEditingOrder] = useState<Order | null>(null)
@@ -102,6 +103,7 @@ export function AdminOrders() {
   })
 
   const [form, setForm] = useState({
+    lead_id: '',
     is_dsa_registered: true,
     dsa_id: '',
     unregistered_dsa_name: '',
@@ -174,7 +176,7 @@ export function AdminOrders() {
 
   const fetchLookups = async () => {
     try {
-      const [productsRes, dsasRes, jobsRes, locationsRes, inventoryRes, installersRes, agentsRes] = await Promise.all([
+      const [productsRes, dsasRes, jobsRes, locationsRes, inventoryRes, installersRes, agentsRes, leadsRes] = await Promise.all([
         supabase.from('products').select('*').eq('is_active', true),
         supabase.from('users').select('*').in('role', ['dsa', 'admin', 'super_admin']).eq('status', 'active'),
         supabase.from('installer_jobs').select('id, order_id, installer_id, commission_amount, status, payout_id'),
@@ -182,6 +184,7 @@ export function AdminOrders() {
         supabase.from('product_inventory').select('product_id, location_id, quantity'),
         supabase.from('users').select('id, full_name').eq('role', 'installer').eq('status', 'active').order('full_name'),
         supabase.from('delivery_agents').select('id, full_name').eq('is_active', true).order('full_name'),
+        supabase.from('leads').select('id,customer_name,phone,email,location,status,dsa_id,source').not('status', 'in', '(converted,lost)').order('created_at', { ascending: false }).limit(1000),
       ])
       setProducts(productsRes.data ?? [])
       setDsas(dsasRes.data ?? [])
@@ -191,6 +194,7 @@ export function AdminOrders() {
       setLocationInventory(inventoryRes.data ?? [])
       setInstallers(installersRes.data ?? [])
       setAgents(agentsRes.data ?? [])
+      setLeads(leadsRes.data ?? [])
     } catch (err) {
       console.error('Error fetching order lookups:', err)
     }
@@ -227,6 +231,22 @@ export function AdminOrders() {
     return () => { supabase.removeChannel(channel) }
   }, [])
 
+  useEffect(() => {
+    const leadId = searchParams.get('lead')
+    if (!leadId || !leads.length) return
+    const lead = leads.find(l => l.id === leadId)
+    if (!lead) return
+    setForm(f => ({ ...f, lead_id: lead.id, dsa_id: lead.dsa_id || '', customer_name: lead.customer_name, customer_phone: lead.phone, customer_email: lead.email || '', customer_address: lead.location || '' }))
+    setIsModalOpen(true)
+  }, [leads, searchParams])
+
+  const chooseLead = (leadId: string) => {
+    const lead = leads.find(l => l.id === leadId)
+    setForm(f => lead
+      ? ({ ...f, lead_id: lead.id, is_dsa_registered: true, dsa_id: lead.dsa_id || '', customer_name: lead.customer_name, customer_phone: lead.phone, customer_email: lead.email || '', customer_address: lead.location || '' })
+      : ({ ...f, lead_id: '', customer_name: '', customer_phone: '', customer_email: '', customer_address: '' }))
+  }
+
   const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault()
     setCreateError('')
@@ -241,7 +261,7 @@ export function AdminOrders() {
       if (!product) throw new Error('Product not found')
 
       const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 4).toUpperCase()}`
-      const productTotal = form.amount > 0 ? form.amount : Number(product.retail_price) * form.quantity
+      const productTotal = Number(product.retail_price) * form.quantity
       const sdCard = sdCardsOf(products).find(c => c.id === sd.productId)
       const sdQty = sd.enabled && sdCard ? sd.quantity : 0
       const sdPrice = sd.enabled && sd.charge && sdCard ? Number(sdCard.retail_price) : 0
@@ -250,6 +270,7 @@ export function AdminOrders() {
       const { data, error } = await supabase
         .from('orders')
         .insert([{
+          lead_id: form.lead_id || null,
           order_number: orderNumber,
           dsa_id: form.is_dsa_registered ? (form.dsa_id || null) : null,
           unregistered_dsa_name: !form.is_dsa_registered ? form.unregistered_dsa_name : null,
@@ -302,9 +323,10 @@ export function AdminOrders() {
         } as Order
         setOrders(current => [createdOrder, ...current])
         setIsModalOpen(false)
+        setSearchParams({}, { replace: true })
         setSd(SD_DEFAULT)
         setNewInstaller(INSTALLER_NONE)
-        setForm({ is_dsa_registered: true, unregistered_dsa_name: '', dsa_id: '', customer_name: '', customer_email: '', customer_phone: '', customer_address: '', product_id: '', fulfillment_location_id: '', quantity: 1, amount: 0, installation_needed: false, installation_price: 0, expected_delivery_date: '', notes: '' })
+        setForm({ lead_id: '', is_dsa_registered: true, unregistered_dsa_name: '', dsa_id: '', customer_name: '', customer_email: '', customer_phone: '', customer_address: '', product_id: '', fulfillment_location_id: '', quantity: 1, amount: 0, installation_needed: false, installation_price: 0, expected_delivery_date: '', notes: '' })
       }
     } catch (err: any) {
       console.error('Error creating order:', err)
@@ -1074,6 +1096,14 @@ export function AdminOrders() {
 
               <form onSubmit={handleCreateOrder} className="flex flex-col flex-1 min-h-0">
               <div className="p-6 space-y-4 overflow-y-auto flex-1">
+                <div className="rounded-xl bg-brand-50 p-3">
+                  <label className="label">Customer lead</label>
+                  <select className="input bg-white" value={form.lead_id} onChange={e => chooseLead(e.target.value)}>
+                    <option value="">Choose a lead, or enter a walk-in customer</option>
+                    {leads.map(lead => <option key={lead.id} value={lead.id}>{lead.customer_name} / {lead.phone}{lead.source === 'whatsapp' ? ' / WhatsApp' : ''}</option>)}
+                  </select>
+                  <p className="mt-1.5 text-xs text-brand-700">Selecting a lead fills its customer and owner, then converts it when the order is saved.</p>
+                </div>
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="label mb-0">DSA In Charge (Optional)</label>
@@ -1112,12 +1142,12 @@ export function AdminOrders() {
 
                 <div>
                   <label className="label">Customer Name *</label>
-                  <input required type="text" className="input" placeholder="e.g. John Smith" value={form.customer_name} onChange={e => setForm({...form, customer_name: e.target.value})} />
+                  <input required readOnly={Boolean(form.lead_id)} type="text" className="input read-only:bg-surface-50" placeholder="e.g. John Smith" value={form.customer_name} onChange={e => setForm({...form, customer_name: e.target.value})} />
                 </div>
 
                 <div>
                   <label className="label">Customer Phone *</label>
-                  <input required type="tel" className="input" placeholder="080..." value={form.customer_phone} onChange={e => setForm({...form, customer_phone: e.target.value.replace(/[^\d+]/g, '')})} />
+                  <input required readOnly={Boolean(form.lead_id)} type="tel" className="input read-only:bg-surface-50" placeholder="080..." value={form.customer_phone} onChange={e => setForm({...form, customer_phone: e.target.value.replace(/[^\d+]/g, '')})} />
                 </div>
 
                 <div>
@@ -1169,7 +1199,7 @@ export function AdminOrders() {
                   </div>
                   <div>
                     <label className="label">Product Amount (₦)</label>
-                    <input type="number" min={0} className="input" value={form.amount} onChange={e => setForm({...form, amount: Number(e.target.value)})} />
+                    <div className="input bg-surface-50 font-bold text-surface-900">{formatCurrency(Number(products.find(p => p.id === form.product_id)?.retail_price || 0) * form.quantity)}</div>
                   </div>
                 </div>
 

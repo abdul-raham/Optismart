@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
@@ -29,6 +29,7 @@ const EMPTY_FORM = { customer_name: '', phone: '', email: '', location: '', temp
 export function DSALeads() {
   const { user, role } = useAuthStore()
   const location = useLocation()
+  const navigate = useNavigate()
   const isAdmin = role !== 'dsa'
   const [leads, setLeads] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
@@ -394,6 +395,9 @@ export function DSALeads() {
                 )}
               </div>
               <footer className="flex flex-wrap gap-2 border-t border-surface-100 p-4">
+                {!['converted', 'lost'].includes(openLead.status) && (
+                  <button onClick={() => navigate(`${isAdmin ? '/app/admin/orders' : '/app/dsa/orders'}?lead=${openLead.id}&new=1`)} className="btn-primary flex h-10 items-center gap-1.5 px-3 text-sm"><Target className="h-4 w-4" /> Convert to order</button>
+                )}
                 {openLead.follow_up_date && !openLead.follow_up_stopped && !['converted', 'lost'].includes(openLead.status) && (
                   <button onClick={() => stopReminders(openLead)} className="btn-outline flex h-10 items-center gap-1.5 px-3 text-sm"><BellOff className="h-4 w-4" /> Stop reminders</button>
                 )}

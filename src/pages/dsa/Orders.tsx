@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { SdCardOption, sdCardsOf, mainProductsOf, SD_DEFAULT, type SdCardValue } from '@/components/shared/SdCardOption'
 import { BranchPicker, type Branch, type BranchStock } from '@/components/shared/BranchPicker'
@@ -47,7 +48,9 @@ function InstallerBadge({ assigned }: { assigned: boolean }) {
 
 export function DSAOrders() {
   const { user } = useAuthStore()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [orders, setOrders] = useState<Order[]>([])
+  const [leads, setLeads] = useState<any[]>([])
   const [products, setProducts] = useState<Product[]>([])
   const [dsas, setDsas] = useState<any[]>([])
   const [branches, setBranches] = useState<Branch[]>([])
@@ -62,6 +65,7 @@ export function DSAOrders() {
   const [submitting, setSubmitting] = useState(false)
 
   const [form, setForm] = useState({
+    lead_id: '',
     is_dsa_registered: true,
     dsa_id: user?.id || '',
     unregistered_dsa_name: '',
@@ -84,14 +88,15 @@ export function DSAOrders() {
       const { data: { session } } = await supabase.auth.getSession()
       const authId = session?.user?.id
 
-      const [ordersRes, productsRes, dsasRes, branchesRes, stockRes] = await Promise.all([
+      const [ordersRes, productsRes, dsasRes, branchesRes, stockRes, leadsRes] = await Promise.all([
         supabase.from('orders').select('*')
           .or(`dsa_id.eq.${user?.id},created_by_auth_id.eq.${authId}`)
           .order('created_at', { ascending: false }),
         supabase.from('products').select('*').eq('is_active', true),
         supabase.from('users').select('id, full_name, email').eq('role', 'dsa'),
         supabase.from('inventory_locations').select('id, name, address').eq('is_active', true).order('name'),
-        supabase.from('product_inventory').select('product_id, location_id, quantity')
+        supabase.from('product_inventory').select('product_id, location_id, quantity'),
+        supabase.from('leads').select('id,customer_name,phone,email,location,status,dsa_id,source').eq('dsa_id', user?.id).not('status', 'in', '(converted,lost)').order('created_at', { ascending: false }).limit(500)
       ])
       
       if (ordersRes.data) setOrders(ordersRes.data)
@@ -99,6 +104,7 @@ export function DSAOrders() {
       if (dsasRes.data) setDsas(dsasRes.data)
       if (branchesRes.data) setBranches(branchesRes.data)
       if (stockRes.data) setBranchStock(stockRes.data)
+      if (leadsRes.data) setLeads(leadsRes.data)
       const installIds = (ordersRes.data ?? []).filter((o: any) => o.installation_needed).map((o: any) => o.id)
       if (installIds.length) {
         const { data: jobs } = await supabase.from('installer_jobs').select('order_id').in('order_id', installIds)
@@ -124,6 +130,22 @@ export function DSAOrders() {
     }
   }, [user?.id])
 
+  useEffect(() => {
+    const leadId = searchParams.get('lead')
+    if (!leadId || !leads.length) return
+    const lead = leads.find(l => l.id === leadId)
+    if (!lead) return
+    setForm(f => ({ ...f, lead_id: lead.id, dsa_id: lead.dsa_id || user?.id || '', customer_name: lead.customer_name, customer_phone: lead.phone, customer_email: lead.email || '', customer_address: lead.location || '' }))
+    setIsModalOpen(true)
+  }, [leads, searchParams, user?.id])
+
+  const chooseLead = (leadId: string) => {
+    const lead = leads.find(l => l.id === leadId)
+    setForm(f => lead
+      ? ({ ...f, lead_id: lead.id, dsa_id: lead.dsa_id || user?.id || '', customer_name: lead.customer_name, customer_phone: lead.phone, customer_email: lead.email || '', customer_address: lead.location || '' })
+      : ({ ...f, lead_id: '', customer_name: '', customer_phone: '', customer_email: '', customer_address: '' }))
+  }
+
   const handleCreateOrder = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!user?.id || !form.product_id) return
@@ -134,7 +156,7 @@ export function DSAOrders() {
       if (!product) throw new Error('Product not found')
 
       const orderNumber = `ORD-${Date.now().toString(36).toUpperCase()}-${crypto.randomUUID().slice(0, 4).toUpperCase()}`
-      const productTotal = form.amount > 0 ? form.amount : Number(product.retail_price) * form.quantity
+      const productTotal = Number(product.retail_price) * form.quantity
       const sdCard = sdCardsOf(products).find(c => c.id === sd.productId)
       const sdQty = sd.enabled && sdCard ? sd.quantity : 0
       const sdPrice = sd.enabled && sd.charge && sdCard ? Number(sdCard.retail_price) : 0
@@ -146,6 +168,7 @@ export function DSAOrders() {
       const { data, error } = await supabase
         .from('orders')
         .insert([{
+          lead_id: form.lead_id || null,
           order_number: orderNumber,
           dsa_id: form.is_dsa_registered ? (form.dsa_id || user.id) : null,
           unregistered_dsa_name: !form.is_dsa_registered ? form.unregistered_dsa_name : null,
@@ -198,8 +221,9 @@ export function DSAOrders() {
 
         setOrders(current => current.some(order => order.id === data.id) ? current : [data, ...current])
         setIsModalOpen(false)
+        setSearchParams({}, { replace: true })
         setSd(SD_DEFAULT)
-        setForm({ is_dsa_registered: true, unregistered_dsa_name: '', dsa_id: user?.id || '', customer_name: '', customer_email: '', customer_phone: '', customer_address: '', product_id: '', fulfillment_location_id: '', quantity: 1, amount: 0, installation_needed: false, installation_price: 0, expected_delivery_date: '', notes: '' })
+        setForm({ lead_id: '', is_dsa_registered: true, unregistered_dsa_name: '', dsa_id: user?.id || '', customer_name: '', customer_email: '', customer_phone: '', customer_address: '', product_id: '', fulfillment_location_id: '', quantity: 1, amount: 0, installation_needed: false, installation_price: 0, expected_delivery_date: '', notes: '' })
       }
     } catch (err: any) {
       console.error('Error creating order:', err)
@@ -418,6 +442,14 @@ If this keeps happening, send this message to admin.`)
 
               <form onSubmit={handleCreateOrder} className="flex flex-col flex-1 min-h-0">
               <div className="p-6 space-y-4 overflow-y-auto flex-1">
+                <div className="rounded-xl bg-brand-50 p-3">
+                  <label className="label">Customer lead</label>
+                  <select className="input bg-white" value={form.lead_id} onChange={e => chooseLead(e.target.value)}>
+                    <option value="">Choose a lead, or enter a walk-in customer</option>
+                    {leads.map(lead => <option key={lead.id} value={lead.id}>{lead.customer_name} / {lead.phone}{lead.source === 'whatsapp' ? ' / WhatsApp' : ''}</option>)}
+                  </select>
+                  <p className="mt-1.5 text-xs text-brand-700">Selecting a lead fills the customer details and converts it when this order is saved.</p>
+                </div>
                 <div>
                   <div className="flex items-center justify-between mb-2">
                     <label className="label mb-0">DSA In Charge *</label>
@@ -455,12 +487,12 @@ If this keeps happening, send this message to admin.`)
 
                 <div>
                   <label className="label">Customer Name *</label>
-                  <input required type="text" className="input" placeholder="e.g. John Smith" value={form.customer_name} onChange={e => setForm({...form, customer_name: e.target.value})} />
+                  <input required readOnly={Boolean(form.lead_id)} type="text" className="input read-only:bg-surface-50" placeholder="e.g. John Smith" value={form.customer_name} onChange={e => setForm({...form, customer_name: e.target.value})} />
                 </div>
                 
                 <div>
                   <label className="label">Customer Phone *</label>
-                  <input required type="tel" className="input" placeholder="080..." value={form.customer_phone} onChange={e => setForm({...form, customer_phone: e.target.value.replace(/[^\d+]/g, '')})} />
+                  <input required readOnly={Boolean(form.lead_id)} type="tel" className="input read-only:bg-surface-50" placeholder="080..." value={form.customer_phone} onChange={e => setForm({...form, customer_phone: e.target.value.replace(/[^\d+]/g, '')})} />
                 </div>
 
                 <div>
@@ -511,7 +543,7 @@ If this keeps happening, send this message to admin.`)
                   </div>
                   <div>
                     <label className="label">Product Amount (₦)</label>
-                    <input type="number" min={0} className="input" value={form.amount} onChange={e => setForm({...form, amount: Number(e.target.value)})} />
+                    <div className="input bg-surface-50 font-bold text-surface-900">{formatCurrency(Number(products.find(p => p.id === form.product_id)?.retail_price || 0) * form.quantity)}</div>
                   </div>
                 </div>
 

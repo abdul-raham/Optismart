@@ -110,6 +110,7 @@ export type OrderStatus =
 
 export interface Order {
   id: string
+  lead_id?: string | null
   order_number: string
   dsa_id: string | null
   unregistered_dsa_name?: string | null
