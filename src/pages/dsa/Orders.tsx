@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { SdCardOption, sdCardsOf, mainProductsOf, SD_DEFAULT, type SdCardValue } from '@/components/shared/SdCardOption'
+import { LeadPicker } from '@/components/shared/LeadPicker'
 import { BranchPicker, type Branch, type BranchStock } from '@/components/shared/BranchPicker'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
@@ -96,7 +97,7 @@ export function DSAOrders() {
         supabase.from('users').select('id, full_name, email').eq('role', 'dsa'),
         supabase.from('inventory_locations').select('id, name, address').eq('is_active', true).order('name'),
         supabase.from('product_inventory').select('product_id, location_id, quantity'),
-        supabase.from('leads').select('id,customer_name,phone,email,location,status,dsa_id,source').eq('dsa_id', user?.id).not('status', 'in', '(converted,lost)').order('created_at', { ascending: false }).limit(500)
+        supabase.from('leads').select('id,customer_name,phone,email,location,status,dsa_id,source,created_at').eq('dsa_id', user?.id).not('status', 'in', '(converted,lost)').order('created_at', { ascending: false }).limit(500)
       ])
       
       if (ordersRes.data) setOrders(ordersRes.data)
@@ -421,34 +422,33 @@ If this keeps happening, send this message to admin.`)
       {/* CREATE ORDER MODAL */}
       <AnimatePresence>
         {isModalOpen && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+          <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4">
             <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="fixed inset-0 bg-surface-900/40 backdrop-blur-sm"
               onClick={() => !submitting && setIsModalOpen(false)}
             />
             <motion.div 
-              initial={{ opacity: 0, scale: 0.95, y: 20 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, y: 20 }}
-              className="bg-white rounded-2xl shadow-card-xl w-full max-w-lg relative z-10 overflow-hidden max-h-[90vh] flex flex-col"
+              initial={{ opacity: 0, y: 40 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 40 }}
+              className="relative z-10 flex h-[100dvh] w-full flex-col overflow-hidden bg-white shadow-card-xl sm:h-auto sm:max-h-[92vh] sm:max-w-xl sm:rounded-3xl"
             >
-              <div className="px-6 py-4 border-b border-surface-100 flex items-center justify-between bg-surface-50/50">
-                <h2 className="text-lg font-bold text-surface-900">Create New Order</h2>
+              <div className="flex items-center justify-between border-b border-surface-100 px-5 pb-3 pt-[max(1rem,env(safe-area-inset-top))] sm:px-6 sm:pt-4">
+                <div>
+                  <h2 className="text-lg font-bold text-surface-900">New order</h2>
+                  <p className="text-xs text-surface-500">Customer, product, then delivery</p>
+                </div>
                 <button onClick={() => !submitting && setIsModalOpen(false)} className="text-surface-400 hover:text-surface-900 transition-colors p-1 rounded-md hover:bg-surface-100">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               <form onSubmit={handleCreateOrder} className="flex flex-col flex-1 min-h-0">
-              <div className="p-6 space-y-4 overflow-y-auto flex-1">
-                <div className="rounded-xl bg-brand-50 p-3">
-                  <label className="label">Customer lead</label>
-                  <select className="input bg-white" value={form.lead_id} onChange={e => chooseLead(e.target.value)}>
-                    <option value="">Choose a lead, or enter a walk-in customer</option>
-                    {leads.map(lead => <option key={lead.id} value={lead.id}>{lead.customer_name} / {lead.phone}{lead.source === 'whatsapp' ? ' / WhatsApp' : ''}</option>)}
-                  </select>
-                  <p className="mt-1.5 text-xs text-brand-700">Selecting a lead fills the customer details and converts it when this order is saved.</p>
+              <div className="flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-5 sm:px-6">
+                <SectionTitle n={1}>Customer</SectionTitle>
+                <div>
+                  <LeadPicker leads={leads} value={form.lead_id} onChange={chooseLead} />
                 </div>
                 <div>
                   <div className="flex items-center justify-between mb-2">
@@ -510,7 +510,8 @@ If this keeps happening, send this message to admin.`)
                   </div>
                 </div>
 
-                <div className="border-t border-surface-100 pt-4">
+                <SectionTitle n={2}>Product</SectionTitle>
+                <div>
                   <label className="label">Select Model / Product *</label>
                   <div className="relative">
                     <Package className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-surface-400" />
@@ -547,7 +548,8 @@ If this keeps happening, send this message to admin.`)
                   </div>
                 </div>
 
-                <div className="border-t border-surface-100 pt-4">
+                <SectionTitle n={3}>Delivery &amp; installation</SectionTitle>
+                <div>
                   <div className="flex items-center gap-3 mb-4">
                     <input 
                       type="checkbox" 
@@ -578,17 +580,33 @@ If this keeps happening, send this message to admin.`)
                 </div>
 
               </div>
-              <div className="px-6 py-4 flex items-center justify-end gap-3 border-t border-surface-100 bg-white shrink-0">
-                <button type="button" onClick={() => setIsModalOpen(false)} disabled={submitting} className="btn-outline">Cancel</button>
-                <button type="submit" disabled={submitting} className="btn-primary w-36 flex items-center justify-center">
-                  {submitting ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Confirm Order'}
+              <div className="shrink-0 border-t border-surface-100 bg-white px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 sm:px-6">
+                <div className="mb-3 flex items-baseline justify-between text-sm">
+                  <span className="text-surface-500">Order total{form.installation_needed ? ' (incl. installation)' : ''}</span>
+                  <span className="text-lg font-extrabold text-surface-900">{formatCurrency(Number(products.find(p => p.id === form.product_id)?.retail_price || 0) * form.quantity + (form.installation_needed ? Number(form.installation_price || 0) : 0))}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                <button type="button" onClick={() => setIsModalOpen(false)} disabled={submitting} className="btn-outline flex-1 sm:flex-none">Cancel</button>
+                <button type="submit" disabled={submitting} className="btn-primary flex flex-[2] items-center justify-center sm:w-40 sm:flex-none">
+                  {submitting ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : 'Confirm order'}
                 </button>
+                </div>
               </div>
               </form>
             </motion.div>
           </div>
         )}
       </AnimatePresence>
+    </div>
+  )
+}
+
+function SectionTitle({ n, children }: { n: number; children: React.ReactNode }) {
+  return (
+    <div className="flex items-center gap-2 pt-1">
+      <span className="grid h-6 w-6 place-items-center rounded-full bg-brand-600 text-xs font-bold text-white">{n}</span>
+      <h3 className="text-sm font-bold uppercase tracking-wide text-surface-700">{children}</h3>
+      <span className="h-px flex-1 bg-surface-100" />
     </div>
   )
 }
