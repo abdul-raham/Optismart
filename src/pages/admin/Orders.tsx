@@ -133,7 +133,7 @@ export function AdminOrders() {
     rescheduled: ['delivered', 'cancelled'],
     delivered: ['cancelled'],
     completed: ['cancelled'],
-    cancelled: []
+    cancelled: ['pending', 'delivered']
   }
 
   const PAGE_SIZE = 50
@@ -362,10 +362,26 @@ export function AdminOrders() {
       fetchData()
       return
     }
+    let recoveryReason = ''
+    if (selectedOrder?.status === 'cancelled' && newStatus === 'pending') {
+      const answer = window.prompt(`Restore order ${selectedOrder.order_number} to pending?\n\nReason for restoring it:`)
+      if (answer === null) return
+      recoveryReason = answer.trim()
+      if (!recoveryReason) { alert('Give a reason for restoring this cancelled order.'); return }
+    }
     setUpdating(orderId)
     try {
       let error: any = null
-      if (newStatus === 'delivered') {
+      if (selectedOrder?.status === 'cancelled') {
+        const rpcRes = await supabase.rpc('restore_cancelled_order', {
+          p_order_id: orderId,
+          p_new_status: newStatus,
+          p_location_id: fulfillmentLocationId || null,
+          p_untracked: newStatus === 'delivered' && !fulfillmentLocationId,
+          p_reason: newStatus === 'delivered' ? deliveryReason.trim() : recoveryReason,
+        })
+        error = rpcRes.error
+      } else if (newStatus === 'delivered') {
         // Stock leaves the chosen branch in the same database transaction (or the delivery is recorded as
         // untracked with a reason when no branch has the stock). The database refuses any other way.
         const rpcRes = await supabase.rpc('fulfill_order', fulfillmentLocationId
@@ -748,8 +764,8 @@ export function AdminOrders() {
                                                 : 'text-brand-700 hover:bg-brand-50'
                                           }`}
                                         >
-                                          {nextStatus === 'cancelled' ? <X className="w-3.5 h-3.5 text-danger-500" /> : <Check className="w-3.5 h-3.5 text-success-500" />}
-                                          Mark {nextStatus}
+                                          {order.status === 'cancelled' ? <ArrowRightLeft className="w-3.5 h-3.5 text-brand-500" /> : nextStatus === 'cancelled' ? <X className="w-3.5 h-3.5 text-danger-500" /> : <Check className="w-3.5 h-3.5 text-success-500" />}
+                                          {order.status === 'cancelled' ? (nextStatus === 'pending' ? 'Restore to pending' : 'Restore and deliver') : `Mark ${nextStatus}`}
                                         </button>
                                       ))}
                                     </div>
@@ -864,8 +880,8 @@ export function AdminOrders() {
                                   : 'bg-white border-surface-200 text-brand-600 hover:border-brand-200 hover:bg-brand-50'
                             }`}
                           >
-                            {nextStatus === 'cancelled' ? <X className="w-3 h-3" /> : <Check className="w-3 h-3" />}
-                            Mark {nextStatus}
+                            {order.status === 'cancelled' ? <ArrowRightLeft className="w-3 h-3" /> : nextStatus === 'cancelled' ? <X className="w-3 h-3" /> : <Check className="w-3 h-3" />}
+                            {order.status === 'cancelled' ? (nextStatus === 'pending' ? 'Restore to pending' : 'Restore and deliver') : `Mark ${nextStatus}`}
                           </button>
                         ))}
                       </>
@@ -1283,6 +1299,16 @@ export function AdminOrders() {
                   <button type="button" onClick={() => setDeliveryOrder(null)} className="rounded-lg p-1 text-surface-400 hover:bg-surface-100 hover:text-surface-700"><X className="h-5 w-5" /></button>
                 </div>
 
+                {deliveryOrder.status === 'cancelled' && (
+                  <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                    <p className="text-xs font-bold text-amber-900">Restore cancelled order as delivered</p>
+                    <p className="mt-1 text-[11px] leading-snug text-amber-800">This records why the cancellation is being reversed. Stock will leave the selected branch when you confirm.</p>
+                    <label className="mt-2 block text-[11px] font-bold text-amber-900">Recovery reason
+                      <textarea className="input mt-1 min-h-[64px] text-xs" placeholder="Why is this order being restored?" value={deliveryReason} onChange={e => setDeliveryReason(e.target.value)} />
+                    </label>
+                  </div>
+                )}
+
                 {(() => {
                   const hasStock = inventoryLocations.some(loc =>
                     Number(locationInventory.find(i => i.location_id === loc.id && i.product_id === deliveryOrder.product_id)?.quantity || 0)
@@ -1310,8 +1336,8 @@ export function AdminOrders() {
                         No branch has enough stock. You can record the delivery without deducting stock — say why (e.g. "sold from
                         stock not yet entered"), then add the stock so counts stay right.
                       </p>
-                      <textarea className="input mt-2 min-h-[64px] text-xs" placeholder="Reason (required)" value={deliveryReason}
-                        onChange={e => setDeliveryReason(e.target.value)} />
+                      {deliveryOrder.status !== 'cancelled' && <textarea className="input mt-2 min-h-[64px] text-xs" placeholder="Reason (required)" value={deliveryReason}
+                        onChange={e => setDeliveryReason(e.target.value)} />}
                     </div>
                   )
                 })()}
@@ -1321,7 +1347,7 @@ export function AdminOrders() {
                   <button
                     type="button"
                     className="btn-primary"
-                    disabled={(
+                    disabled={(deliveryOrder.status === 'cancelled' && !deliveryReason.trim()) || (
                       inventoryLocations.some(loc =>
                         Number(locationInventory.find(i => i.location_id === loc.id && i.product_id === deliveryOrder.product_id)?.quantity || 0) >= (deliveryOrder.quantity || 1)
                       ) ? !deliveryLocationId : !deliveryReason.trim()
