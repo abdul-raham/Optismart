@@ -1142,7 +1142,7 @@ export function AdminOrders() {
 
                 <div>
                   <label className="label">Customer Name *</label>
-                  <input required readOnly={Boolean(form.lead_id)} type="text" className="input read-only:bg-surface-50" placeholder="e.g. John Smith" value={form.customer_name} onChange={e => setForm({...form, customer_name: e.target.value})} />
+                  <input required type="text" className="input" placeholder="e.g. John Smith" value={form.customer_name} onChange={e => setForm({...form, customer_name: e.target.value})} />
                 </div>
 
                 <div>
