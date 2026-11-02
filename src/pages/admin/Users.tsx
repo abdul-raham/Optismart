@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '@/lib/supabase'
-import { Users, Search, Mail, Ban, CheckCircle2, User, Phone, ExternalLink, AlertTriangle } from 'lucide-react'
+import { Users, Search, Mail, Ban, CheckCircle2, User, Phone, ExternalLink, AlertTriangle, UserPlus, X, Copy } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { useAuthStore } from '@/stores/authStore'
 import { TableSkeleton } from '@/components/shared/Skeletons'
@@ -38,6 +38,38 @@ export function AdminUsers() {
     fetchUsers()
     checkDSAPerformanceWindows().catch(console.error)
   }, [])
+
+  const me = useAuthStore(state => state.user)
+  const canManage = me?.role === 'super_admin' || (me?.role === 'admin' && Boolean(me?.can_manage_users))
+  const isSuper = me?.role === 'super_admin'
+  const ASSIGNABLE = isSuper ? ['super_admin', 'admin', 'dsa', 'installer', 'reseller', 'outlet'] : ['dsa', 'installer', 'reseller', 'outlet']
+  const [showAdd, setShowAdd] = useState(false)
+  const [addForm, setAddForm] = useState({ full_name: '', email: '', phone: '', role: 'dsa' })
+  const [adding, setAdding] = useState(false)
+  const [addError, setAddError] = useState('')
+  const [created, setCreated] = useState<{ email: string; password: string } | null>(null)
+
+  const createUser = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setAdding(true); setAddError('')
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/admin-users', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token || ''}` }, body: JSON.stringify(addForm) })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json.error || 'The account could not be created')
+      setCreated({ email: json.email, password: json.password })
+      setAddForm({ full_name: '', email: '', phone: '', role: 'dsa' })
+      fetchUsers()
+    } catch (err) {
+      setAddError(err instanceof Error ? err.message : 'The account could not be created')
+    } finally { setAdding(false) }
+  }
+
+  const changeRole = async (userId: string, role: string) => {
+    const { error } = await supabase.from('users').update({ role, updated_at: new Date().toISOString() }).eq('id', userId)
+    if (error) { alert(error.message.includes('super admin') || error.message.includes('administrator') || error.message.includes('own role') ? error.message : 'Could not change the role'); return }
+    setUsers(prev => prev.map(u => u.id === userId ? { ...u, role } : u))
+  }
 
   const fetchUsers = async () => {
     setLoading(true)
@@ -149,6 +181,11 @@ export function AdminUsers() {
           <h1 className="text-2xl font-bold text-surface-900 tracking-tight">User Management</h1>
           <p className="text-sm text-surface-500 mt-1">Manage accounts, performance probation status, and target settings.</p>
         </div>
+        {canManage && (
+          <button onClick={() => { setShowAdd(true); setCreated(null); setAddError('') }} className="btn-primary h-10 px-4 text-sm font-semibold flex items-center gap-2 self-start sm:self-auto">
+            <UserPlus className="w-4 h-4" /> Add user
+          </button>
+        )}
       </div>
 
       <PushCoverage />
@@ -258,9 +295,16 @@ export function AdminUsers() {
                     {/* Role + Status row */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${getRoleColor(u.role)}`}>
-                          {u.role.replace('_', ' ')}
-                        </span>
+                        {canManage && u.id !== me?.id && (isSuper || !['admin', 'super_admin'].includes(u.role)) ? (
+                          <select value={u.role} onClick={e => e.stopPropagation()} onChange={e => changeRole(u.id, e.target.value)} aria-label={`Role for ${u.full_name}`}
+                            className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border cursor-pointer ${getRoleColor(u.role)}`}>
+                            {Array.from(new Set([u.role, ...ASSIGNABLE])).map(r => <option key={r} value={r}>{r.replace('_', ' ')}</option>)}
+                          </select>
+                        ) : (
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${getRoleColor(u.role)}`}>
+                            {u.role.replace('_', ' ')}
+                          </span>
+                        )}
                         {isProbationWaived && (
                           <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-cyan-50 text-cyan-700 border border-cyan-200">
                             Waived
@@ -292,6 +336,44 @@ export function AdminUsers() {
           </AnimatePresence>
         </div>
       )}
+
+      <AnimatePresence>
+        {showAdd && (
+          <div className="fixed inset-0 z-[100] flex items-end justify-center sm:items-center sm:p-4">
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 bg-surface-900/50 backdrop-blur-sm" onClick={() => !adding && setShowAdd(false)} />
+            <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 30 }} className="relative w-full max-w-md rounded-t-3xl bg-white p-6 shadow-2xl sm:rounded-3xl">
+              <div className="mb-4 flex items-center justify-between">
+                <h2 className="text-lg font-bold text-surface-900">{created ? 'Account created' : 'Add a user'}</h2>
+                <button onClick={() => setShowAdd(false)} aria-label="Close" className="rounded-lg p-1.5 text-surface-500 hover:bg-surface-100"><X className="h-5 w-5" /></button>
+              </div>
+              {created ? (
+                <div className="space-y-4">
+                  <p className="text-sm text-surface-600">Share these details privately. They can change the password after signing in (Settings → password).</p>
+                  <div className="space-y-2 rounded-2xl bg-surface-50 p-4 text-sm">
+                    <p><span className="text-surface-500">Email:</span> <strong className="select-all">{created.email}</strong></p>
+                    <p><span className="text-surface-500">Temporary password:</span> <strong className="select-all font-mono">{created.password}</strong></p>
+                  </div>
+                  <button onClick={() => { navigator.clipboard?.writeText(`Email: ${created.email}\nPassword: ${created.password}`).catch(() => {}) }} className="btn-outline flex w-full items-center justify-center gap-2"><Copy className="h-4 w-4" /> Copy details</button>
+                  <p className="text-xs text-surface-400">This password is shown only once. For OptiSmart OS access, also add them in OS → Team.</p>
+                </div>
+              ) : (
+                <form onSubmit={createUser} className="space-y-3">
+                  <div><label className="label">Full name *</label><input required className="input" value={addForm.full_name} onChange={e => setAddForm({ ...addForm, full_name: e.target.value })} /></div>
+                  <div><label className="label">Email *</label><input required type="email" className="input" value={addForm.email} onChange={e => setAddForm({ ...addForm, email: e.target.value })} /></div>
+                  <div><label className="label">Phone</label><input type="tel" className="input" placeholder="080..." value={addForm.phone} onChange={e => setAddForm({ ...addForm, phone: e.target.value })} /></div>
+                  <div><label className="label">Role *</label>
+                    <select className="input" value={addForm.role} onChange={e => setAddForm({ ...addForm, role: e.target.value })}>
+                      {ASSIGNABLE.map(r => <option key={r} value={r}>{r.replace('_', ' ')}</option>)}
+                    </select>
+                  </div>
+                  {addError && <p className="rounded-lg bg-rose-50 p-2.5 text-xs font-semibold text-rose-700">{addError}</p>}
+                  <button type="submit" disabled={adding} className="btn-primary w-full">{adding ? 'Creating…' : 'Create account'}</button>
+                </form>
+              )}
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
