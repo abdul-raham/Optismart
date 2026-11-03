@@ -78,6 +78,7 @@ export function AdminOrders() {
   const [deliveryOrder, setDeliveryOrder] = useState<Order | null>(null)
   const [deliveryLocationId, setDeliveryLocationId] = useState('')
   const [deliveryReason, setDeliveryReason] = useState('')
+  const [deliveryBranchSearch, setDeliveryBranchSearch] = useState('')
   const [sd, setSd] = useState<SdCardValue>(SD_DEFAULT)
   const [installers, setInstallers] = useState<{ id: string; full_name: string }[]>([])
   const [agents, setAgents] = useState<{ id: string; full_name: string }[]>([])
@@ -98,7 +99,7 @@ export function AdminOrders() {
 
   const [editForm, setEditForm] = useState({
     customer_name: '', customer_email: '', customer_phone: '', customer_address: '',
-    product_id: '', quantity: 1, total_amount: 0, installation_needed: false,
+    product_id: '', fulfillment_location_id: '', quantity: 1, total_amount: 0, installation_needed: false,
     installation_price: 0, expected_delivery_date: '', notes: '',
     amount_remitted: '' as number | '', delivery_fee: 0, delivery_agent_id: '',
   })
@@ -347,6 +348,7 @@ export function AdminOrders() {
       setDeliveryOrder(selectedOrder ?? null)
       setDeliveryLocationId((selectedOrder as any)?.fulfillment_location_id || '')
       setDeliveryReason('')
+      setDeliveryBranchSearch('')
       setOpenDropdownId(null)
       return
     }
@@ -446,7 +448,8 @@ export function AdminOrders() {
     setEditForm({
       customer_name: order.customer_name, customer_email: order.customer_email || '',
       customer_phone: order.customer_phone, customer_address: order.customer_address,
-      product_id: order.product_id, quantity: order.quantity, total_amount: order.total_amount,
+      product_id: order.product_id, fulfillment_location_id: (order as any).fulfillment_location_id || '',
+      quantity: order.quantity, total_amount: order.total_amount,
       installation_needed: order.installation_needed, installation_price: order.installation_price,
       expected_delivery_date: order.expected_delivery_date || '', notes: order.notes || '',
       amount_remitted: order.amount_remitted ?? '', delivery_fee: Number(order.delivery_fee || 0), delivery_agent_id: order.delivery_agent_id || '',
@@ -463,10 +466,12 @@ export function AdminOrders() {
     try {
       const product = products.find(item => item.id === editForm.product_id)
       if (!product) throw new Error('Select a valid product.')
+      const isDelivered = ['delivered', 'completed'].includes(editingOrder.status)
       const { data, error } = await supabase.from('orders').update({
         customer_name: editForm.customer_name, customer_email: editForm.customer_email || null,
         customer_phone: editForm.customer_phone, customer_address: editForm.customer_address,
         product_id: editForm.product_id, quantity: editForm.quantity, unit_price: product.retail_price, unit_cost: product.cost_price || 0,
+        ...(isDelivered ? {} : { fulfillment_location_id: editForm.fulfillment_location_id || null }),
         total_amount: editForm.total_amount, installation_needed: editForm.installation_needed,
         installation_price: editForm.installation_needed ? editForm.installation_price : 0,
         expected_delivery_date: editForm.expected_delivery_date || null, notes: editForm.notes,
@@ -575,6 +580,8 @@ export function AdminOrders() {
         order={viewOrder ? (orders.find(o => o.id === viewOrder.id) || viewOrder) : null}
         onClose={() => setViewOrder(null)}
         onEdit={o => { setViewOrder(null); openEditModal(o) }}
+        onRestoreToPending={o => { setViewOrder(null); handleUpdateStatus(o.id, 'pending') }}
+        onRestoreAndDeliver={o => { setViewOrder(null); handleUpdateStatus(o.id, 'delivered') }}
         products={products}
         branches={inventoryLocations}
         installers={installers}
@@ -1000,6 +1007,17 @@ export function AdminOrders() {
                     </div>
                   </div>
 
+                  {!['delivered', 'completed'].includes(editingOrder.status) && (
+                    <BranchPicker
+                      productId={editForm.product_id}
+                      quantity={editForm.quantity}
+                      branches={inventoryLocations}
+                      stock={locationInventory}
+                      value={editForm.fulfillment_location_id}
+                      onChange={id => setEditForm(f => ({ ...f, fulfillment_location_id: id }))}
+                    />
+                  )}
+
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                       <label className="label">Quantity *</label>
@@ -1281,85 +1299,160 @@ export function AdminOrders() {
 
       {createPortal(
         <AnimatePresence>
-          {deliveryOrder && (
-            <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
-              <motion.button
-                type="button"
-                aria-label="Close fulfillment dialog"
-                initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-                className="fixed inset-0 bg-surface-900/50 backdrop-blur-sm"
-                onClick={() => !updating && setDeliveryOrder(null)}
-              />
-              <motion.div initial={{ opacity: 0, y: 16, scale: 0.97 }} animate={{ opacity: 1, y: 0, scale: 1 }} exit={{ opacity: 0, y: 16, scale: 0.97 }} className="relative z-10 w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h2 className="text-lg font-bold text-surface-900">Choose fulfillment location</h2>
-                    <p className="mt-1 text-sm text-surface-500">Order {deliveryOrder.order_number} needs {deliveryOrder.quantity || 1} unit(s).</p>
-                  </div>
-                  <button type="button" onClick={() => setDeliveryOrder(null)} className="rounded-lg p-1 text-surface-400 hover:bg-surface-100 hover:text-surface-700"><X className="h-5 w-5" /></button>
-                </div>
+          {deliveryOrder && (() => {
+            const needQty = Math.max(1, deliveryOrder.quantity || 1)
+            const accId = (deliveryOrder as any).accessory_product_id as string | null | undefined
+            const accQty = Number((deliveryOrder as any).accessory_quantity || 0)
+            const needAcc = Boolean(accId && accQty > 0)
+            const locationRows = inventoryLocations.map(location => {
+              const available = Number(locationInventory.find(item => item.location_id === location.id && item.product_id === deliveryOrder.product_id)?.quantity || 0)
+              const accAvailable = needAcc ? Number(locationInventory.find(item => item.location_id === location.id && item.product_id === accId)?.quantity || 0) : 0
+              const enoughProduct = available >= needQty
+              const enoughAcc = !needAcc || accAvailable >= accQty
+              const enough = enoughProduct && enoughAcc
+              return { ...location, available, accAvailable, enoughProduct, enoughAcc, enough }
+            }).sort((a, b) => Number(b.enough) - Number(a.enough) || b.available - a.available || a.name.localeCompare(b.name))
+            const hasStock = locationRows.some(r => r.enough)
+            const q = deliveryBranchSearch.trim().toLowerCase()
+            const visibleRows = q ? locationRows.filter(r => r.name.toLowerCase().includes(q) || (r.address || '').toLowerCase().includes(q)) : locationRows
 
-                {deliveryOrder.status === 'cancelled' && (
-                  <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3">
-                    <p className="text-xs font-bold text-amber-900">Restore cancelled order as delivered</p>
-                    <p className="mt-1 text-[11px] leading-snug text-amber-800">This records why the cancellation is being reversed. Stock will leave the selected branch when you confirm.</p>
-                    <label className="mt-2 block text-[11px] font-bold text-amber-900">Recovery reason
-                      <textarea className="input mt-1 min-h-[64px] text-xs" placeholder="Why is this order being restored?" value={deliveryReason} onChange={e => setDeliveryReason(e.target.value)} />
-                    </label>
-                  </div>
-                )}
-
-                {(() => {
-                  const hasStock = inventoryLocations.some(loc =>
-                    Number(locationInventory.find(i => i.location_id === loc.id && i.product_id === deliveryOrder.product_id)?.quantity || 0)
-                    >= (deliveryOrder.quantity || 1)
-                  )
-                  return hasStock ? (
-                    <div className="mt-4 space-y-2">
-                      <p className="text-xs font-bold text-surface-700">Select Branch Inventory Location:</p>
-                      {inventoryLocations.map(location => {
-                        const available = Number(locationInventory.find(item => item.location_id === location.id && item.product_id === deliveryOrder.product_id)?.quantity || 0)
-                        const enough = available >= (deliveryOrder.quantity || 1)
-                        return (
-                          <label key={location.id} className={`flex items-center justify-between rounded-xl border p-3 ${enough ? 'cursor-pointer border-surface-200 hover:border-brand-300' : 'cursor-not-allowed border-surface-100 bg-surface-50 opacity-60'}`}>
-                            <span className="flex items-center gap-3"><input type="radio" name="fulfillment-location" disabled={!enough} checked={deliveryLocationId === location.id} onChange={() => setDeliveryLocationId(location.id)} /><span><span className="block text-sm font-bold text-surface-900">{location.name}</span><span className="block text-xs text-surface-500">{location.address || 'No address set'}</span></span></span>
-                            <span className={`text-xs font-bold ${enough ? 'text-success-700' : 'text-danger-600'}`}>{available} available</span>
-                          </label>
-                        )
-                      })}
-                      {inventoryLocations.length === 0 && <p className="rounded-xl bg-warning-50 p-3 text-sm text-warning-800">No inventory location is configured.</p>}
-                    </div>
-                  ) : (
-                    <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-xl">
-                      <p className="text-xs font-bold text-amber-900">No inventory recorded for this product</p>
-                      <p className="text-[11px] text-amber-800 mt-1 leading-snug">
-                        No branch has enough stock. You can record the delivery without deducting stock — say why (e.g. "sold from
-                        stock not yet entered"), then add the stock so counts stay right.
+            return (
+              <div className="fixed inset-0 z-[10000] flex items-end justify-center sm:items-center sm:p-4">
+                <motion.button
+                  type="button"
+                  aria-label="Close fulfillment dialog"
+                  initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+                  className="fixed inset-0 bg-surface-900/50 backdrop-blur-sm"
+                  onClick={() => !updating && setDeliveryOrder(null)}
+                />
+                <motion.div
+                  initial={{ opacity: 0, y: 24, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 24, scale: 0.98 }}
+                  className="relative z-10 flex max-h-[90dvh] w-full flex-col overflow-hidden rounded-t-3xl bg-white shadow-2xl sm:max-h-[85vh] sm:max-w-md sm:rounded-2xl"
+                >
+                  <div className="flex shrink-0 items-start justify-between gap-4 border-b border-surface-100 px-5 py-4 sm:px-6">
+                    <div>
+                      <h2 className="text-lg font-bold text-surface-900">Choose fulfillment location</h2>
+                      <p className="mt-0.5 text-xs text-surface-500">
+                        Order {deliveryOrder.order_number} · {needQty} unit(s){needAcc ? ` + ${accQty} SD card(s)` : ''}
                       </p>
-                      {deliveryOrder.status !== 'cancelled' && <textarea className="input mt-2 min-h-[64px] text-xs" placeholder="Reason (required)" value={deliveryReason}
-                        onChange={e => setDeliveryReason(e.target.value)} />}
                     </div>
-                  )
-                })()}
+                    <button type="button" onClick={() => setDeliveryOrder(null)} className="rounded-lg p-1.5 text-surface-400 hover:bg-surface-100 hover:text-surface-700">
+                      <X className="h-5 w-5" />
+                    </button>
+                  </div>
 
-                <div className="mt-6 flex justify-end gap-3 border-t border-surface-100 pt-4">
-                  <button type="button" className="btn-outline" onClick={() => setDeliveryOrder(null)} disabled={Boolean(updating)}>Cancel</button>
-                  <button
-                    type="button"
-                    className="btn-primary"
-                    disabled={(deliveryOrder.status === 'cancelled' && !deliveryReason.trim()) || (
-                      inventoryLocations.some(loc =>
-                        Number(locationInventory.find(i => i.location_id === loc.id && i.product_id === deliveryOrder.product_id)?.quantity || 0) >= (deliveryOrder.quantity || 1)
-                      ) ? !deliveryLocationId : !deliveryReason.trim()
-                    ) || Boolean(updating)}
-                    onClick={() => handleUpdateStatus(deliveryOrder.id, 'delivered', deliveryLocationId || '')}
-                  >
-                    {updating ? 'Completing...' : 'Confirm Delivery'}
-                  </button>
-                </div>
-              </motion.div>
-            </div>
-          )}
+                  <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4 sm:px-6">
+                    {deliveryOrder.status === 'cancelled' && (
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                        <p className="text-xs font-bold text-amber-900">Restore cancelled order as delivered</p>
+                        <p className="mt-1 text-[11px] leading-snug text-amber-800">This records why the cancellation is being reversed. Stock will leave the selected branch when you confirm.</p>
+                        <label className="mt-2 block text-[11px] font-bold text-amber-900">Recovery reason
+                          <textarea className="input mt-1 min-h-[60px] text-xs" placeholder="Why is this order being restored?" value={deliveryReason} onChange={e => setDeliveryReason(e.target.value)} />
+                        </label>
+                      </div>
+                    )}
+
+                    {hasStock ? (
+                      <div className="space-y-2.5">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-xs font-bold text-surface-700">Select Branch Inventory Location:</p>
+                          <span className="text-[11px] font-semibold text-surface-500">
+                            {locationRows.filter(r => r.enough).length} with stock
+                          </span>
+                        </div>
+                        {locationRows.length > 5 && (
+                          <div className="relative">
+                            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-surface-400" />
+                            <input
+                              type="text"
+                              placeholder="Search branch (e.g. Uyo, Lagos, Abuja)…"
+                              value={deliveryBranchSearch}
+                              onChange={e => setDeliveryBranchSearch(e.target.value)}
+                              className="input h-9 w-full pl-9 text-xs"
+                            />
+                          </div>
+                        )}
+                        <div className="space-y-2">
+                          {visibleRows.map(location => (
+                            <label
+                              key={location.id}
+                              className={`flex items-center justify-between gap-3 rounded-xl border p-3 transition-colors ${
+                                location.enough
+                                  ? deliveryLocationId === location.id
+                                    ? 'cursor-pointer border-brand-500 bg-brand-50/50'
+                                    : 'cursor-pointer border-surface-200 hover:border-brand-300'
+                                  : 'cursor-not-allowed border-surface-100 bg-surface-50 opacity-60'
+                              }`}
+                            >
+                              <span className="flex min-w-0 items-center gap-3">
+                                <input
+                                  type="radio"
+                                  name="fulfillment-location"
+                                  disabled={!location.enough}
+                                  checked={deliveryLocationId === location.id}
+                                  onChange={() => setDeliveryLocationId(location.id)}
+                                />
+                                <span className="min-w-0">
+                                  <span className="block truncate text-sm font-bold text-surface-900">{location.name}</span>
+                                  <span className="block truncate text-xs text-surface-500">{location.address || 'No address set'}</span>
+                                </span>
+                              </span>
+                              <span className="shrink-0 text-right">
+                                <span className={`block text-xs font-bold ${location.enoughProduct ? 'text-success-700' : 'text-danger-600'}`}>
+                                  {location.available} in stock
+                                </span>
+                                {needAcc && (
+                                  <span className={`block text-[11px] font-semibold ${location.enoughAcc ? 'text-surface-500' : 'text-danger-600'}`}>
+                                    {location.accAvailable} SD card{location.accAvailable === 1 ? '' : 's'}
+                                  </span>
+                                )}
+                              </span>
+                            </label>
+                          ))}
+                          {visibleRows.length === 0 && (
+                            <p className="rounded-xl border border-surface-100 bg-surface-50 p-3 text-center text-xs text-surface-500">
+                              No branch matches "{deliveryBranchSearch}".
+                            </p>
+                          )}
+                        </div>
+                        {inventoryLocations.length === 0 && <p className="rounded-xl bg-warning-50 p-3 text-sm text-warning-800">No inventory location is configured.</p>}
+                      </div>
+                    ) : (
+                      <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
+                        <p className="text-xs font-bold text-amber-900">No inventory recorded for this product</p>
+                        <p className="mt-1 text-[11px] leading-snug text-amber-800">
+                          No branch has enough stock. You can record the delivery without deducting stock — say why (e.g. "sold from
+                          stock not yet entered"), then add the stock so counts stay right.
+                        </p>
+                        {deliveryOrder.status !== 'cancelled' && (
+                          <textarea
+                            className="input mt-2 min-h-[60px] text-xs"
+                            placeholder="Reason (required)"
+                            value={deliveryReason}
+                            onChange={e => setDeliveryReason(e.target.value)}
+                          />
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex shrink-0 justify-end gap-3 border-t border-surface-100 bg-white px-5 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 sm:px-6">
+                    <button type="button" className="btn-outline" onClick={() => setDeliveryOrder(null)} disabled={Boolean(updating)}>Cancel</button>
+                    <button
+                      type="button"
+                      className="btn-primary"
+                      disabled={(deliveryOrder.status === 'cancelled' && !deliveryReason.trim()) || (hasStock ? !deliveryLocationId : !deliveryReason.trim()) || Boolean(updating)}
+                      onClick={() => handleUpdateStatus(deliveryOrder.id, 'delivered', deliveryLocationId || '')}
+                    >
+                      {updating ? 'Completing...' : 'Confirm Delivery'}
+                    </button>
+                  </div>
+                </motion.div>
+              </div>
+            )
+          })()}
         </AnimatePresence>,
         document.body
       )}

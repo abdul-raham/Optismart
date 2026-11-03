@@ -1,5 +1,5 @@
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Phone, Mail, MapPin, Package, HardDrive, Warehouse, Truck, Wrench, User, Calendar, Edit2, StickyNote, Banknote } from 'lucide-react'
+import { X, Phone, Mail, MapPin, Package, HardDrive, Warehouse, Truck, Wrench, User, Edit2, StickyNote, Banknote, ArrowRightLeft, Check } from 'lucide-react'
 import { formatCurrency, formatDate } from '@/lib/utils'
 import { OrderStatusBadge } from './Badges'
 import { defaultInstallerPay } from './InstallerPicker'
@@ -8,10 +8,12 @@ import type { Order } from '@/types'
 type Named = { id: string; name?: string; full_name?: string }
 
 /** Everything about one order on a side panel: product, branch, customer, money, installer and delivery. */
-export function OrderDetailsDrawer({ order, onClose, onEdit, products, branches, installers, agents, job }: {
+export function OrderDetailsDrawer({ order, onClose, onEdit, onRestoreToPending, onRestoreAndDeliver, products, branches, installers, agents, job }: {
   order: Order | null
   onClose: () => void
   onEdit?: (o: Order) => void
+  onRestoreToPending?: (o: Order) => void
+  onRestoreAndDeliver?: (o: Order) => void
   products: Named[]
   branches: Named[]
   installers: Named[]
@@ -109,10 +111,24 @@ export function OrderDetailsDrawer({ order, onClose, onEdit, products, branches,
             </div>
 
             {editable && onEdit && (
-              <footer className="border-t border-surface-100 p-4">
+              <footer className="border-t border-surface-100 p-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
                 <button onClick={() => onEdit(order)} className="btn-primary flex h-11 w-full items-center justify-center gap-2 text-sm">
                   <Edit2 className="h-4 w-4" /> Edit order, money &amp; installer
                 </button>
+              </footer>
+            )}
+            {order.status === 'cancelled' && (onRestoreToPending || onRestoreAndDeliver) && (
+              <footer className="flex flex-col gap-2 border-t border-surface-100 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:flex-row">
+                {onRestoreToPending && (
+                  <button onClick={() => onRestoreToPending(order)} className="btn-outline flex h-11 flex-1 items-center justify-center gap-2 text-sm">
+                    <ArrowRightLeft className="h-4 w-4 text-brand-600" /> Restore to pending
+                  </button>
+                )}
+                {onRestoreAndDeliver && (
+                  <button onClick={() => onRestoreAndDeliver(order)} className="btn-primary flex h-11 flex-1 items-center justify-center gap-2 text-sm">
+                    <Check className="h-4 w-4" /> Restore and deliver
+                  </button>
+                )}
               </footer>
             )}
           </motion.aside>
