@@ -121,3 +121,45 @@ export function LeadPicker({ leads, value, onChange, ownerName, title = 'your le
     </>
   )
 }
+
+// One or two wrong digits (a typo) still counts as the same number.
+const digitsOff = (a: string, b: string) => a.length === b.length ? [...a].filter((c, i) => c !== b[i]).length : Infinity
+const words = (v: string) => v.toLowerCase().split(/[^a-z]+/).filter(w => w.length >= 3)
+
+/** Typed the customer in by hand? If the name or number looks like one of the leads, offer to use that lead, so the
+ * order is linked to the WhatsApp chat it came from. */
+export function LeadMatchHint({ leads, value, name, phone, onPick }: { leads: PickerLead[]; value: string; name: string; phone: string; onPick: (leadId: string) => void }) {
+  const matches = useMemo(() => {
+    if (value) return []
+    const typed = phoneKey(phone), nameWords = words(name)
+    if (typed.length < 10 && !nameWords.length) return []
+    return leads
+      .map(l => {
+        const p = phoneKey(l.phone)
+        const off = typed.length >= 10 && p.length >= 10 ? digitsOff(typed.slice(-10), p.slice(-10)) : Infinity
+        const leadWords = words(l.customer_name)
+        const sameName = nameWords.some(w => leadWords.some(lw => lw === w || (w.length >= 4 && (lw.startsWith(w) || w.startsWith(lw)))))
+        const score = off === 0 ? 3 : off <= 2 ? 2 : sameName ? 1 : 0
+        return { l, score }
+      })
+      .filter(m => m.score > 0)
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 2)
+  }, [leads, value, name, phone])
+  if (!matches.length) return null
+  return (
+    <div className="space-y-2 rounded-2xl border border-amber-300 bg-amber-50 p-3">
+      <p className="text-xs font-semibold text-amber-900">Is this one of your WhatsApp leads? Linking it counts the order for that chat.</p>
+      {matches.map(({ l, score }) => (
+        <div key={l.id} className="flex items-center gap-3 rounded-xl bg-white p-2.5 shadow-sm">
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-brand-100 text-xs font-bold text-brand-700">{l.customer_name.slice(0, 2).toUpperCase()}</span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-bold text-surface-900">{l.customer_name}</span>
+            <span className="block truncate text-xs text-surface-600">{l.phone}{score === 3 ? ' · same number' : score === 2 ? ' · almost the same number' : ' · similar name'}{l.created_at ? ` · ${ago(l.created_at)}` : ''}</span>
+          </span>
+          <button type="button" onClick={() => onPick(l.id)} className="shrink-0 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-bold text-white">Use this lead</button>
+        </div>
+      ))}
+    </div>
+  )
+}

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { LeadPicker } from '@/components/shared/LeadPicker'
+import { LeadMatchHint, LeadPicker } from '@/components/shared/LeadPicker'
 import { useSearchParams } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -1183,6 +1183,7 @@ export function AdminOrders() {
                   <label className="label">Customer Phone *</label>
                   <input required readOnly={Boolean(form.lead_id)} type="tel" className="input read-only:bg-surface-50" placeholder="080..." value={form.customer_phone} onChange={e => setForm({...form, customer_phone: e.target.value.replace(/[^\d+]/g, '')})} />
                 </div>
+                <LeadMatchHint leads={leads} value={form.lead_id} name={form.customer_name} phone={form.customer_phone} onPick={chooseLead} />
 
                 <div>
                   <label className="label">Customer Email (Optional)</label>

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { SdCardOption, sdCardsOf, mainProductsOf, SD_DEFAULT, type SdCardValue } from '@/components/shared/SdCardOption'
-import { LeadPicker } from '@/components/shared/LeadPicker'
+import { LeadMatchHint, LeadPicker } from '@/components/shared/LeadPicker'
 import { BranchPicker, type Branch, type BranchStock } from '@/components/shared/BranchPicker'
 import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/stores/authStore'
@@ -494,6 +494,7 @@ If this keeps happening, send this message to admin.`)
                   <label className="label">Customer Phone *</label>
                   <input required readOnly={Boolean(form.lead_id)} type="tel" className="input read-only:bg-surface-50" placeholder="080..." value={form.customer_phone} onChange={e => setForm({...form, customer_phone: e.target.value.replace(/[^\d+]/g, '')})} />
                 </div>
+                <LeadMatchHint leads={leads} value={form.lead_id} name={form.customer_name} phone={form.customer_phone} onPick={chooseLead} />
 
                 <div>
                   <label className="label">Customer Email (Optional)</label>
