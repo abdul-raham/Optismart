@@ -536,8 +536,8 @@ If this keeps happening, send this message to admin.`)
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="label">Quantity *</label>
-                    <input required type="number" min={1} className="input" value={form.quantity} onChange={e => {
-                      const qty = parseInt(e.target.value) || 1
+                    <input required type="number" min={1} max={100} className="input" value={form.quantity} onChange={e => {
+                      const qty = Math.min(100, Math.max(1, parseInt(e.target.value) || 1))
                       const p = products.find(prod => prod.id === form.product_id)
                       setForm({...form, quantity: qty, amount: p ? p.retail_price * qty : form.amount})
                     }} />

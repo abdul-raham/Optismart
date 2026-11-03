@@ -12,7 +12,7 @@ const smtpHost = process.env.SMTP_HOST
 const smtpPort = process.env.SMTP_PORT ? Number(process.env.SMTP_PORT) : 465
 const smtpSecure = process.env.SMTP_SECURE !== 'false'
 const fromName = process.env.EMAIL_FROM_NAME || 'OptiSmart Portal'
-const appUrl = process.env.APP_URL || 'https://optismart-sigma.vercel.app'
+const appUrl = (process.env.APP_URL || 'https://sales.optismart.com.ng').replace(/\/+$/, '')
 const cronSecret = process.env.CRON_SECRET || process.env.DAILY_REPORT_SECRET
 
 // Target recipients
@@ -229,7 +229,8 @@ export async function fetchReportMetrics(supabase, period = 'daily', targetDate)
   const dsaMap = new Map()
 
   deliveredOrders.forEach(o => {
-    const qty = Number(o.quantity || 1)
+    const rawQty = Number(o.quantity || 1)
+    const qty = rawQty > 0 && rawQty <= 100 ? rawQty : Math.max(1, Math.min(100, Math.round(Number(o.total_amount || 0) / 75000) || 1))
     const rev = Number(o.total_amount || 0)
     const product = o.product_id ? productMap.get(o.product_id) : null
     const unitCost = Number(o.unit_cost || product?.cost_price || 0)
@@ -241,9 +242,10 @@ export async function fetchReportMetrics(supabase, period = 'daily', targetDate)
     cameraCost += cost
     orderDeliveryFees += fee
 
-    const dsaId = o.dsa_id || '_unregistered'
+
     const dsaUser = o.dsa_id ? userMap.get(o.dsa_id) : null
-    const dsaName = dsaUser?.full_name || o.unregistered_dsa_name || 'Direct / System'
+    const dsaName = (dsaUser?.full_name || o.unregistered_dsa_name || 'Direct / System').trim()
+    const dsaId = dsaName.toLowerCase()
 
     if (!dsaMap.has(dsaId)) {
       dsaMap.set(dsaId, { name: dsaName, cameras: 0, revenue: 0, orders: 0 })
@@ -325,7 +327,11 @@ export async function fetchReportMetrics(supabase, period = 'daily', targetDate)
   // 5. Pipeline Summary
   const newOrdersCount = newOrders.length
   const newOrdersValue = newOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0)
-  const newCamerasOrdered = newOrders.reduce((sum, o) => sum + Number(o.quantity || 1), 0)
+  const newCamerasOrdered = newOrders.reduce((sum, o) => {
+    const rawQty = Number(o.quantity || 1)
+    const qty = rawQty > 0 && rawQty <= 100 ? rawQty : Math.max(1, Math.min(100, Math.round(Number(o.total_amount || 0) / 75000) || 1))
+    return sum + qty
+  }, 0)
 
   return {
     period,

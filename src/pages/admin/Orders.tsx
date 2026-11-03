@@ -1021,8 +1021,8 @@ export function AdminOrders() {
                   <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <div>
                       <label className="label">Quantity *</label>
-                      <input required type="number" min={1} className="input" disabled={['delivered', 'completed'].includes(editingOrder.status)} value={editForm.quantity} onChange={e => {
-                        const qty = parseInt(e.target.value) || 1
+                      <input required type="number" min={1} max={100} className="input" disabled={['delivered', 'completed'].includes(editingOrder.status)} value={editForm.quantity} onChange={e => {
+                        const qty = Math.min(100, Math.max(1, parseInt(e.target.value) || 1))
                         const p = products.find(prod => prod.id === editForm.product_id)
                         setEditForm({...editForm, quantity: qty, total_amount: p ? p.retail_price * qty : editForm.total_amount})
                       }} />
@@ -1226,8 +1226,8 @@ export function AdminOrders() {
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <label className="label">Quantity *</label>
-                    <input required type="number" min={1} className="input" value={form.quantity} onChange={e => {
-                      const qty = parseInt(e.target.value) || 1
+                    <input required type="number" min={1} max={100} className="input" value={form.quantity} onChange={e => {
+                      const qty = Math.min(100, Math.max(1, parseInt(e.target.value) || 1))
                       const p = products.find(prod => prod.id === form.product_id)
                       setForm({...form, quantity: qty, amount: p ? p.retail_price * qty : form.amount})
                     }} />
