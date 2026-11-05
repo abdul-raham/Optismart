@@ -78,6 +78,9 @@ export function AdminOrders() {
   const [deliveryOrder, setDeliveryOrder] = useState<Order | null>(null)
   const [deliveryLocationId, setDeliveryLocationId] = useState('')
   const [deliveryReason, setDeliveryReason] = useState('')
+  // The day it was actually delivered (Lagos). Today unless the admin is recording a past delivery.
+  const lagosToday = () => new Date(Date.now() + 3600000).toISOString().slice(0, 10)
+  const [deliveredOn, setDeliveredOn] = useState(lagosToday())
   const [deliveryBranchSearch, setDeliveryBranchSearch] = useState('')
   const [sd, setSd] = useState<SdCardValue>(SD_DEFAULT)
   const [installers, setInstallers] = useState<{ id: string; full_name: string }[]>([])
@@ -348,6 +351,7 @@ export function AdminOrders() {
       setDeliveryOrder(selectedOrder ?? null)
       setDeliveryLocationId((selectedOrder as any)?.fulfillment_location_id || '')
       setDeliveryReason('')
+      setDeliveredOn(lagosToday())
       setDeliveryBranchSearch('')
       setOpenDropdownId(null)
       return
@@ -381,14 +385,15 @@ export function AdminOrders() {
           p_location_id: fulfillmentLocationId || null,
           p_untracked: newStatus === 'delivered' && !fulfillmentLocationId,
           p_reason: newStatus === 'delivered' ? deliveryReason.trim() : recoveryReason,
+          ...(newStatus === 'delivered' ? { p_delivered_on: deliveredOn } : {}),
         })
         error = rpcRes.error
       } else if (newStatus === 'delivered') {
         // Stock leaves the chosen branch in the same database transaction (or the delivery is recorded as
         // untracked with a reason when no branch has the stock). The database refuses any other way.
         const rpcRes = await supabase.rpc('fulfill_order', fulfillmentLocationId
-          ? { p_order_id: orderId, p_location_id: fulfillmentLocationId }
-          : { p_order_id: orderId, p_untracked: true, p_reason: deliveryReason || 'No branch had stock' })
+          ? { p_order_id: orderId, p_location_id: fulfillmentLocationId, p_delivered_on: deliveredOn }
+          : { p_order_id: orderId, p_untracked: true, p_reason: deliveryReason || 'No branch had stock', p_delivered_on: deliveredOn })
         error = rpcRes.error
       } else {
         const updateRes = await supabase
@@ -582,6 +587,18 @@ export function AdminOrders() {
         onEdit={o => { setViewOrder(null); openEditModal(o) }}
         onRestoreToPending={o => { setViewOrder(null); handleUpdateStatus(o.id, 'pending') }}
         onRestoreAndDeliver={o => { setViewOrder(null); handleUpdateStatus(o.id, 'delivered') }}
+        onChangeDeliveryDate={async o => {
+          // The day it really happened decides which month the sale (and commission) counts in.
+          const day = window.prompt(`Delivery date for order ${o.order_number} (YYYY-MM-DD):`, (o.delivered_at || '').slice(0, 10))
+          if (day === null) return
+          if (!/^d{4}-d{2}-d{2}$/.test(day.trim())) { alert('Use the format YYYY-MM-DD, e.g. 2026-10-31.'); return }
+          const reason = window.prompt('Reason for changing the delivery date:')
+          if (reason === null) return
+          if (!reason.trim()) { alert('Give a reason for changing the delivery date.'); return }
+          const { error } = await supabase.rpc('set_delivery_date', { p_order_id: o.id, p_delivered_on: day.trim(), p_reason: reason.trim() })
+          if (error) { alert(error.message); return }
+          fetchData()
+        }}
         products={products}
         branches={inventoryLocations}
         installers={installers}
@@ -1345,6 +1362,15 @@ export function AdminOrders() {
                   </div>
 
                   <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-5 py-4 sm:px-6">
+                    <label className="block rounded-xl border border-surface-200 bg-surface-50 p-3">
+                      <span className="text-xs font-bold text-surface-900">Delivered on</span>
+                      <input type="date" className="input mt-1 text-sm" value={deliveredOn} max={lagosToday()}
+                        min={new Date(Date.now() + 3600000 - 60 * 86400000).toISOString().slice(0, 10)}
+                        onChange={e => setDeliveredOn(e.target.value || lagosToday())} />
+                      <span className="mt-1 block text-[11px] leading-snug text-surface-500">
+                        The sale counts in the month of this date. Change it only when recording a delivery that happened earlier (up to 60 days back).
+                      </span>
+                    </label>
                     {deliveryOrder.status === 'cancelled' && (
                       <div className="rounded-xl border border-amber-200 bg-amber-50 p-3">
                         <p className="text-xs font-bold text-amber-900">Restore cancelled order as delivered</p>

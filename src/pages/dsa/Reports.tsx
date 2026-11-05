@@ -57,7 +57,7 @@ export function DSAReports() {
     fetchReportsData()
   }, [user?.id])
 
-  const { filteredOrders, filteredCommissions } = useMemo(() => {
+  const { filteredOrders, filteredCommissions, deliveredInPeriod } = useMemo(() => {
     const now = new Date()
     const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const startOfWeek = new Date(startOfDay)
@@ -82,18 +82,20 @@ export function DSAReports() {
         const matchesStatus = selectedStatus === 'all' || o.status === selectedStatus
         return matchesTime && matchesStatus
       }),
-      filteredCommissions: allCommissions.filter(c => filterByDate(c.triggered_at))
+      filteredCommissions: allCommissions.filter(c => filterByDate(c.triggered_at)),
+      // A sale counts in the period it was delivered, whenever it was logged.
+      deliveredInPeriod: allOrders.filter(o => ['delivered', 'completed'].includes(o.status) && filterByDate(o.delivered_at || o.created_at)).length,
     }
   }, [allOrders, allCommissions, timeFilter, selectedStatus])
 
   const stats = useMemo(() => {
     const totalOrders = filteredOrders.length
-    const deliveredOrders = filteredOrders.filter(o => o.status === 'delivered').length
+    const deliveredOrders = deliveredInPeriod
     const outstandingOrders = filteredOrders.filter(o => !['delivered', 'cancelled', 'returned'].includes(o.status)).length
     const percentDelivered = totalOrders > 0 ? Math.round((deliveredOrders / totalOrders) * 100) : 0
     const totalRemittance = filteredCommissions.filter(c => c.status === 'paid').reduce((sum, c) => sum + Number(c.amount), 0)
     return { totalOrders, deliveredOrders, outstandingOrders, percentDelivered, totalRemittance }
-  }, [filteredOrders, filteredCommissions])
+  }, [filteredOrders, filteredCommissions, deliveredInPeriod])
 
   const getExportData = () => {
     const orderRows = allOrders.map(o => ({

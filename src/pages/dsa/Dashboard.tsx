@@ -60,7 +60,12 @@ export function DSADashboard() {
           const d = new Date(o.created_at)
           return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
         })
-        const currentMonthDelivered = currentMonthOrders.filter(o => o.status === 'delivered')
+        // Delivered this month (by delivery date), whenever the order was logged.
+        const currentMonthDelivered = activeOrders.filter(o => {
+          if (!['delivered', 'completed'].includes(o.status)) return false
+          const d = new Date(o.delivered_at || o.created_at)
+          return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear()
+        })
         
         const { data: userProfile } = await supabase.from('users').select('expected_orders_target').eq('id', userId).single()
         const target = userProfile?.expected_orders_target || 30

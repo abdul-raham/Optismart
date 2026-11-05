@@ -8,12 +8,13 @@ import type { Order } from '@/types'
 type Named = { id: string; name?: string; full_name?: string }
 
 /** Everything about one order on a side panel: product, branch, customer, money, installer and delivery. */
-export function OrderDetailsDrawer({ order, onClose, onEdit, onRestoreToPending, onRestoreAndDeliver, products, branches, installers, agents, job }: {
+export function OrderDetailsDrawer({ order, onClose, onEdit, onRestoreToPending, onRestoreAndDeliver, onChangeDeliveryDate, products, branches, installers, agents, job }: {
   order: Order | null
   onClose: () => void
   onEdit?: (o: Order) => void
   onRestoreToPending?: (o: Order) => void
   onRestoreAndDeliver?: (o: Order) => void
+  onChangeDeliveryDate?: (o: Order) => void
   products: Named[]
   branches: Named[]
   installers: Named[]
@@ -92,7 +93,10 @@ export function OrderDetailsDrawer({ order, onClose, onEdit, onRestoreToPending,
               <Section icon={Truck} title="Delivery">
                 <Row label="Delivered by">{agent?.full_name || <span className="font-normal text-surface-400">Not set</span>}</Row>
                 <Row label="Expected">{order.expected_delivery_date ? formatDate(order.expected_delivery_date) : '—'}</Row>
-                {order.delivered_at && <Row label="Delivered">{formatDate(order.delivered_at)}</Row>}
+                {order.delivered_at && <Row label="Delivered">{formatDate(order.delivered_at)}{o.delivered_at_estimated ? <span className="ml-1 font-normal text-surface-400">(estimated)</span> : null}</Row>}
+                {onChangeDeliveryDate && ['delivered', 'completed'].includes(order.status) && (
+                  <button type="button" onClick={() => onChangeDeliveryDate(order)} className="mt-1 text-xs font-bold text-brand-600 hover:underline">Change delivery date</button>
+                )}
               </Section>
 
               {order.installation_needed && (

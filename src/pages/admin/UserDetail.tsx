@@ -312,14 +312,14 @@ export function UserDetail() {
   // Calculate probation badge status for DSA
   const now = new Date()
   const currentMonthStr = now.toISOString().slice(0, 7)
-  const deliveredThisMonth = userOrders.filter(o => o.status === 'delivered' && o.created_at?.startsWith(currentMonthStr)).length
+  const deliveredThisMonth = userOrders.filter(o => o.status === 'delivered' && (o.delivered_at || o.created_at)?.startsWith(currentMonthStr)).length
   const isOnProbation = deliveredThisMonth < 20
 
   // Calculate 7-day performance window status for DSA
   const windowStart = user?.performance_start_date ? new Date(user.performance_start_date) : new Date()
   const rawDiffDays = Math.floor((now.getTime() - windowStart.getTime()) / (1000 * 60 * 60 * 24))
   const dayNumber = Math.min(7, Math.max(1, rawDiffDays + 1))
-  const windowSales = userOrders.filter(o => o.status === 'delivered' && new Date(o.created_at) >= windowStart).length
+  const windowSales = userOrders.filter(o => o.status === 'delivered' && new Date(o.delivered_at || o.created_at) >= windowStart).length
   const advertisingExpenses = userExpenses.filter(expense =>
     ['advertising', 'ad_cost', 'marketing'].includes(String(expense.category).toLowerCase())
   )

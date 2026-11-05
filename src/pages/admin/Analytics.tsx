@@ -20,7 +20,7 @@ export function AdminAnalytics() {
   const fetchAnalytics = async () => {
     try {
       // Fetch orders to process sales trends
-      const { data: orders } = await supabase.from('orders').select('total_amount, created_at, status, dsa_id')
+      const { data: orders } = await supabase.from('orders').select('total_amount, created_at, delivered_at, status, dsa_id').range(0, 9999)
       const { data: users } = await supabase.from('users').select('id, full_name').eq('role', 'dsa')
 
       if (orders && users) {
@@ -32,7 +32,7 @@ export function AdminAnalytics() {
         })
 
         const trendData = last7Days.map(date => {
-          const dayOrders = orders.filter(o => o.status === 'delivered' && o.created_at.startsWith(date))
+          const dayOrders = orders.filter(o => o.status === 'delivered' && (o.delivered_at || o.created_at).startsWith(date))
           const revenue = dayOrders.reduce((sum, o) => sum + Number(o.total_amount), 0)
           return {
             name: new Date(date).toLocaleDateString('en-US', { weekday: 'short' }),

@@ -27,7 +27,7 @@ export async function checkDSAPerformanceWindows() {
         .select('id, total_amount')
         .eq('dsa_id', dsa.id)
         .eq('status', 'delivered')
-        .gte('created_at', startDate.toISOString())
+        .gte('delivered_at', startDate.toISOString())
 
       const salesCount = orders?.length || 0
 

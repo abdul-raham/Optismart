@@ -90,7 +90,7 @@ export function AdminUsers() {
 
         if (dsaIds.length > 0) {
           const [{ data: dsaOrders }, { data: adExpenses }] = await Promise.all([
-            supabase.from('orders').select('dsa_id, status, created_at').in('dsa_id', dsaIds).eq('status', 'delivered').gte('created_at', `${currentMonthStr}-01T00:00:00.000Z`),
+            supabase.from('orders').select('dsa_id, status, created_at, delivered_at').in('dsa_id', dsaIds).eq('status', 'delivered').gte('delivered_at', `${currentMonthStr}-01T00:00:00+01:00`),
             supabase.from('expenses').select('dsa_id, amount, category').in('dsa_id', dsaIds),
           ])
 

@@ -34,7 +34,7 @@ export function DSALeaderboard() {
       const { data: dsas } = await supabase.from('users').select('id, full_name, email').in('role', ['dsa', 'admin', 'super_admin']).eq('status', 'active')
       
       // 2. Fetch all delivered orders (filter by date later or query)
-      const { data: orders } = await supabase.from('orders').select('dsa_id, created_at, total_amount').eq('status', 'delivered')
+      const { data: orders } = await supabase.from('orders').select('dsa_id, created_at, delivered_at, total_amount').in('status', ['delivered', 'completed']).range(0, 9999)
 
       if (dsas && orders) {
         const now = new Date()
@@ -45,7 +45,8 @@ export function DSALeaderboard() {
         const startOfYear = new Date(now.getFullYear(), 0, 1)
 
         const filteredOrders = orders.filter(o => {
-          const d = new Date(o.created_at)
+          // Ranked by when sales were delivered, not when they were logged.
+          const d = new Date(o.delivered_at || o.created_at)
           switch (timeFilter) {
             case 'day': return d >= startOfDay
             case 'week': return d >= startOfWeek

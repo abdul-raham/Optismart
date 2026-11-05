@@ -31,6 +31,7 @@ interface DSASummary {
   orders_count: number
   delivered_orders: number
   pending_orders: number
+  stale_orders: number
   total_revenue: number
   total_commission: number
   commission_paid: number
@@ -69,6 +70,7 @@ export function AdminReports() {
   const [totalCameras, setTotalCameras] = useState(0)
   const [totalOrders, setTotalOrders] = useState(0)
   const [pendingOrders, setPendingOrders] = useState(0)
+  const [staleOrders, setStaleOrders] = useState(0)
   const [totalRevenue, setTotalRevenue] = useState(0)
   const [totalCommissions, setTotalCommissions] = useState(0)
   const [remittanceData, setRemittanceData] = useState<RemittanceRow[]>([])
@@ -127,18 +129,22 @@ export function AdminReports() {
     }
   }
 
+  // Lagos time (UTC+1, no daylight saving): a month or a custom range of whole days.
   const monthRange = () => {
     if (startDate || endDate) {
+      const next = (d: string) => { const t = new Date(`${d}T00:00:00+01:00`); t.setUTCDate(t.getUTCDate() + 1); return t.toISOString() }
       return {
-        start: startDate ? new Date(`${startDate}T00:00:00.000Z`).toISOString() : new Date('2020-01-01').toISOString(),
-        end: endDate ? new Date(`${endDate}T23:59:59.999Z`).toISOString() : new Date('2099-12-31').toISOString(),
+        start: startDate ? new Date(`${startDate}T00:00:00+01:00`).toISOString() : new Date('2020-01-01').toISOString(),
+        end: endDate ? next(endDate) : new Date('2099-12-31').toISOString(),
       }
     }
     if (!selectedMonth) return null
     const [year, month] = selectedMonth.split('-').map(Number)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const nextYear = month === 12 ? year + 1 : year, nextMonth = month === 12 ? 1 : month + 1
     return {
-      start: new Date(Date.UTC(year, month - 1, 1)).toISOString(),
-      end: new Date(Date.UTC(year, month, 1)).toISOString(),
+      start: new Date(`${year}-${pad(month)}-01T00:00:00+01:00`).toISOString(),
+      end: new Date(`${nextYear}-${pad(nextMonth)}-01T00:00:00+01:00`).toISOString(),
     }
   }
 
@@ -148,159 +154,36 @@ export function AdminReports() {
     if (data) setDsaList(data)
   }
 
+  // Sales count in the period they were DELIVERED (delivery date), orders in the period they were logged, and open
+  // orders whenever they were logged. Worked out in the database: no row limit, Lagos months.
   const fetchDsaSummaries = async () => {
-    // Fetch all orders with DSA info
-    let query = supabase
-      .from('orders')
-      .select(`
-        id, dsa_id, quantity, total_amount, status, created_at,
-        dsa:users!orders_dsa_id_fkey ( id, full_name, email )
-      `)
-
-    if (selectedDsa) query = query.eq('dsa_id', selectedDsa)
-    if (selectedStatus) query = query.eq('status', selectedStatus)
     const range = monthRange()
-    if (range) {
-      query = query.gte('created_at', range.start).lt('created_at', range.end)
-    }
-
-    const { data: orders, error: ordersError } = await query
-    if (ordersError) throw ordersError
-
-    let comms: any[] = []
-    try {
-      let commQuery = supabase.from('commissions').select('dsa_id, amount, status, triggered_at')
-      if (selectedDsa) commQuery = commQuery.eq('dsa_id', selectedDsa)
-      if (range) commQuery = commQuery.gte('triggered_at', range.start).lt('triggered_at', range.end)
-      const { data } = await commQuery
-      if (data) comms = data
-    } catch (_) {}
-
-    if (!orders) return
-
-    // Aggregate by DSA
-    const map: Record<string, DSASummary> = {}
-    let totalCam = 0, totalOrd = 0, pendOrd = 0, totalRev = 0
-
-    orders.forEach((o: any) => {
-      const dsaId = o.dsa_id || '_unregistered'
-      const dsaName = o.dsa?.full_name || 'Unregistered'
-      const dsaEmail = o.dsa?.email || '—'
-
-      if (!map[dsaId]) {
-        map[dsaId] = { dsa_id: dsaId, dsa_name: dsaName, dsa_email: dsaEmail, cameras_sold: 0, orders_count: 0, delivered_orders: 0, pending_orders: 0, total_revenue: 0, total_commission: 0, commission_paid: 0 }
-      }
-      map[dsaId].orders_count += 1
-      if (o.status === 'delivered') {
-        map[dsaId].cameras_sold += o.quantity || 0
-        map[dsaId].delivered_orders += 1
-        map[dsaId].total_revenue += o.total_amount || 0
-        totalRev += o.total_amount || 0
-        totalCam += o.quantity || 0
-      }
-      if (['pending', 'approved', 'processing', 'dispatched', 'rescheduled'].includes(o.status)) {
-        map[dsaId].pending_orders += 1
-        pendOrd += 1
-      }
-      totalOrd += 1
-    });
-
-    (comms || []).forEach((c: any) => {
-      const dsaId = c.dsa_id || '_unregistered'
-      if (map[dsaId]) {
-        map[dsaId].total_commission += c.amount || 0
-        if (c.status === 'paid') map[dsaId].commission_paid += c.amount || 0
-      }
-    })
-
-    const totalComm = (comms || []).reduce((s: number, c: any) => s + (c.amount || 0), 0)
-
-    setDsaSummaries(Object.values(map))
-    setTotalCameras(totalCam)
-    setTotalOrders(totalOrd)
-    setPendingOrders(pendOrd)
-    setTotalRevenue(totalRev)
-    setTotalCommissions(totalComm)
+    const { data, error } = await supabase.rpc('sales_report', { p_start: range?.start ?? null, p_end: range?.end ?? null, p_dsa: selectedDsa || null })
+    if (error) throw error
+    const rows = (data || []) as any[]
+    const summaries: DSASummary[] = rows.map(r => ({
+      dsa_id: r.dsa_id || '_unregistered', dsa_name: r.dsa_name, dsa_email: r.dsa_email,
+      cameras_sold: r.cameras_sold, orders_count: r.orders_logged, delivered_orders: r.delivered_orders,
+      pending_orders: r.open_orders, stale_orders: r.stale_open, total_revenue: Number(r.revenue) || 0,
+      total_commission: Number(r.commission) || 0, commission_paid: Number(r.commission_paid) || 0,
+    }))
+    setDsaSummaries(summaries)
+    setTotalCameras(summaries.reduce((n, d) => n + d.cameras_sold, 0))
+    setTotalOrders(summaries.reduce((n, d) => n + d.orders_count, 0))
+    setPendingOrders(summaries.reduce((n, d) => n + d.pending_orders, 0))
+    setStaleOrders(summaries.reduce((n, d) => n + d.stale_orders, 0))
+    setTotalRevenue(summaries.reduce((n, d) => n + d.total_revenue, 0))
+    setTotalCommissions(summaries.reduce((n, d) => n + d.total_commission, 0))
   }
 
+  // Month by month (Lagos): cameras/orders delivered that month, orders logged that month, commissions.
   const fetchMonthlyBreakdown = async () => {
-    let ordersQuery = supabase
-      .from('orders')
-      .select('dsa_id, quantity, total_amount, status, created_at, dsa:users!orders_dsa_id_fkey(full_name)')
-      .order('created_at', { ascending: true })
-
-    let commsQuery = supabase
-      .from('commissions')
-      .select('dsa_id, amount, triggered_at')
-
-    if (selectedDsa) {
-      ordersQuery = ordersQuery.eq('dsa_id', selectedDsa)
-      commsQuery = commsQuery.eq('dsa_id', selectedDsa)
-    }
-    if (selectedStatus) {
-      ordersQuery = ordersQuery.eq('status', selectedStatus)
-    }
-    const range = monthRange()
-    if (range) {
-      ordersQuery = ordersQuery.gte('created_at', range.start).lt('created_at', range.end)
-      commsQuery = commsQuery.gte('triggered_at', range.start).lt('triggered_at', range.end)
-    }
-
-    const { data: orders, error: ordersError } = await ordersQuery
-    if (ordersError) throw ordersError
-
-    let comms: any[] = []
-    try {
-      const { data } = await commsQuery
-      if (data) comms = data
-    } catch (_) {}
-
-    if (!orders) return
-
-    const monthMap: Record<string, MonthlyBreakdown> = {}
-    const dsaMonthSales: Record<string, Record<string, number>> = {}
-
-    orders.forEach((o: any) => {
-      const month = o.created_at?.slice(0, 7) || ''
-      if (!monthMap[month]) monthMap[month] = { month, cameras: 0, orders: 0, delivered_orders: 0, revenue: 0, commissions: 0, active_dsas: 0, top_dsa: '' }
-      
-      monthMap[month].orders += 1
-      if (o.status === 'delivered') {
-        monthMap[month].cameras += o.quantity || 0
-        monthMap[month].delivered_orders += 1
-        monthMap[month].revenue += o.total_amount || 0
-
-        const dsaName = o.dsa?.full_name || 'Unregistered'
-        if (!dsaMonthSales[month]) dsaMonthSales[month] = {}
-        if (!dsaMonthSales[month][dsaName]) dsaMonthSales[month][dsaName] = 0
-        dsaMonthSales[month][dsaName] += o.quantity || 0
-      }
-    });
-
-    (comms || []).forEach((c: any) => {
-      const month = c.triggered_at?.slice(0, 7) || ''
-      if (monthMap[month]) monthMap[month].commissions += c.amount || 0
-    })
-
-    Object.keys(monthMap).forEach(month => {
-      const dsasInMonth = dsaMonthSales[month] || {}
-      monthMap[month].active_dsas = Object.keys(dsasInMonth).length
-      
-      let topDsa = ''
-      let maxCam = 0
-      for (const [name, cams] of Object.entries(dsasInMonth)) {
-         if (cams > maxCam) {
-            maxCam = cams
-            topDsa = name
-         }
-      }
-      monthMap[month].top_dsa = topDsa ? `${topDsa} (${maxCam})` : '—'
-    })
-
-    const result = Object.values(monthMap)
-      .sort((a, b) => a.month.localeCompare(b.month))
-
-    setMonthlyData(monthlyView === 'alltime' ? result : result.slice(-12))
+    const { data, error } = await supabase.rpc('sales_by_month', { p_dsa: selectedDsa || null, p_months: monthlyView === 'alltime' ? 0 : 12 })
+    if (error) throw error
+    setMonthlyData(((data || []) as any[]).map(m => ({
+      month: m.month, cameras: m.cameras, orders: m.orders_logged, delivered_orders: m.delivered_orders,
+      revenue: Number(m.revenue) || 0, commissions: Number(m.commissions) || 0, active_dsas: m.active_dsas, top_dsa: m.top_dsa,
+    })))
   }
 
   const fetchRemittance = async () => {
@@ -428,9 +311,9 @@ export function AdminReports() {
 
 
   const statCards = [
-    { label: 'Total Cameras Sold', value: totalCameras.toLocaleString(), icon: Camera, color: 'from-blue-500 to-cyan-400' },
-    { label: 'Total Orders', value: totalOrders.toLocaleString(), icon: ShoppingBag, color: 'from-brand-500 to-violet-500' },
-    { label: 'Pending Orders', value: pendingOrders.toLocaleString(), icon: Clock, color: 'from-amber-500 to-orange-400' },
+    { label: 'Cameras Sold (delivered)', value: totalCameras.toLocaleString(), icon: Camera, color: 'from-blue-500 to-cyan-400' },
+    { label: 'Orders Logged', value: totalOrders.toLocaleString(), icon: ShoppingBag, color: 'from-brand-500 to-violet-500' },
+    { label: staleOrders ? `Open Orders · ${staleOrders} over 14 days` : 'Open Orders', value: pendingOrders.toLocaleString(), icon: Clock, color: 'from-amber-500 to-orange-400' },
     { label: 'Total Revenue', value: formatCompactAmount(totalRevenue), icon: TrendingUp, color: 'from-emerald-500 to-teal-400' },
     { label: 'Total Commissions', value: formatCompactAmount(totalCommissions), icon: Banknote, color: 'from-rose-500 to-pink-400' },
   ]
@@ -453,8 +336,8 @@ export function AdminReports() {
                 DSA: d.dsa_name,
                 Email: d.dsa_email,
                 'Cameras Sold': d.cameras_sold,
-                'Orders Count': d.orders_count,
-                'Pending Orders': d.pending_orders,
+                'Orders Logged': d.orders_count,
+                'Open Orders (not delivered)': d.pending_orders, 'Open Over 14 Days': d.stale_orders,
                 'Revenue (₦)': d.total_revenue,
                 'Commission (₦)': d.total_commission,
                 'Paid (₦)': d.commission_paid,
@@ -610,8 +493,8 @@ export function AdminReports() {
                   'Email': d.dsa_email,
                   'Delivered Cameras': d.cameras_sold,
                   'Delivered Orders': d.delivered_orders,
-                  'Pending Orders': d.pending_orders,
-                  'Total Originated Orders': d.orders_count,
+                  'Open Orders (not delivered)': d.pending_orders, 'Open Over 14 Days': d.stale_orders,
+                  'Orders Logged': d.orders_count,
                   'Delivered Revenue (₦)': d.total_revenue,
                   'Commission (₦)': d.total_commission,
                   'Paid (₦)': d.commission_paid,
@@ -627,8 +510,8 @@ export function AdminReports() {
                 DSA: d.dsa_name, Email: d.dsa_email,
                 'Delivered Cameras': d.cameras_sold,
                 'Delivered Orders': d.delivered_orders,
-                'Pending Orders': d.pending_orders,
-                'Total Originated': d.orders_count,
+                'Open Orders (not delivered)': d.pending_orders, 'Open Over 14 Days': d.stale_orders,
+                'Orders Logged': d.orders_count,
                 'Delivered Revenue (₦)': d.total_revenue,
                 'Commission (₦)': d.total_commission,
                 'Paid (₦)': d.commission_paid,
@@ -644,7 +527,7 @@ export function AdminReports() {
           <table className="w-full min-w-[860px] text-sm">
             <thead>
               <tr className="bg-surface-50 text-left">
-                {['DSA Name', 'Email', 'Delivered Cameras', 'Delivered Orders', 'Pending', 'Total Originated', 'Delivered Revenue', 'Commission', 'Paid'].map(h => (
+                {['DSA Name', 'Email', 'Cameras Delivered', 'Orders Delivered', 'Open (not delivered)', 'Orders Logged', 'Delivered Revenue', 'Commission', 'Paid'].map(h => (
                   <th key={h} className="px-4 py-3 text-xs font-bold text-surface-500 uppercase tracking-wider whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -669,6 +552,7 @@ export function AdminReports() {
                     <td className="px-4 py-3 font-bold text-emerald-700">{d.delivered_orders}</td>
                     <td className="px-4 py-3">
                       <span className={`font-bold ${d.pending_orders > 0 ? 'text-amber-600' : 'text-surface-400'}`}>{d.pending_orders}</span>
+                      {d.stale_orders > 0 && <span className="ml-1.5 rounded-full bg-red-50 px-1.5 py-0.5 text-[10px] font-bold text-red-600" title="Open for more than 14 days: probably delivered but never marked">{d.stale_orders} old</span>}
                     </td>
                     <td className="px-4 py-3 font-semibold text-surface-600">{d.orders_count}</td>
                     <td className="px-4 py-3 font-semibold">₦{d.total_revenue.toLocaleString()}</td>
@@ -746,7 +630,7 @@ export function AdminReports() {
           <table className="w-full min-w-[760px] text-sm">
             <thead>
               <tr className="bg-surface-50 text-left">
-                {['Month', 'Cameras Sold', 'Orders', 'Active DSAs', 'Top DSA', 'Revenue', 'Commissions'].map(h => (
+                {['Month', 'Cameras Delivered', 'Orders Logged', 'Active DSAs', 'Top DSA', 'Revenue', 'Commissions'].map(h => (
                   <th key={h} className="px-4 py-3 text-xs font-bold text-surface-500 uppercase tracking-wider">{h}</th>
                 ))}
               </tr>
