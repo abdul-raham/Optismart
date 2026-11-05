@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { MonthCloseBanner } from '@/components/shared/MonthCloseBanner'
 import { LeadMatchHint, LeadPicker } from '@/components/shared/LeadPicker'
 import { useSearchParams } from 'react-router-dom'
 import { createPortal } from 'react-dom'
@@ -605,6 +606,7 @@ export function AdminOrders() {
         agents={agents}
         job={viewOrder ? jobsByOrder.get(viewOrder.id) : undefined}
       />
+      <MonthCloseBanner admin />
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold tracking-tight text-surface-900">

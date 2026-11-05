@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { MonthCloseBanner } from '@/components/shared/MonthCloseBanner'
 import { useSearchParams } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { SdCardOption, sdCardsOf, mainProductsOf, SD_DEFAULT, type SdCardValue } from '@/components/shared/SdCardOption'
@@ -244,6 +245,7 @@ If this keeps happening, send this message to admin.`)
 
   return (
     <div className="space-y-6 relative">
+      <MonthCloseBanner />
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-surface-900 tracking-tight">Orders Management</h1>
